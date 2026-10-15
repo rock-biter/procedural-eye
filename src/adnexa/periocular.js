@@ -38,8 +38,10 @@ const SUPPORT_EASE = 2
 // by a smooth maximum this wide (mm), not the eye surface's limbal groove.
 const LIMBUS_BRIDGE = 0.8
 
-// How loosely the face passes through its landmarks (thinPlate()).
-const FACE_SMOOTHING = 40
+// How loosely the face passes through its landmarks, and through the points
+// the lids hand it, which it follows closely (thinPlate()).
+const FACE_SMOOTHING = 60
+const LID_SMOOTHING = 1
 
 // Polynomial smooth maximum (iq), as in common.glsl.
 export function smoothMax(a, b, k) {
@@ -195,8 +197,8 @@ export function faceLandmarks(lids) {
 }
 
 // Thin-plate spline near the landmarks (z = Σ wᵢ φ(|p − pᵢ|) + a + b·x + c·y,
-// φ(r) = r² log r): the smoothest surface that passes close to them, within
-// a fraction of a millimeter (`smoothing` relaxes the interpolation).
+// φ(r) = r² log r): the smoothest surface that passes close to them. A point's
+// fourth value (else `smoothing`) relaxes the interpolation at it.
 export function thinPlate(points, smoothing = 0) {
 	const n = points.length
 	const size = n + 3
@@ -207,7 +209,7 @@ export function thinPlate(points, smoothing = 0) {
 		for (let j = 0; j < n; j++) {
 			matrix[i][j] = phi(Math.hypot(points[i][0] - points[j][0], points[i][1] - points[j][1]))
 		}
-		matrix[i][i] += smoothing
+		matrix[i][i] += points[i][3] ?? smoothing
 		matrix[i][n] = matrix[n][i] = 1
 		matrix[i][n + 1] = matrix[n + 1][i] = points[i][0]
 		matrix[i][n + 2] = matrix[n + 2][i] = points[i][1]
@@ -247,7 +249,7 @@ export function thinPlate(points, smoothing = 0) {
 export function createFace(eye, lids, through = []) {
 	const points = [
 		...faceLandmarks(lids),
-		...through.map(([x, y, z]) => [eye.nasalSign * x, y, z - eye.apexZ]),
+		...through.map(([x, y, z]) => [eye.nasalSign * x, y, z - eye.apexZ, LID_SMOOTHING]),
 	]
 	const depth = thinPlate(points, FACE_SMOOTHING)
 	return (x, y) => eye.apexZ + depth(eye.nasalSign * x, y)

@@ -15,6 +15,11 @@ import { PARAM_SCHEMA } from '../src/params/paramSchema'
 
 const params = createDefaults(PARAM_SCHEMA)
 const eye = createEyeGeometry(params)
+// The eye of each side: its nose side matches the fissure's.
+const eyes = {
+	1: eye,
+	[-1]: createEyeGeometry({ ...params, eye: { ...params.eye, laterality: 'left' } }),
+}
 const close = (a, b, tolerance, label) =>
 	assert.ok(Math.abs(a - b) < tolerance, `${label ?? ''} ${a} vs ${b}`)
 const DEG = Math.PI / 180
@@ -136,7 +141,7 @@ test('the lids do not fold or collapse in view', () => {
 		},
 	]
 	for (const { label, side, lids } of shapes) {
-		const mesh = createLidMesh(lids, eye, side, { around, across })
+		const mesh = createLidMesh(lids, eyes[side], side, { around, across })
 		const point = (i, j) => {
 			const k = (((i % around) + around) % around) * across + j
 			return Array.from(mesh.positions.subarray(k * 3, k * 3 + 3))
@@ -190,7 +195,7 @@ test('the skin turns into the face without creases', () => {
 	const around = 560
 	const across = 150
 	for (const side of [1, -1]) {
-		const mesh = createLidMesh(params.lids, eye, side, { around, across })
+		const mesh = createLidMesh(params.lids, eyes[side], side, { around, across })
 		const at = (i, j) => {
 			const k = (((i % around) + around) % around) * across + j
 			return mesh.positions.subarray(k * 3, k * 3 + 3)

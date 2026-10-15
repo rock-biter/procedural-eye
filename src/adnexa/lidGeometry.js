@@ -33,6 +33,7 @@ import {
 	smoothMax,
 	supportAt,
 	supportLift,
+	supportZ,
 } from './periocular'
 
 // Profile partition: s in [0, WALL) the intermarginal strip, [WALL, EDGE) the
@@ -60,13 +61,16 @@ const RADIAL = { start: 2, end: 16 }
 const SLIDE = 12
 // The lateral overlap: the upper lid laps over the lower one along a fold
 // running out of the lateral canthus, this much below the chord (radians).
-const LATERAL_FOLD = { slant: 0.35, length: 4.5, width: 0.8 }
+const LATERAL_FOLD = { slant: 0.35, length: 4.5, width: 1.2 }
 // How much further from the margin (mm) the upper lid's fold lies when the lid
 // is closed: open, the skin above the crease folds down over it (the pretarsal
 // show, 2–3.5 mm, Price 2009); closed, the crease is 6–7.5 mm above the margin.
 const CREASE_UNFOLD = 4
 // Points of the lids' shell the face passes through, around the fissure.
 const FACE_RING = 32
+// Over how many millimeters past the margin's edge the margin's sideways
+// shift off the support fades out (shellPoint()).
+const SHIFT_FADE = 6
 // The lower margin is thinner than the upper one (the intermarginal strip
 // 1.0 against 1.36 mm, Zhu 2022).
 const LOWER_MARGIN = 0.8
@@ -285,7 +289,7 @@ function columnProfile(context, column) {
 	const band = share * (crease + 1) + (1 - share) * 7
 	// Where the face meets the lid (lidContext()): above the fold, below the
 	// pretarsal roll, closer to the margin toward the canthi.
-	const ring = (share * (crease + 2.5) + (1 - share) * 6) * (0.5 + 0.5 * volume)
+	const ring = (share * (crease + 2.2) + (1 - share) * 3.5) * (0.5 + 0.5 * volume)
 	// How far the closing margin has slid from the open one.
 	const [ox, oy] = open.loop(t)
 	const [cx, cy] = fissure.loop(t)
@@ -394,17 +398,24 @@ function lateralFold(lids, fissure, x, y) {
 function shellPoint(context, profile, trace, a) {
 	const { lids, eye, fissure } = context
 	const { point: q, direction } = alongTrace(trace, a, profile)
-	const support = supportAt(eye, lids, fissure, q[0], q[1])
-	const normal = thicknessDirection(support.normal)
 	const rise = smootherstep(profile.radius, 2.5 + 2 * (1 - profile.volume), a)
 	const b = profile.thickness + (profile.lidThickness - profile.thickness) * rise
-	return {
-		position: vec3.madd(support.point, normal, b),
-		support: support.point,
-		normal,
-		q,
-		direction,
-	}
+	// The margin stands off the support along its normal; away from it that
+	// sideways shift fades out over SHIFT_FADE mm and the thickness is taken
+	// upright. Shifting every row along its own normal would pull rows back
+	// where the support bends (from the globe to the canthi) and crease the
+	// skin there.
+	const fade = 1 - smootherstep(profile.radius, profile.radius + SHIFT_FADE, a)
+	const n = profile.marginNormal
+	const x = q[0] + n[0] * profile.thickness * fade
+	const y = q[1] + n[1] * profile.thickness * fade
+	const support = supportAt(eye, lids, fissure, x, y)
+	const normal = thicknessDirection(support.normal)
+	const upright = [x, y, support.point[2] + b / normal[2]]
+	// From the margin's edge, which stands along the margin's normal, into it.
+	const offset = vec3.madd([q[0], q[1], supportZ(eye, lids, fissure, q[0], q[1])], n, b)
+	const into = smootherstep(profile.radius, profile.radius + 3, a)
+	return { position: vec3.lerp(offset, upright, into), normal, q, direction }
 }
 
 // The skin point of a column at distance `a` from the margin: the lid's shell
@@ -415,7 +426,7 @@ function skinPoint(context, profile, trace, a) {
 	const { lids, open, face } = context
 	const shell = shellPoint(context, profile, trace, a)
 	const [x, y, z] = shell.position
-	const toFace = smootherstep(1.5, profile.ring + 4, a)
+	const toFace = smootherstep(1.5, profile.ring + 2, a)
 	const position = [x, y, z + (face(x, y) - z) * toFace]
 	const upper = profile.share * profile.canthi
 	const creaseGroove = -lids.creaseDepth * bell(a - profile.crease, 0.9) * upper
@@ -440,7 +451,13 @@ function skinPoint(context, profile, trace, a) {
 
 // Everything a column's points need.
 function columnAt(context, column) {
-	return { column, profile: columnProfile(context, column), trace: traceColumn(context, column) }
+	const { lids, eye, fissure } = context
+	const profile = columnProfile(context, column)
+	const trace = traceColumn(context, column)
+	// The direction the margin stands off the support in.
+	const [mx, my] = alongTrace(trace, 0, profile).point
+	profile.marginNormal = thicknessDirection(supportAt(eye, lids, fissure, mx, my).normal)
+	return { column, profile, trace }
 }
 
 // World position of profile coordinate s on a column, the distance `a` from
@@ -454,7 +471,7 @@ function pointOn(context, data, s) {
 		const { point: q, direction } = alongTrace(trace, a, profile)
 		const support = supportAt(eye, lids, fissure, q[0], q[1])
 		return {
-			position: vec3.madd(support.point, thicknessDirection(support.normal), b),
+			position: vec3.madd(support.point, profile.marginNormal, b),
 			a,
 			direction: a > 0 ? direction : column.direction,
 			fold: 0,

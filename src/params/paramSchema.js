@@ -214,12 +214,12 @@ export const PARAM_SCHEMA = {
 		marginThickness: num(2, 1.2, 3, 0.05, 'mm', 'rebuild', 'margin thickness'),
 		marginRadius: num(0.7, 0.2, 1.2, 0.01, 'mm', 'rebuild', 'margin edge radius'),
 		lidThickness: num(2.6, 1.5, 6, 0.05, 'mm', 'rebuild', 'upper lid thickness'),
-		lowerThickness: num(3, 1.5, 6, 0.05, 'mm', 'rebuild', 'lower lid thickness'),
+		lowerThickness: num(2.2, 1.5, 6, 0.05, 'mm', 'rebuild', 'lower lid thickness'),
 		creaseHeight: num(3, 1, 8, 0.1, 'mm', 'rebuild', 'upper lid show (margin to fold)'),
 		creaseDepth: num(1.1, 0, 1.5, 0.05, 'mm', 'rebuild', 'upper crease depth'),
 		creaseFold: num(0.9, 0, 1.5, 0.05, 'mm', 'rebuild', 'skin fold over the crease'),
-		lowerRoll: num(0.3, 0, 1, 0.05, 'mm', 'rebuild', 'lower pretarsal roll'),
-		lateralOverlap: num(0.5, 0, 1.2, 0.01, 'mm', 'rebuild', 'lateral overlap'),
+		lowerRoll: num(0.2, 0, 1, 0.05, 'mm', 'rebuild', 'lower pretarsal roll'),
+		lateralOverlap: num(0.35, 0, 1.2, 0.01, 'mm', 'rebuild', 'lateral overlap'),
 		// Depths behind the corneal apex and the face around the orbit
 		// (src/adnexa/periocular.js).
 		medialDepth: num(4.5, 1, 8, 0.1, 'mm', 'rebuild', 'medial canthus behind apex'),

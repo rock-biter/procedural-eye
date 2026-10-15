@@ -29,7 +29,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 | --- | --- |
 | Support (`supportZ()`, `supportAt()`) | What the posterior margins rest on. It merges (smooth maximum over 4 mm) two surfaces: the globe, and a surface through the canthi at `lids.medialDepth` and `lids.lateralDepth`, receding above and below the chord.<br>The globe term includes the cornea, its limbal sulcus bridged by a 0.8 mm smooth maximum; past 0.88 of the sclera radius it is continued by a slope that eases off over 2 mm.<br>Toward the canthi the lids therefore pass in front of the receding globe.<br>Its normal is the sphere's over the globe and the support's elsewhere, averaged over 3 mm. |
 | Conjunctiva (`conjunctivaZ()`) | What lies behind the margins:<br>- the globe, which past 0.96 of its radius turns back into the fornix (over 1.6 mm laterally, 0.9 mm medially);<br>- the caruncle, an elliptic mound about 3.4 × 4.8 mm, centered 1.8 mm from the medial canthus, just behind the margins;<br>- the plica semilunaris, a crescent fold 0.35 mm high about 4 mm from the canthus. |
-| Face (`createFace()`) | A smoothed thin-plate spline. It passes through a ring of 32 points of the open lids' shell, so the lids flow into it. Its anatomical landmarks are:<br>- the brow (`browHeight`, `browProjection`) and the forehead;<br>- the glabella, the nasion and the nasal dorsum (`noseDistance`, `noseProjection`), and the nasal sidewall;<br>- a recess beside the medial canthus;<br>- the lateral orbital rim (`rimDepth`) and the temple;<br>- the infraorbital rim and the cheek (`cheekProjection`). |
+| Face (`createFace()`) | A thin-plate spline. It follows closely a ring of 32 points of the open lids' shell, so the lids flow into it, and passes loosely through its anatomical landmarks, so it stays smooth. The landmarks are:<br>- the brow (`browHeight`, `browProjection`) and the forehead;<br>- the glabella, the nasion and the nasal dorsum (`noseDistance`, `noseProjection`), and the nasal sidewall;<br>- a recess beside the medial canthus;<br>- the lateral orbital rim (`rimDepth`) and the temple;<br>- the infraorbital rim and the cheek (`cheekProjection`). |
 
 ## Lid Mesh
 
@@ -51,10 +51,11 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 | [0.14, 1] | Skin | The lid's shell, turning into the face. |
 
 - **Shell**:
-  - It stands off the support along the support's normal, tilted at most 35° from the front.
+  - The margin stands off the support along the support's normal at the margin, tilted at most 35° from the front.
+  - Past the margin's edge that sideways shift fades out over 6 mm, and the thickness is taken upright, blended in over 3 mm. Shifting every row along its own normal would pull rows back where the support bends from the globe to the canthi, and crease the skin there.
   - Its thickness grows from the margin's at the edge to `lidThickness` (upper) or `lowerThickness` (lower) within 2.5 mm.
   - Toward each canthus the thickness tapers over a third of the margin. A faster taper would part neighboring columns into creases.
-- **Into the face**: away from the margin the skin turns into the face. The turn ends 4 mm past the ring the face passes through, which lies above the fold, below the pretarsal roll, and nearer the margin toward the canthi. Lid and face meet on that ring, so there is no seam.
+- **Into the face**: away from the margin the skin turns into the face. The turn ends 2 mm past the ring the face follows. The ring lies before the globe curves away under the lid: about 2 mm above the fold, 3.5 mm below the lower margin, and nearer the margin toward the canthi. Lid and face meet on that ring, so there is no seam, and the lids do not fall back with the globe into a bag.
 - **Over it**:
   - The upper lid's crease, `creaseDepth` deep at `creaseHeight` from the margin, lower toward the canthi. This is the pretarsal show: with the eye open, the skin above folds down over the crease, here as a fold of `creaseFold`.
   - The lower lid's pretarsal roll (`lowerRoll`), fullest in the middle.
