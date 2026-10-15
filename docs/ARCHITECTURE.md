@@ -36,6 +36,7 @@
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, lash, meniscus and bubble meshes with their materials. |
+| [`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js) | The skin's pigment patterns baked on the GPU over the lid mesh at rest. |
 | [`src/sclera/vesselGenerator.js`](../src/sclera/vesselGenerator.js) * | Seeded episcleral and conjunctival vessel network. |
 | [`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) | The network rasterized into the polar vessel map, when its parameters or the globe change. |
 | **Animation** ([`docs/ANIMATION.md`](ANIMATION.md)) | |
@@ -54,7 +55,7 @@
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
 | [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: render pass, accumulation, depth of field, effects. |
 | [`src/render/accumulationPass.js`](../src/render/accumulationPass.js) | Progressive mean of still frames in a float history. |
-| [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution gather). |
+| [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare and gather), composited over the accumulated mean. |
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
@@ -71,7 +72,7 @@
      - the eye geometry (`createEyeGeometry()`);
      - the entrance-pupil depth the camera aims at;
      - the rig transform and the eyeball mesh;
-     - the lid mesh and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
+     - the lid mesh, its skin patterns (baked on the GPU) and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
      - the lashes and the tear film.
 
      A rebuild always bakes too.

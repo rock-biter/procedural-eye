@@ -88,7 +88,7 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 
 - **Camera**: an orthographic camera at the light looks at a point 4 mm behind the apex.
 - **Casters**: objects on `SHADOW_LAYER` (1), drawn with the lid follow applied.
-- **Map**: a 2048² float depth map covering ±40 mm, the whole skin patch. The lookup fades out toward its border, so a receiver past it shows no edge.
+- **Map**: a float depth map covering ±40 mm, the whole skin patch: 2048² for accumulation samples, 1024² for interactive frames, whose filters are wider than its texels and whose taps then stay in the texture cache. The lookup fades out toward its border, so a receiver past it shows no edge.
 - **Filtering** (`key-shadow.glsl`):
   - Accumulation samples move the light to a point on the emitter's area (`sample.light`) and compare hard. The mean of the samples is the true penumbra.
   - Interactive frames filter. The eye's receivers, shadowed by the lids and lashes close by, use a Poisson filter over about 0.35 mm.

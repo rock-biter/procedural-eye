@@ -84,7 +84,7 @@ The same bake with `PIGMENT_PASS` writes the pigment atlas, with the same layout
 - **Stroma**: the slab between the back paraboloid (pigment epithelium) and the uncarved surface, carved by the crypt cavities.
   - Their walls widen below the surface by `crypts.undercut`, so the openings overhang.
   - The height field is turned into a distance with a Lipschitz factor of 0.6.
-- **Fibers**: three families by polar domain repetition. Each evaluates its own cell and both neighbors; hashing is PCG per cell.
+- **Fibers**: three families by polar domain repetition. Each evaluates its own cell and its neighbor on the near side; the far neighbor only when one of its fibers could come closer than the best so far (its center lies at least 0.75 − waviness cells away, and the slant of the sweep and the wave shortens that lateral gap at most by a factor computed per family), so the distance is unchanged. Hashing is PCG per cell.
   - **Radial vessels**: `radialCount` tubes of radius `radialThickness` (×0.65–1.35). They wave by `radialWaviness` cells (1.5–5 waves across the width) at `radialHeight` of the uncarved surface (±5%), over a seeded stretch of ρ, on `radialCoverage` of the cells.
   - **Collagen arcs**: `arcCount` tubes each way, of radius `arcThickness`, sweeping `arcSpan` from root to margin (Rohen, Wyatt) at `arcHeight`.
     - The counter-clockwise family sweeps 0.85 as far, slightly deeper.
@@ -92,7 +92,7 @@ The same bake with `PIGMENT_PASS` writes the pigment atlas, with the same layout
   - Heights are shares of the *uncarved* surface, so where a crypt removes the stroma, the fibers bridge over it.
   - A vertical bound skips the cells when the point is far from the family's band.
 - **Pupillary ruff**: a crenated rim of the pigment epithelium on the margin (`ruff.width`, `ruff.crenations`), evaluated only near the margin.
-- **Micro striations**: `micro.amplitude` at `micro.frequency` around, faded out by the ray-footprint LOD.
+- **Micro striations**: `micro.amplitude` at `micro.frequency` around, faded out by the ray-footprint LOD. Fresh interactive frames also leave them out where the depth of field's gather will blur them away: the trace estimates, at every step, the blur radius of the point from its apparent (paraxial) distance against the focus distance (`uDefocus`, as the gather computes it), and the striations fade once it passes both two of their widths and the 2.5 px from which the gather shows in full. In the default oblique framing most of the iris lies outside the millimeter of macro depth of field; the accumulated samples always draw them.
 
 ## Tracing
 

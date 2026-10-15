@@ -1,6 +1,6 @@
 // The eyelids: the ring mesh of src/adnexa/lidGeometry.js around the
 // fissure, in world space (it does not turn with the gaze), with the skin
-// program.
+// program and its baked pigment patterns (src/adnexa/skinPattern.js).
 import {
 	BufferAttribute,
 	BufferGeometry,
@@ -19,10 +19,12 @@ import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
 import { createConjunctivaMesh, createLidMesh, LID_PROFILE } from './lidGeometry'
 import { bakeLidOcclusion } from './lidOcclusion'
+import SkinPattern from './skinPattern'
 
 export default class Lids {
 	// `shadowUniforms`: the key light's shadow map (src/lighting/keyShadow.js).
 	constructor(envUniforms, shadowUniforms, debugView) {
+		this.pattern = new SkinPattern()
 		this.uniforms = {
 			uZero: new Uniform(0),
 			uSkinColor: new Uniform(new Color()),
@@ -34,6 +36,8 @@ export default class Lids {
 			uPixelAngle: new Uniform(0.001),
 			uDefocus: new Uniform(new Vector2(0, 1)),
 			uOcclusion: new Uniform(1),
+			uSkinPattern: new Uniform(this.pattern.texture),
+			uSkinPatternBox: new Uniform(this.pattern.box),
 			...envUniforms,
 			...shadowUniforms,
 		}
@@ -51,7 +55,8 @@ export default class Lids {
 		this.fissure = null
 	}
 
-	rebuild(params, eye) {
+	// `renderer` bakes the skin patterns over the new mesh.
+	rebuild(params, eye, renderer) {
 		const data = createLidMesh(params.lids, eye, eye.nasalSign)
 		// The conjunctiva fills the canthi beyond the globe's outline (same program).
 		const fornix = createConjunctivaMesh(params.lids, eye, eye.nasalSign)
@@ -87,8 +92,16 @@ export default class Lids {
 		)
 		geometry.computeVertexNormals()
 		geometry.computeBoundingSphere()
+		geometry.computeBoundingBox()
 		this.mesh.geometry.dispose()
 		this.mesh.geometry = geometry
+		// The patterns cover the mesh at rest, with a texel or so to spare.
+		const { min, max } = geometry.boundingBox
+		this.pattern.bake(
+			renderer,
+			{ min: [min.x - 0.1, min.y - 0.1], max: [max.x + 0.1, max.y + 0.1] },
+			params.lids.seed,
+		)
 		this.fissure = data.fissure
 		const { medial, lateral, lengths } = data.fissure
 		this.uniforms.uCanthi.value.set(medial[0], medial[1], lateral[0], lateral[1])
@@ -120,5 +133,6 @@ export default class Lids {
 	dispose() {
 		this.mesh.geometry.dispose()
 		this.material.dispose()
+		this.pattern.dispose()
 	}
 }

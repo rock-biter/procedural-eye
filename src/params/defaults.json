@@ -199,7 +199,7 @@
     "shine": 0.5
   },
   "skin": {
-    "color": "#d39b7c",
+    "color": "#b88264",
     "redness": 0.45,
     "roughness": 0.42,
     "wetness": 0.5,
@@ -210,7 +210,7 @@
     "veins": 0.4,
     "pigmentation": 0.4,
     "occlusion": 1,
-    "backdrop": 0.55
+    "backdrop": 1.09
   },
   "sclera": {
     "color": "#e7ddd2",
@@ -304,7 +304,7 @@
     "focalLength": 110,
     "fNumber": 8,
     "sensorHeight": 24,
-    "distance": 185,
+    "distance": 204,
     "azimuth": -55.7,
     "elevation": -19.6,
     "targetX": 0,

@@ -88,6 +88,8 @@ export default class Lashes {
 		this.material.name = 'Lashes'
 		this.mesh = new Mesh(new BufferGeometry(), this.material)
 		this.mesh.name = 'Lashes'
+		// Drawn first: the skin and the eye behind them are not shaded.
+		this.mesh.renderOrder = -1
 		// Casters of the key light's shadow.
 		this.mesh.layers.enable(SHADOW_LAYER)
 		this.lashes = []

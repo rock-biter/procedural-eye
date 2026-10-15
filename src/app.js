@@ -204,7 +204,7 @@ export default class EyeApp {
 		const lidKey = JSON.stringify([this.params.lids, this.eye])
 		if (lidKey !== this.lidKey) {
 			this.lidKey = lidKey
-			this.lids.rebuild(this.params, this.eye)
+			this.lids.rebuild(this.params, this.eye, this.setup.renderer)
 			const distances = bakeFissureMap(this.params.lids, this.eye.nasalSign)
 			const data = this.fissureMap.image.data
 			for (let i = 0; i < distances.length; i++) data[i] = DataUtils.toHalfFloat(distances[i])

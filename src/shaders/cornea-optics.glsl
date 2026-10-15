@@ -85,6 +85,13 @@ float intersectParaboloid(vec3 o, vec3 d, float z0, float c) {
 	return -1.0;
 }
 
+// How far behind the anterior cornea a point `inside` mm behind it along the
+// line of sight appears: its paraxial image through one refracting surface.
+float apparentDepth(float inside) {
+	float s = max(inside, 1e-3);
+	return 1.0 / (uIor.z / s - (uIor.z - 1.0) / uCornea.x);
+}
+
 // Refraction through both corneal surfaces from the outer point `p` (normal
 // `n`, incident `d`). Returns false when the ray misses the posterior surface
 // (it enters the limbus) or is totally reflected; otherwise the posterior

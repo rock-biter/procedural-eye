@@ -63,12 +63,15 @@ To check an arbitrary framing, pass a state string: `--query state=$(node -e "pr
 
 ## Performance
 
-- **Interactive frames** set the budget: the iris march dominates. The adaptive pixel ratio (down to `quality.minPixelRatio`) and the cheaper interactive tier keep the eye responsive. Photo mode renders one full-quality sample per frame.
+- **Interactive frames** set the budget. The adaptive pixel ratio (down to `quality.minPixelRatio`) and the cheaper interactive tier keep the eye responsive. Photo mode renders one full-quality sample per frame.
+- **Budget** (default preset, 2560×1400, Apple M1, October 2026): about 59 ms per interactive frame and 58 ms per accumulation sample. The cornea and iris take about half (the field's evaluations near the surface: the end of the march, the normal, the occlusion and the soft shadow, with the fibers the largest part), the skin about a fifth, the post-processing about a sixth. A frontal close-up whose iris fills the frame (`blue-crypts`) takes about 136 ms.
 - **Measurement**:
   - Use `--bench` or `window.__EYE__.measureSync()` to compare builds on the same machine, at the same size and DPR.
-  - `measure()` reads GPU timer queries where available (`EXT_disjoint_timer_query_webgl2`, Chrome only). They are about 2× inflated on ANGLE-Metal.
+  - Close every other page that renders WebGL (a tab with the app in `pnpm dev`): it shares the GPU and makes timings swing by a third. Render a few frames between synchronous reads and keep the fastest batch; alternate the builds under comparison.
+  - `measure()` reads GPU timer queries where available (`EXT_disjoint_timer_query_webgl2`, Chrome only). On ANGLE-Metal they are inflated and cumulative: a query around one draw reports the time from the start of the command buffer, so successive draws' differences give their costs.
 
 ## Known Limitations
 
 - **Timing**: frame timings in headless captures are not representative (no vsync, frame rate limit off). Wall-clock measurements swing widely on a loaded machine; repeat them and compare medians.
+- **One-sample captures**: `start()` renders a frame before `compileAsync()` and restarts the accumulation after it, so during the compile `--samples 1` already reads as converged and can capture that first frame, before the eye takes its pose. Wait for `getCompileMs()` to be set, or capture two samples or more.
 - **Safari**: the scene targets Chrome and Safari on Apple Silicon. The capture script runs Chrome only, so Safari needs a manual check.

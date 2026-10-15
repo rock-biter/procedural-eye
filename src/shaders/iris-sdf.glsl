@@ -23,9 +23,21 @@ uniform vec4 uFiberArc; // count each way, radius (mm), sweep root→margin (rad
 uniform vec4 uFiberMisc; // radial coverage, arc coverage, fusion (mm), crypt undercut (mm)
 uniform vec4 uRuff; // width (mm), crenations, micro amplitude (mm), micro striations around
 uniform uint uIrisSeed;
+// How many striation widths the depth of field's blur radius must reach before
+// the micro striations are left out: interactive frames skip what the gather
+// averages out anyway; accumulation samples never do (src/eye/eyeball.js).
+uniform float uIrisMicroBlur;
 
-// Mip level of the atlas lookups, set by the trace from the ray footprint.
+// The interactive depth of field shows its gather in full from this blur
+// radius (pixels) on (dof-composite-fragment.glsl).
+#define IRIS_GATHERED_BLUR 2.5
+
+// The ray footprint (mm), the mip level of the atlas lookups there, and the
+// radius (mm) over which the depth of field spreads that point, set by the
+// trace (iris-trace.glsl).
+float gIrisFootprint = 0.0;
 float gIrisLod = 0.0;
+float gIrisBlur = 0.0;
 
 #define IRIS_MARGIN_ROUNDING 0.1
 // Heightfield to distance: the surface slopes stay below about 1.3.
@@ -56,10 +68,20 @@ float fiberFamily(float theta, float rho, float r0, float h0, float top, float c
 	float cell = TAU / count;
 	float phi = sweep * (1.0 - rho);
 	int n = int(count + 0.5);
-	int k0 = int(floor((theta - phi) / cell));
+	float x = (theta - phi) / cell;
+	int k0 = int(floor(x));
+	// The point's cell, its neighbor on the near side, and the far neighbor
+	// only when one of its fibers could come closer than the best so far: its
+	// center lies at least 0.75 − waviness cells away (jitter ±0.25 cell, wave
+	// up to ±waviness), and the slant of the sweep and the wave shortens that
+	// lateral gap at most by the factor below.
+	int side = x - float(k0) < 0.5 ? -1 : 1;
+	float slant = (abs(sweep) + waviness * cell * TAU * 5.0) / width;
+	float farGap = r0 * (0.75 - waviness) * cell * inversesqrt(1.0 + sq(r0 * slant)) - radius * 1.35;
 	float best = 1e3;
-	for (int j = -1; j <= 1; j++) {
-		int k = wrapIndex(k0 + j, n);
+	for (int j = ZERO; j < 3; j++) {
+		if (j == 2 && farGap >= best) break;
+		int k = wrapIndex(k0 + (j == 0 ? 0 : j == 1 ? side : -side), n);
 		uint hash = pcgHash(uint(k) * 2654435761u + seed);
 		vec4 a = hashBytes(hash);
 		if (a.x > coverage) continue;
@@ -125,11 +147,19 @@ IrisParts irisParts(vec3 p) {
 	float arcsCw = fiberFamily(theta, rho, m.r0, h0, top, uFiberArc.x, uFiberArc.y, 0.32, uFiberArc.w, uFiberArc.z, uFiberMisc.y, uIrisSeed + 202u);
 	float arcsCcw = fiberFamily(theta, rho, m.r0, h0, top, uFiberArc.x, uFiberArc.y, 0.32, uFiberArc.w - 0.08, -uFiberArc.z * 0.85, uFiberMisc.y, uIrisSeed + 303u);
 
-	// Fine radial striations on the surface, only where a pixel resolves them.
+	// Fine radial striations on the surface, only where a pixel resolves them
+	// (they fade with the atlas level) and the depth of field does not blur
+	// them away: over uIrisMicroBlur of their widths, once the gather shows.
 	float micro = 0.0;
 	if (uRuff.z > 0.0 && gIrisLod < 1.5 && abs(slab) < 0.05) {
 		int around = int(uRuff.w);
-		micro = uRuff.z * (1.0 - gIrisLod / 1.5) * periodicNoise(vec2(theta * (1.0 / TAU) * float(around), rho * 40.0), around, uIrisSeed + 404u);
+		float striation = TAU * r / float(around);
+		float hidden = gIrisBlur / max(uIrisMicroBlur * striation, IRIS_GATHERED_BLUR * gIrisFootprint);
+		float resolved = 1.0 - smoothstep(1.0, 2.0, hidden);
+		if (resolved > 0.0) {
+			micro = uRuff.z * resolved * (1.0 - gIrisLod / 1.5) *
+				periodicNoise(vec2(theta * (1.0 / TAU) * float(around), rho * 40.0), around, uIrisSeed + 404u);
+		}
 	}
 
 	// The pupil cuts the stroma and the fibers (rounded margin), not the ruff.
