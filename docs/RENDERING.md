@@ -82,6 +82,7 @@ The accumulation history keeps the alpha for the depth of field. The effects rec
 | **Skin, lashes, tear film** | |
 | `uSkinColor`, `uSkin`, `uSkin2`, `uSkin3`, `uPixelAngle` | Skin color; (redness, roughness, wetness, pores); (wrinkles, translucency, lid profile ends); (freckles, veins, pigmentation, `lids.seed`). |
 | `uCanthi`, `uMarginLength`, `uDefocus` | The medial and lateral canthi in the front plane at rest; the upper and lower margin lengths; the camera's aperture diameter and focus distance, which widen the footprint of the skin's fine relief by the blur circle ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). |
+| `uOcclusion` | How strongly the skin applies its baked ambient occlusion (the `ao` attribute, [`docs/ADNEXA.md`](ADNEXA.md#baked-occlusion)). |
 | `uLashColor`, `uLashShine` | Lash fiber color and cuticle shine. |
 | `uTearTint` | What the water shows of what lies behind. |
 

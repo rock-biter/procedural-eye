@@ -18,6 +18,7 @@ import { SHADOW_LAYER } from '../lighting/keyShadow'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
 import { createConjunctivaMesh, createLidMesh, LID_PROFILE } from './lidGeometry'
+import { bakeLidOcclusion } from './lidOcclusion'
 
 export default class Lids {
 	// `shadowUniforms`: the key light's shadow map (src/lighting/keyShadow.js).
@@ -32,6 +33,7 @@ export default class Lids {
 			uMarginLength: new Uniform(new Vector2(28, 28)),
 			uPixelAngle: new Uniform(0.001),
 			uDefocus: new Uniform(new Vector2(0, 1)),
+			uOcclusion: new Uniform(1),
 			...envUniforms,
 			...shadowUniforms,
 		}
@@ -68,6 +70,12 @@ export default class Lids {
 		geometry.setAttribute('lid', new BufferAttribute(join(data.lid, fornix.lid), 4))
 		geometry.setAttribute('relief', new BufferAttribute(join(data.relief, fornix.relief), 4))
 		geometry.setAttribute('follow', new BufferAttribute(join(data.follow, fornix.follow), 2))
+		// Ambient occlusion, baked at rest over the lid band and the conjunctiva.
+		const [lidOcclusion, fornixOcclusion] = bakeLidOcclusion(
+			[{ ...data, bakes: (v) => data.lid[v * 4 + 2] < 10 }, fornix],
+			eye,
+		)
+		geometry.setAttribute('ao', new BufferAttribute(join(lidOcclusion, fornixOcclusion), 1))
 		geometry.setIndex(
 			new BufferAttribute(
 				join(
@@ -106,6 +114,7 @@ export default class Lids {
 		u.uSkin.value.set(skin.redness, skin.roughness, skin.wetness, skin.pores)
 		u.uSkin2.value.set(skin.wrinkles, skin.translucency, LID_PROFILE.wall, LID_PROFILE.edge)
 		u.uSkin3.value.set(skin.freckles, skin.veins, skin.pigmentation, params.lids.seed)
+		u.uOcclusion.value = skin.occlusion
 	}
 
 	dispose() {

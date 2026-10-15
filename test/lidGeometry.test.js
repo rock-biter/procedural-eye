@@ -326,6 +326,42 @@ test('the meniscus lies on the eye along the margins, tapering at the canthi', (
 	}
 })
 
+test('baked occlusion: open on the face, dark in the canthi and under the margins', async () => {
+	const { bakeLidOcclusion } = await import('../src/adnexa/lidOcclusion')
+	const lids = createLidMesh(params.lids, eye, 1, { around: 280, across: 80 })
+	const conjunctiva = createConjunctivaMesh(params.lids, eye, 1)
+	const [ao, conjunctivaAo] = bakeLidOcclusion([lids, conjunctiva], eye)
+	assert.equal(ao.length, lids.positions.length / 3)
+	assert.equal(conjunctivaAo.length, conjunctiva.positions.length / 3)
+	for (const value of [...ao, ...conjunctivaAo]) assert.ok(value >= 0 && value <= 1)
+	// Near each canthus the conjunctiva the opening shows is in a pocket.
+	const near = (mesh, values, [cx, cy], radius) => {
+		let sum = 0
+		let count = 0
+		for (let v = 0; v < values.length; v++) {
+			const x = mesh.positions[v * 3]
+			const y = mesh.positions[v * 3 + 1]
+			if (Math.hypot(x - cx, y - cy) < radius) {
+				sum += values[v]
+				count++
+			}
+		}
+		return sum / count
+	}
+	const { medial, lateral } = lids.fissure
+	assert.ok(near(conjunctiva, conjunctivaAo, medial, 1.5) < 0.8, 'medial canthus')
+	assert.ok(near(conjunctiva, conjunctivaAo, lateral, 1.5) < 0.8, 'lateral canthus')
+	// The open cheek far below the eye sees the sky.
+	assert.ok(near(lids, ao, [0, -20], 3) > 0.97, 'cheek')
+	// The posterior margin, against the globe, is darker than the skin above.
+	const k = (i, j) => i * 80 + j
+	assert.ok(ao[k(0, 0)] < ao[k(0, 60)], 'margin against the skin above')
+	assert.deepEqual(
+		bakeLidOcclusion([lids], eye)[0].slice(0, 400),
+		bakeLidOcclusion([lids], eye)[0].slice(0, 400),
+	)
+})
+
 test('lashes: counts, lengths, roots on the margin, pointing away from the eye', async () => {
 	const { generateLashes, LASH_SEGMENTS } = await import('../src/adnexa/lashGenerator')
 	const lashes = generateLashes(params, eye)

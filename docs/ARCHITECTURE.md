@@ -31,6 +31,7 @@
 | [`src/adnexa/fissure.js`](../src/adnexa/fissure.js) * | The palpebral fissure: the margins between the canthi, their closure. |
 | [`src/adnexa/periocular.js`](../src/adnexa/periocular.js) * | The margins' support, the conjunctiva and caruncle, the face around the orbit (thin-plate spline). |
 | [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | The lid ring (columns, profile, shell turning into the face), the conjunctiva and meniscus meshes. |
+| [`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js) * | Ambient occlusion baked into the lid and conjunctiva vertices (horizon-based, over a front height field). |
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, lash, meniscus and bubble meshes with their materials. |

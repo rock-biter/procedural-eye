@@ -6,7 +6,7 @@ The eyelids, their skin and lashes, the visible tear film and the scleral vessel
 
 `createFissure()` ([`src/adnexa/fissure.js`](../src/adnexa/fissure.js)) draws the palpebral fissure in the front plane.
 
-- **Canthi**: `lids.fissureWidth` apart horizontally, the medial one `lids.medialShare` of it nasal of the pupil center at `lids.medialHeight`, the lateral one raised by `lids.canthalTilt`. By default (29 mm, 0.53, −3.2 mm, 2°) the medial canthus lies 15.4 mm nasal of the pupil center and 3.2 mm below it, the lateral one 13.6 mm temporal and 1 mm higher.
+- **Canthi**: `lids.fissureWidth` apart horizontally, the medial one `lids.medialShare` of it nasal of the pupil center at `lids.medialHeight`, the lateral one raised by `lids.canthalTilt`. By default (29 mm, 0.505, −3.2 mm, 2°) the medial canthus lies 14.6 mm nasal of the pupil center and 3.2 mm below it, the lateral one 14.4 mm temporal and 1 mm higher, so the iris sits about in the middle of the fissure.
 - **Margins**: each is a height above the chord between the canthi, in two cubic Hermite parts.
   - The first leaves the medial canthus at `upperMedialAngle` / `lowerMedialAngle` and rises to the extreme at `upperPeak` / `lowerPeak` (shares of the chord from the medial canthus).
   - The second falls from there to the lateral canthus, which it meets at `upperAngle` / `lowerAngle`.
@@ -28,7 +28,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 | Surface | Shape |
 | --- | --- |
 | Support (`supportZ()`, `supportAt()`) | What the posterior margins rest on. It merges (smooth maximum over 4 mm) two surfaces: the globe, and a surface through the canthi at `lids.medialDepth` and `lids.lateralDepth`, receding above and below the chord.<br>The globe term includes the cornea, its limbal sulcus bridged by a 0.8 mm smooth maximum; past 0.88 of the sclera radius it is continued by a slope that eases off over 2 mm.<br>Toward the canthi the lids therefore pass in front of the receding globe.<br>Its normal is the sphere's over the globe and the support's elsewhere, averaged over 3 mm. |
-| Conjunctiva (`conjunctivaZ()`) | What lies behind the margins:<br>- the globe, which past 0.96 of its radius turns back into the fornix (over 1.6 mm laterally, 0.9 mm medially);<br>- the caruncle, an elliptic mound about 3.4 × 4.8 mm, centered 1.8 mm from the medial canthus, just behind the margins;<br>- the plica semilunaris, a crescent fold 0.35 mm high about 4 mm from the canthus. |
+| Conjunctiva (`conjunctivaZ()`) | What lies behind the margins:<br>- the globe, which past 0.96 of its radius turns back into the fornix (over 1.6 mm laterally, 0.9 mm medially);<br>- the caruncle, an elliptic mound about 2.3 × 3.4 mm, centered 1.3 mm from the medial canthus, just behind the margins;<br>- the plica semilunaris, a crescent fold 0.3 mm high about 2.9 mm from the canthus. |
 | Face (`createFace()`) | A thin-plate spline. It follows closely a ring of 32 points of the open lids' shell, so the lids flow into it, and passes loosely through its anatomical landmarks, so it stays smooth. The landmarks are:<br>- the brow (`browHeight`, `browProjection`) and the forehead;<br>- the glabella, the nasion and the nasal dorsum (`noseDistance`, `noseProjection`), and the nasal sidewall;<br>- a recess beside the medial canthus;<br>- the lateral orbital rim (`rimDepth`) and the temple;<br>- the infraorbital rim and the cheek (`cheekProjection`). |
 
 ## Lid Mesh
@@ -71,9 +71,19 @@ Each vertex carries:
 - `relief` = (the front-plane direction in which the distance from the margin grows, the depth of the grooves in mm, the share of the way along the margin from the medial canthus):
   - the depth is ≤ 0 and records the crease and the lateral fold;
   - the skin program orients and shades its fine detail by this attribute;
-- `follow` = (upper share, follow weight): the weight is 1 over the inner half of the lid band and 0 from 3 mm past its edge, so the brow and the cheek stay put.
+- `follow` = (upper share, follow weight): the weight is 1 over the inner half of the lid band and 0 from 3 mm past its edge, so the brow and the cheek stay put;
+- `ao`: the baked ambient occlusion, 1 open to 0 closed ([Baked Occlusion](#baked-occlusion)).
 
 The upper share is 1 on the upper lid and 0 on the lower one, blended across the canthi by the column's direction. All of the relief is in the mesh positions, so the key-light shadow pass, which draws the same mesh with the lid follow, casts the same folds. `lidFace()` returns the face the lids turn into.
+
+### Baked Occlusion
+
+`bakeLidOcclusion()` ([`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js)) bakes ambient occlusion into the lid and conjunctiva vertices on every rebuild, in about 0.15 s.
+
+- **Field**: the skin, the conjunctiva and the globe are drawn into a height field seen from the front (0.1 mm cells over ±24 × ±18 mm).
+- **Horizon**: each vertex looks for the horizon over that field in 8 directions, out to 3 mm, against its tangent plane; nearer occluders count more (horizon-based ambient occlusion, Bavoil 2008).
+- **Where**: the lid band (up to 10 mm from the margin) and the conjunctiva; the face beyond it stays open. It darkens the canthi's pockets most, then the posterior margins against the globe and the crease.
+- **Rest**: it is baked with the lids at rest and does not follow the gaze. The skin program scales it by `skin.occlusion`.
 
 ### Conjunctiva
 
@@ -102,7 +112,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
   - per-channel wrap diffuse (`skin.translucency`) with subsurface-tinted shadows;
   - GGX specular from each emitter's representative point (`skin.roughness`, lower in oily patches on the lids);
   - a mirror reflection of the rig where it is wet (`skin.wetness`, toward the margin);
-  - ambient and specular occlusion in the folds and grooves;
+  - ambient and specular occlusion in the folds and grooves, and the baked occlusion (`ao`, scaled by `skin.occlusion`);
   - the key-light shadow.
 
 ## Lashes

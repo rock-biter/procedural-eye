@@ -198,7 +198,7 @@ export const PARAM_SCHEMA = {
 	lids: {
 		// Fissure (src/adnexa/fissure.js).
 		fissureWidth: num(29, 24, 32, 0.1, 'mm', 'rebuild', 'fissure width'),
-		medialShare: num(0.53, 0.45, 0.6, 0.005, '', 'rebuild', 'medial share of the width'),
+		medialShare: num(0.505, 0.45, 0.6, 0.005, '', 'rebuild', 'medial share of the width'),
 		medialHeight: num(-3.2, -5, 1, 0.05, 'mm', 'rebuild', 'medial canthus height'),
 		canthalTilt: num(2, -6, 12, 0.1, 'deg', 'rebuild', 'canthal tilt'),
 		mrd1: num(4, 0.5, 6, 0.05, 'mm', 'rebuild', 'upper margin above pupil (MRD1)'),
@@ -262,6 +262,7 @@ export const PARAM_SCHEMA = {
 		freckles: num(0.15, 0, 1, 0.01),
 		veins: num(0.45, 0, 1, 0.01, '', 'uniform', 'veins (thin-skin tint)'),
 		pigmentation: num(0.4, 0, 1, 0.01, '', 'uniform', 'crease and canthi pigment'),
+		occlusion: num(0.85, 0, 1, 0.01, '', 'uniform', 'baked ambient occlusion'),
 		backdrop: num(0.55, 0, 1.5, 0.01, '', 'uniform', 'backdrop (× lit skin tone)'),
 	},
 	sclera: {

@@ -3,6 +3,7 @@
 // lids follow the gaze.
 attribute vec4 lid; // t along the fissure, s across the profile, a (mm from the margin), upper lid
 attribute vec4 relief; // front-plane direction in which a grows (xy), fold depth (mm, ≤ 0), along the margin (0 medial, 1 lateral)
+attribute float ao; // baked ambient occlusion (1 open), src/adnexa/lidOcclusion.js
 
 #include ./lid-follow.glsl
 
@@ -13,6 +14,7 @@ varying vec3 vRestPos;
 varying vec3 vNormal;
 varying vec4 vLid;
 varying vec4 vRelief;
+varying float vAo;
 
 void main() {
 	float angle = lidFollowAngle(follow);
@@ -23,5 +25,6 @@ void main() {
 	vNormal = rotateAboutX(normalize(mat3(modelMatrix) * normal), angle);
 	vLid = lid;
 	vRelief = relief;
+	vAo = ao;
 	gl_Position = projectionMatrix * viewMatrix * world;
 }

@@ -19,12 +19,14 @@ uniform vec4 uCanthi; // medial (xy) and lateral (zw) canthus, front plane at re
 uniform vec2 uMarginLength; // upper and lower margin lengths (mm)
 uniform float uPixelAngle; // radians per pixel
 uniform vec2 uDefocus; // camera aperture diameter, focus distance (mm)
+uniform float uOcclusion; // strength of the baked ambient occlusion
 
 varying vec3 vWorldPos;
 varying vec3 vRestPos;
 varying vec3 vNormal;
 varying vec4 vLid;
 varying vec4 vRelief;
+varying float vAo;
 
 // Meibomian orifices per margin, upper and lower (docs/RESEARCH.md).
 const vec2 ORIFICES = vec2(34.0, 24.0);
@@ -205,6 +207,8 @@ void main() {
 
 	// Folds are shaded (ambient and specular occlusion), grooves a little.
 	float occlusion = (1.0 - 0.45 * pow(cavity, 0.8)) * (1.0 + 4.0 * micro.x + 1.5 * wrinkles.x);
+	// Baked over the geometry: deep in the canthi, under the margins, in the crease.
+	occlusion *= mix(1.0, vAo, uOcclusion);
 	// Wet toward the margin, oily patches on the lids, matte further out.
 	float sebum = smoothstep(-0.3, 0.6, valueNoise(p / 2.5, seed + 83u)) * (1.0 - smoothstep(6.0, 16.0, a));
 	float wet = mix(uSkin.z * exp(-a / 2.5), 1.0 - 0.25 * smoothstep(0.6, 1.2, u), onMargin);

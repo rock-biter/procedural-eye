@@ -23,8 +23,8 @@ const FORNIX_EASE = { lateral: 1.6, medial: 0.9 }
 // its top behind the posterior margins there and its fall-off; lateral of it
 // the plica semilunaris, a crescent fold about 2 mm wide (`at` mm from the
 // canthus, its height, width, half its length and its curvature).
-const CARUNCLE = { inset: 1.8, length: 1.7, height: 2.4, behind: 0.3, bulge: 1.3 }
-const PLICA = { at: 4, height: 0.35, width: 0.6, length: 3.2, bend: 0.08 }
+const CARUNCLE = { inset: 1.3, length: 1.15, height: 1.7, behind: 0.45, bulge: 1.2 }
+const PLICA = { at: 2.9, height: 0.3, width: 0.5, length: 2.6, bend: 0.08 }
 // The support surface through the canthi recedes above and below the chord.
 const CANTHAL_CURVATURE = 0.012
 // The blend between the eye surface and the canthal surface (mm). For it the
