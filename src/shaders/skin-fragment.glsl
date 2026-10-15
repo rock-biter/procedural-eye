@@ -210,7 +210,7 @@ void main() {
 	float wet = mix(uSkin.z * exp(-a / 2.5), 1.0 - 0.25 * smoothstep(0.6, 1.2, u), onMargin);
 	float roughness = mix(uSkin.y * (1.0 - 0.25 * sebum), mix(0.06, 0.13, smoothstep(0.4, 1.0, u)), wet);
 	vec3 wrap = uSkin2.y * vec3(0.55, 0.28, 0.18);
-	float lit = keyShadow(vWorldPos + geometric * 0.02);
+	float lit = keyShadow(vWorldPos + geometric * 0.02, geometric);
 	// Light scattered under the skin softens the red edge of the shadows.
 	vec3 shadow = mix(vec3(lit), vec3(sqrt(lit), lit, lit * lit), uSkin2.y);
 	vec3 color = litSurface(vWorldPos, n, v, albedo * occlusion, wrap, roughness, 0.028, occlusion, shadow);

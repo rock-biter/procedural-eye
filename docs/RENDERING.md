@@ -104,7 +104,7 @@ Defines:
 | `iris-bake-fragment.glsl` | Structure and pigment atlas bake. |
 | `sclera.glsl` | Sclera albedo with vessels, conjunctival micro-relief, fissure distance, lid occlusion and lid reflections. |
 | `lid-follow.glsl` | Lid rotation with the gaze and its inverse for rest-space lookups. |
-| `key-shadow.glsl` | Shadow map lookup (Poisson PCF or hard). |
+| `key-shadow.glsl` | Shadow map lookup: hard, Poisson PCF, or estimated penumbra with a slope-scaled bias for the skin. |
 | `lit-surface.glsl` | Shared lighting of the world-space surfaces (wrap diffuse, GGX with representative points, wet mirror). |
 | `skin-relief.glsl`, `noise3.glsl` | Skin micro-relief with analytic gradients (furrows, fine network, pores, wrinkles, crow's feet), prefiltered by the pixel footprint, and the skin's pigment patterns (mottling, freckles, veins); 3D gradient noise with derivatives. |
 | `debug-views.glsl` | Debug view numbering. |

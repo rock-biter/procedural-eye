@@ -2,7 +2,8 @@
 // (emitter 0) looking at the eye renders the casters (objects on layer
 // SHADOW_LAYER: lids and lashes) into a float depth map. For accumulation
 // samples the camera moves to a point on the emitter's area, so the averaged
-// hard shadows form the real penumbra; interactive frames filter instead.
+// hard shadows form the real penumbra; interactive frames estimate it
+// (percentage-closer soft shadows, key-shadow.glsl).
 import {
 	Color,
 	DoubleSide,
@@ -23,8 +24,9 @@ import vertexShader from '../shaders/shadow-depth-vertex.glsl'
 
 export const SHADOW_LAYER = 1
 const SIZE = 2048
-// Half extent of the shadowed region around the eye (mm).
-const EXTENT = 26
+// Half extent of the shadowed region around the eye (mm): the whole skin
+// patch (the lookup fades out toward the border).
+const EXTENT = 40
 
 export default class KeyShadow {
 	constructor() {
@@ -102,8 +104,12 @@ export default class KeyShadow {
 		scene.background = previousBackground
 		renderer.setRenderTarget(previousTarget)
 
-		// Interactive frames: filter about a third of a millimeter of penumbra.
-		params.set(sample ? 0 : 0.35 / (2 * EXTENT), 0.0004, 1, 0)
+		// Interactive frames: a penumbra of at least a third of a millimeter,
+		// wider with the occluder's distance times the light's apparent size
+		// (key-shadow.glsl); accumulation samples compare hard.
+		const size = 2 * Math.sqrt(emitter.halfWidth * emitter.halfHeight)
+		const apparent = size / Math.hypot(...emitter.center)
+		params.set(sample ? 0 : 0.35 / (2 * EXTENT), 0.0004, 1, sample ? 0 : apparent)
 	}
 
 	dispose() {

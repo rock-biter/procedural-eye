@@ -84,14 +84,16 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 
 ## Key-Light Shadow
 
-[`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js) renders the shadows of the lids and lashes from emitter 0, when it is a panel or a window.
+[`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js) renders the shadows of the lids, the lashes and the face around them from emitter 0, when it is a panel or a window.
 
 - **Camera**: an orthographic camera at the light looks at a point 4 mm behind the apex.
 - **Casters**: objects on `SHADOW_LAYER` (1), drawn with the lid follow applied.
-- **Map**: a 2048² float depth map covering ±26 mm.
+- **Map**: a 2048² float depth map covering ±40 mm, the whole skin patch. The lookup fades out toward its border, so a receiver past it shows no edge.
 - **Filtering** (`key-shadow.glsl`):
-  - Interactive frames filter it with Poisson PCF over about 0.35 mm.
   - Accumulation samples move the light to a point on the emitter's area (`sample.light`) and compare hard. The mean of the samples is the true penumbra.
+  - Interactive frames filter. The eye's receivers, shadowed by the lids and lashes close by, use a Poisson filter over about 0.35 mm.
+  - The skin, shadowed by the face's own relief too, estimates the penumbra (percentage-closer soft shadows): 12 samples find the occluders within reach of a light of its apparent size (`uKeyShadowParams.w`, the emitter's size over its distance), their mean distance times that size is the penumbra's width, and 12 more filter over it (from 0.35 mm up to about 5 mm). The disk turns per pixel. A lash on the lid stays sharp; the brow's or the nose's shadow is as soft as the accumulated one.
+  - **Self-shadowing**: the skin casts and receives, so its lookup (`keyShadow(position, normal)`) adds a slope-scaled bias: the filter's radius and a texel and a half, times the tangent of the angle between the normal and the light, capped at 6. Otherwise the tilted skin shadows itself in part of the filter's samples and darkens uniformly inside the map. The light direction and the map's scales come from the shadow matrix.
 - **Receivers**: the skin, lashes, tear film and sclera. The iris samples the shadow where its light ray enters the cornea, then adds its own soft self-shadow.
 
 ## Physical Camera
