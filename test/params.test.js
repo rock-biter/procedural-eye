@@ -125,26 +125,44 @@ test('random eyes: valid overrides and the measured marginals (±2% over 10k)', 
 	)
 })
 
-test('random eyes: shades within the ranges, with vivid blues and ambers', async () => {
-	const { SHADE_COLORS, SHADES, randomEye } = await import('../src/params/populationPriors')
+test('random eyes: shades within the ranges, with vivid blues, ambers and a tenth of mako', async () => {
+	const { MAKO_SHARE, SHADE_COLORS, SHADES, randomEye } =
+		await import('../src/params/populationPriors')
 	const { irisColorRgb, irisLayerModel } = await import('../src/iris/irisColor')
+	const { hexToLinearRgb } = await import('../src/lighting/colorTemperature')
+	const checkRanges = (shade) => {
+		for (const [leaf, [min, max]] of Object.entries(SHADE_COLORS[shade].color)) {
+			const range = BASE_PARAM_SCHEMA.irisColor[leaf]
+			assert.ok(range.min <= min && min <= max && max <= range.max, `${shade} ${leaf}`)
+		}
+	}
 	SHADES.forEach((shades, colorClass) => {
 		const total = shades.reduce((sum, [, share]) => sum + share, 0)
 		assert.ok(Math.abs(total - 1) < 1e-9, `class ${colorClass}`)
-		for (const [shade] of shades) {
-			for (const [leaf, [min, max]] of Object.entries(SHADE_COLORS[shade].color)) {
-				const range = BASE_PARAM_SCHEMA.irisColor[leaf]
-				assert.ok(range.min <= min && min <= max && max <= range.max, `${shade} ${leaf}`)
-			}
-		}
+		for (const [shade] of shades) checkRanges(shade)
 	})
-	// The albedo at a typical stroma thickness, with its saturation.
+	checkRanges('mako')
+	// The albedo at a typical stroma thickness, with its saturation and tint.
 	let blue = 0
 	let amber = 0
+	let mako = 0
 	for (let seed = 0; seed < 1000; seed++) {
 		const params = createDefaults(BASE_PARAM_SCHEMA)
-		applyOverrides(BASE_PARAM_SCHEMA, params, randomEye('european', seed).params)
+		const eye = randomEye('european', seed)
+		assert.deepEqual(applyOverrides(BASE_PARAM_SCHEMA, params, eye.params), [])
 		const color = params.irisColor
+		if (eye.features.shade === 'mako') {
+			mako++
+			// Green-blue: green and blue well over red.
+			const rgb = irisColorRgb(color.ablMelanin, color.eumelanin, 0.45, irisLayerModel(color))
+			const luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+			const tint = hexToLinearRgb(color.tint)
+			const [r, g, b] = rgb.map(
+				(v, i) => Math.max(luma + (v - luma) * color.saturation, 0) * tint[i],
+			)
+			assert.ok(g > 3 * r && b > 2 * r && color.glow > 0, `mako ${seed}`)
+			continue
+		}
 		const rgb = irisColorRgb(color.ablMelanin, color.eumelanin, 0.45, irisLayerModel(color))
 		const luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
 		const [r, g, b] = rgb.map((v) => Math.max(luma + (v - luma) * color.saturation, 0))
@@ -153,6 +171,7 @@ test('random eyes: shades within the ranges, with vivid blues and ambers', async
 	}
 	assert.ok(blue > 100, `vivid blue ${blue}/1000`)
 	assert.ok(amber > 50, `amber ${amber}/1000`)
+	assert.ok(Math.abs(mako / 1000 - MAKO_SHARE) < 0.03, `mako ${mako}/1000`)
 })
 
 test('PNG text metadata round-trips and keeps the chunk CRC valid', async () => {

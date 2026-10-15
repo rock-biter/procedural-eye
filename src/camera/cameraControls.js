@@ -1,6 +1,7 @@
 // Pointer controls that edit params.camera directly (the params stay the single
 // source of truth): drag orbits, shift- or right-drag pans the target, the
-// wheel changes the focus distance (and with it the magnification).
+// wheel changes the focus distance (and with it the magnification) within
+// `distanceLimits`.
 import { setValue } from '../params/params'
 
 const ORBIT_DEGREES_PER_PIXEL = 0.12
@@ -12,6 +13,9 @@ export default class CameraControls {
 		this.schema = schema
 		this.params = params
 		this.onChange = onChange
+		// () => [min, max] distances for the wheel, or null. Outside them, the
+		// wheel only brings the camera back toward them.
+		this.distanceLimits = null
 		this.pointer = null
 		this.handleDown = this.handleDown.bind(this)
 		this.handleMove = this.handleMove.bind(this)
@@ -68,7 +72,15 @@ export default class CameraControls {
 	handleWheel(event) {
 		event.preventDefault()
 		const camera = this.params.camera
-		this.set('camera.distance', camera.distance * Math.exp(event.deltaY * ZOOM_PER_WHEEL_UNIT))
+		let distance = camera.distance * Math.exp(event.deltaY * ZOOM_PER_WHEEL_UNIT)
+		if (this.distanceLimits) {
+			const [min, max] = this.distanceLimits()
+			const low = Math.min(min, camera.distance)
+			const high = Math.max(max, camera.distance)
+			distance = Math.min(Math.max(distance, low), high)
+		}
+		if (distance === camera.distance) return
+		this.set('camera.distance', distance)
 		this.onChange()
 	}
 }

@@ -126,6 +126,7 @@
     "fiberAbl": 0.89,
     "saturation": 1.63,
     "tint": "#ffffff",
+    "glow": 0,
     "variation": 0.3,
     "heterochromia": {
       "amount": 0.78,
@@ -315,7 +316,8 @@
   },
   "zoom": {
     "out": 480,
-    "mobileOut": 820,
+    "mobileOut": 720,
+    "start": 0.5,
     "duration": 1.2
   },
   "post": {

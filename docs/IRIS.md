@@ -128,6 +128,8 @@ Fresh interactive frames use `quality.interactiveShadowSteps` and `quality.inter
 
   Crypt floors darken physically: less stroma lies over the black epithelium. Then come `irisColor.saturation` and `irisColor.tint`. Beyond the root, the albedo fades into the pigmented iridocorneal angle.
 
+  `irisColor.glow` *(artistic, 0 by default)* gives the iris a light of its own: the albedo times the glow times the radiance of a white diffuse surface lit by the rig (`lightRig.luminance`), so it keeps its look under any lighting. Neither the lids' shadow nor the occlusion dims it. The mako eyes of the random eye use it.
+
 ## Color Model
 
 [`src/iris/irisColor.js`](../src/iris/irisColor.js) computes the spectral reflectance of the layered iris by Kubelka–Munk theory, from 400 to 700 nm in 10 nm steps:

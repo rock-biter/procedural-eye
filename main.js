@@ -15,8 +15,9 @@ import { ANCESTRIES, randomEye } from './src/params/populationPriors'
 import { PRESETS } from './src/params/presets'
 import RenderSetup from './src/renderSetup'
 
-// The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=),
-// creates the params, the renderer and the app, and the GUI unless hidden.
+// The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
+// #debug), creates the params, the renderer and the app, the dock unless
+// ?gui=0, and the panel while the URL ends in #debug.
 const urlParams = new URLSearchParams(window.location.search)
 const presetName = PRESETS[urlParams.get('preset')] ? urlParams.get('preset') : 'default'
 const state = urlParams.get('state') ? decodeState(urlParams.get('state')) : null
@@ -33,22 +34,33 @@ if (urlParams.has('photo'))
 	setValue(PARAM_SCHEMA, params, 'quality.photoSamples', urlParams.get('photo'))
 if (urlParams.has('view')) setValue(PARAM_SCHEMA, params, 'debug.view', urlParams.get('view'))
 
-// Zoom in glides back to the distance the camera started at. Portrait screens
-// are narrow: the whole figure needs a farther camera to fit across.
+// The zoom-in and zoom-out distances of the screen's shape, which also bound
+// the wheel: zoom in is camera.distance; portrait screens are narrow, so their
+// zoom out is farther. Landscape screens start zoom.start of the way out
+// (unless the URL sets the scene); portrait ones zoomed in.
 const startDistance = params.camera.distance
+function zoomDistances(settings) {
+	return [startDistance, portrait() ? settings.mobileOut : settings.out]
+}
+if (!portrait() && !urlParams.has('state') && !urlParams.has('preset')) {
+	const [near, far] = zoomDistances(params.zoom)
+	setValue(PARAM_SCHEMA, params, 'camera.distance', near + (far - near) * params.zoom.start)
+}
 
 const setup = new RenderSetup({ params, urlParams })
 // Captures (?photo=) start frozen: a deterministic instant.
 const app = new EyeApp({ setup, params, frozen: urlParams.has('photo') })
 // The app object itself, for console debugging.
 if (urlParams.has('debug')) window.__EYE_APP__ = app
+app.controls.distanceLimits = () => zoomDistances(app.targetParams.zoom)
 
 // The panel's random-eye ancestry and the length of preset and random-eye
 // transitions (seconds; 0 switches at once).
 const panelState = { ancestry: 'european', transition: TRANSITION.duration }
 
 // The groups a random eye resets to their defaults before applying its sample.
-const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera', 'lashes', 'skin']
+// The lashes are not among them: a random eye keeps them.
+const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera', 'skin']
 
 // Glides to the preset `name`: its overrides on the defaults.
 function loadPreset(name, duration = panelState.transition) {
@@ -74,10 +86,9 @@ function loadRandomEye(ancestry = panelState.ancestry, seed, duration = panelSta
 // values a running transition is heading for.
 function zoom(direction) {
 	const settings = app.targetParams.zoom
-	const out = portrait() ? settings.mobileOut : settings.out
-	const distance = direction === 'in' ? startDistance : out
+	const [near, far] = zoomDistances(settings)
 	const target = cloneParams(app.targetParams)
-	setValue(PARAM_SCHEMA, target, 'camera.distance', distance)
+	setValue(PARAM_SCHEMA, target, 'camera.distance', direction === 'in' ? near : far)
 	app.transitionTo(target, settings.duration)
 }
 
@@ -157,6 +168,21 @@ if (urlParams.get('gui') !== '0') {
 	)
 	document.body.appendChild(dock)
 
+	// The panel shows while the URL ends in #debug: built the first time, then
+	// hidden and shown again as the hash changes.
+	let panel = null
+	const updatePanel = async () => {
+		const shown = window.location.hash === '#debug'
+		if (shown) panel ??= createPanel()
+		if (panel) (await panel).pane.hidden = !shown
+	}
+	window.addEventListener('hashchange', updatePanel)
+	updatePanel()
+}
+
+// The collapsed panel: the presets, the actions, every parameter, the random
+// ancestry and the transition length.
+async function createPanel() {
 	const { createGui } = await import('./src/debug/gui')
 	const gui = createGui({
 		schema: PARAM_SCHEMA,
@@ -194,6 +220,7 @@ if (urlParams.get('gui') !== '0') {
 	app.listeners.add((path) => {
 		if (path === 'camera' || path === '*') gui.refresh()
 	})
+	return gui
 }
 
 app.start()

@@ -105,7 +105,8 @@ export default class Eyeball {
 	// rest space, the camera position in eye space and its pixel angle.
 	// `interactive`: a fresh frame while something changes (cheaper shading).
 	// `lidRadiance`, `lashRadiance`: linear colors of the skin and the lashes as
-	// seen in the reflections.
+	// seen in the reflections; `whiteRadiance`: a white diffuse surface lit by
+	// the rig (the scale of the iris glow).
 	update(
 		params,
 		pupilDiameter,
@@ -117,6 +118,7 @@ export default class Eyeball {
 		eyeToWorld,
 		lidRadiance,
 		lashRadiance,
+		whiteRadiance,
 	) {
 		const u = this.uniforms
 		const packed = eye.pack()
@@ -166,7 +168,12 @@ export default class Eyeball {
 		const lens = params.camera
 		u.uDefocus.value.set(2 * apertureRadius(lens.focalLength, lens.fNumber), lens.distance)
 		const color = params.irisColor
-		u.uIrisColorMisc.value.set(color.fiberAbl, color.saturation, IRIS_COLOR_LUT.maxStroma, 0)
+		u.uIrisColorMisc.value.set(
+			color.fiberAbl,
+			color.saturation,
+			IRIS_COLOR_LUT.maxStroma,
+			color.glow * whiteRadiance,
+		)
 		u.uIrisTint.value.set(color.tint)
 		const structure = params.irisStructure
 		const f = structure.fibers

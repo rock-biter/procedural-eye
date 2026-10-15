@@ -71,26 +71,29 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 | `?state=<string>` | Applies the non-default values encoded by **Copy state URL** or **Save PNG** (base64url JSON), on top of the preset. |
 | `?photo=<n>` | Sets `quality.photoSamples` to `n` and starts in photo mode (frozen clock); the accumulation stops after `n` samples. |
 | `?view=<name>` | Sets `debug.view`; see [`docs/RENDERING.md`](RENDERING.md#debug-views) for the list. |
-| `?gui=0` | Hides the panel (captures). |
+| `?gui=0` | Hides the dock and the panel (captures). |
 | `?dpr=<ratio>` | Pins the pixel ratio (0.5–2) and turns the adaptive resolution off. |
 | `?debug=1` | Exposes the app object as `window.__EYE_APP__` for console debugging. |
+| `#debug` | Shows the panel (it is not even loaded otherwise). It follows the hash: adding or removing `#debug` on an open page shows or hides it. |
 
 ## Controls
 
 - Drag orbits the camera (`camera.azimuth`, `camera.elevation`).
 - Shift-drag or right-drag pans the target (`camera.targetX`, `camera.targetY`).
-- The wheel changes `camera.distance`, which is also the focus distance.
+- The wheel changes `camera.distance`, which is also the focus distance, between the dock's zoom-in and zoom-out distances (`CameraControls.distanceLimits`); from outside them it only moves back toward them.
 - **Space** toggles photo mode when the page, not a panel control, has the focus.
 
 **The dock** holds three buttons outside the panel, always in view: bottom right, or bottom center on phones and tablets (`style.css`). Each blurs itself after a click, so Space still toggles photo mode.
 
 - **Zoom out** and **Zoom in** (magnifiers) glide `camera.distance` over `zoom.duration`:
   - Zoom out to `zoom.out`, which frames the whole figure; portrait screens (phones held upright), much narrower, to `zoom.mobileOut`.
-  - Zoom in back to the distance the camera started at, on every screen.
+  - Zoom in to `camera.distance`, on every screen.
+  - Landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (half the framing by default), unless the URL sets `?preset=` or `?state=`; portrait screens start zoomed in.
+  - The wheel stays between the zoom-in and zoom-out distances of the screen.
 - Portrait screens start, and load presets, with `camera.targetZ` 0.
 - **Random eye**.
 
-The panel starts collapsed. When its open folders outgrow the viewport it scrolls, and it stops above the dock (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
+The panel shows only while the URL ends in `#debug`, and starts collapsed. When its open folders outgrow the viewport it scrolls, and it stops above the dock (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
 
 ## Console API
 

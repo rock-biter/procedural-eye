@@ -13,7 +13,7 @@
 
 uniform sampler2D uIrisPigment; // ABL melanin, eumelanin share, freckle mask, nodule mask
 uniform sampler3D uIrisColorLut; // linear sRGB by (ABL melanin, eumelanin share, stroma thickness)
-uniform vec4 uIrisColorMisc; // ABL share over fibers, saturation, LUT max stroma (mm), unused
+uniform vec4 uIrisColorMisc; // ABL share over fibers, saturation, LUT max stroma (mm), glow radiance
 uniform vec3 uIrisTint;
 
 // Single-surface keratometric index: the cornea as one refracting surface.
@@ -98,6 +98,8 @@ vec3 shadeIris(IrisHit hit) {
 	// The ambient light reaching the iris comes through the cornea, under the lids.
 	float lidAmbient = lidOcclusion((uEyeToWorld * vec4(pEye, 1.0)).xyz);
 	vec3 radiance = albedo * INV_PI * backgroundIrradiance(n) * ao * 0.6 * mix(0.4, 1.0, lidAmbient);
+	// Its own light (irisColor.glow), neither shadowed nor occluded.
+	radiance += albedo * uIrisColorMisc.w;
 	for (int i = ZERO; i < uEmitterCount; i++) {
 		int base = i * EMITTER_VEC4S;
 		vec4 A = uEmitters[base];

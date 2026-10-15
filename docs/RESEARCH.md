@@ -68,6 +68,7 @@ Edwards et al. 2016 (photo grading; European n = 619 / East Asian n = 467 / Sout
   - hazel/light brown: hazel 45%, light brown 30%, amber 25%;
   - dark brown: brown 65%, chestnut 35%.
 - The tone mapping and the corneal reflections wash out the rendered chroma. The shades therefore raise `irisColor.saturation` *(artistic)*, up to 2.6 for a deep blue; real photographs such as `eye-05.jpg` are this vivid.
+- The **mako** shade (a tenth of the random eyes) is fantasy, not data: the glowing eyes of Final Fantasy VII, with `irisColor.tint` and `irisColor.glow` *(artistic)*.
 
 ## Pupil and gaze dynamics
 

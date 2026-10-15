@@ -80,7 +80,7 @@ The accumulation history keeps the alpha for the depth of field. The effects rec
 | `uIrisAtlas`, `uIrisPigment`, `uIrisColorLut` | Structure atlas, pigment atlas, color lookup ([`docs/IRIS.md`](IRIS.md)). |
 | `uIrisRest`, `uIrisThicknessResponse`, `uIrisSeed` | Rest space and the seed of the analytic parts. |
 | `uFiberRadial`, `uFiberArc`, `uFiberMisc`, `uRuff` | Fiber families, coverage, fusion, undercut, ruff and micro striations. |
-| `uIrisColorMisc`, `uIrisTint` | ABL share over the radial vessels, saturation, LUT stroma range; tint. |
+| `uIrisColorMisc`, `uIrisTint` | ABL share over the radial vessels, saturation, LUT stroma range, glow radiance (`irisColor.glow` times a white surface lit by the rig); tint. |
 | `uIrisSteps`, `uIrisShadowSteps`, `uIrisAoSteps`, `uIrisMicroBlur` | The quality tier of the frame. |
 | `uDefocus` | The camera's aperture diameter and focus distance: the blur radius over the iris, which decides where fresh frames leave out the micro striations. |
 | **Skin, lashes, tear film** | |

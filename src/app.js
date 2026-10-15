@@ -464,6 +464,7 @@ export default class EyeApp {
 			this.eyeRig.eyeToWorld,
 			this.reflectedRadiance(this.params.skin.color, 0.35),
 			this.reflectedRadiance(this.params.lashes.color, 0.5),
+			this.lightRig.luminance * 0.05,
 		)
 		this.lids.update(this.params, pixelAngle)
 		this.lashes.update(this.params)
