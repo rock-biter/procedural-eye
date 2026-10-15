@@ -4,6 +4,8 @@
 // rebuilt, and any change restarts the accumulation. While nothing changes,
 // frames accumulate jittered samples (pixel, lens) until
 // params.quality.photoSamples, then rendering stops and the image stays.
+// transitionTo() carries the params to new values over a couple of seconds
+// (src/params/paramTransition.js), so the eye transforms in place.
 import {
 	DataTexture,
 	DataUtils,
@@ -30,11 +32,12 @@ import IrisAtlas from './iris/irisAtlas'
 import IrisColorLut from './iris/irisColorLut'
 import { createIrisSpace } from './iris/irisSpace'
 import { hexToLinearRgb } from './lighting/colorTemperature'
-import { EMITTER_TYPE } from './lighting/envRig'
+import { EMITTER_TYPE, sceneLuminance, sphericalDirection } from './lighting/envRig'
 import KeyShadow from './lighting/keyShadow'
 import LightRig from './lighting/lightRig'
 import { applyOverrides, cloneParams, encodeState, getLeaf } from './params/params'
 import { PARAM_SCHEMA } from './params/paramSchema'
+import { ParamTransition, TRANSITION } from './params/paramTransition'
 import PostProcessing from './render/postProcessing'
 import ScleraMaps from './sclera/scleraMaps'
 import { SCLERA_PSI } from './sclera/vesselGenerator'
@@ -53,6 +56,11 @@ export default class EyeApp {
 		// The line of sight the camera frames (src/animation/animator.js).
 		this.framing = { yaw: 0, pitch: 0 }
 		this.animationStarted = false
+		// The last pose, and the one a transition's pose glides from.
+		this.lastPose = null
+		this.poseFrom = null
+		// The running parameter transition.
+		this.transition = null
 		window.addEventListener('pointermove', (event) => {
 			this.pointer.x = (event.clientX / window.innerWidth) * 2 - 1
 			this.pointer.y = 1 - (event.clientY / window.innerHeight) * 2
@@ -61,6 +69,8 @@ export default class EyeApp {
 			if (event.code === 'Space' && event.target === document.body) this.toggleFrozen()
 		})
 		this.irisSpace = null
+		// The lids and eye the lid mesh and the fissure map were built for.
+		this.lidKey = null
 		this.dirty = new Set(['rebuild', 'bake', 'define'])
 		this.listeners = new Set()
 		this.lastTime = null
@@ -106,9 +116,11 @@ export default class EyeApp {
 		setup.scene.add(this.tearFilm.meniscus, this.tearFilm.bubbles)
 		this.physicalCamera = new PhysicalCamera()
 		this.post = new PostProcessing(setup.renderer, setup.scene, this.physicalCamera.camera)
-		this.controls = new CameraControls(setup.renderer.domElement, PARAM_SCHEMA, params, () =>
-			this.notifyChange('camera'),
-		)
+		// Orbiting takes the camera over from a transition.
+		this.controls = new CameraControls(setup.renderer.domElement, PARAM_SCHEMA, params, () => {
+			this.transition?.cancel('camera')
+			this.notifyChange('camera')
+		})
 		this.cameraEye = new Vector3()
 		// Continuous interactive frames for measure(): { remaining, resolve }.
 		this.benchmark = null
@@ -184,11 +196,17 @@ export default class EyeApp {
 		this.focusDepth = entrancePupil(this.eye).depth
 		this.eyeRig.setGeometry(this.eye)
 		this.eyeball.rebuild(this.eye)
-		this.lids.rebuild(this.params, this.eye)
-		const distances = bakeFissureMap(this.params.lids, this.eye.nasalSign)
-		const data = this.fissureMap.image.data
-		for (let i = 0; i < distances.length; i++) data[i] = DataUtils.toHalfFloat(distances[i])
-		this.fissureMap.needsUpdate = true
+		// The lid mesh and the fissure map take about half a second: they are
+		// rebuilt only when the lids or the eye change, not for a new lash seed.
+		const lidKey = JSON.stringify([this.params.lids, this.eye])
+		if (lidKey !== this.lidKey) {
+			this.lidKey = lidKey
+			this.lids.rebuild(this.params, this.eye)
+			const distances = bakeFissureMap(this.params.lids, this.eye.nasalSign)
+			const data = this.fissureMap.image.data
+			for (let i = 0; i < distances.length; i++) data[i] = DataUtils.toHalfFloat(distances[i])
+			this.fissureMap.needsUpdate = true
+		}
 		this.lashes.rebuild(this.params, this.eye)
 		this.tearFilm.rebuild(this.params, this.eye)
 	}
@@ -202,10 +220,12 @@ export default class EyeApp {
 		})
 	}
 
+	// The color lookup and the vessel map rebuild only when their inputs
+	// change; during a transition the lookup crossfades instead.
 	bake() {
 		this.irisSpace = this.createIrisSpace()
 		this.irisAtlas.bake(this.setup.renderer, this.params, this.irisSpace, this.eye.nasalSign)
-		this.irisColorLut.update(this.params.irisColor)
+		if (!this.irisColorLut.blending) this.irisColorLut.update(this.params.irisColor)
 		this.scleraMaps.bake(this.params, this.eye.scleraRadius)
 	}
 
@@ -218,9 +238,68 @@ export default class EyeApp {
 	// Call after changing the parameter at `path`.
 	onParamChange(path) {
 		const leaf = getLeaf(PARAM_SCHEMA, path)
-		if (leaf) this.dirty.add(leaf.kind)
+		if (this.transition) this.interruptTransition(path, leaf)
+		this.markDirty(path)
 		this.setup.syncQuality(this.params)
 		this.notifyChange(path)
+	}
+
+	markDirty(path) {
+		const leaf = getLeaf(PARAM_SCHEMA, path)
+		if (leaf) this.dirty.add(leaf.kind)
+	}
+
+	// Carries the params to `target` (a full params object) over `duration`
+	// seconds: numbers and colors glide, the rest switches at the start.
+	transitionTo(target, duration = TRANSITION.duration) {
+		const mode = (p) =>
+			p.animation.enabled ? `${p.animation.gaze}:${p.animation.pupilReflex}` : 'still'
+		const modeChanges = mode(this.params) !== mode(target)
+		this.transition = new ParamTransition(PARAM_SCHEMA, this.params, target, duration)
+		for (const path of this.transition.switched) this.markDirty(path)
+		this.irisColorLut.beginBlend(target.irisColor)
+		// A pose that changes its source (a still eye coming alive, another gaze
+		// mode) glides from where it was.
+		this.poseFrom = modeChanges ? this.lastPose : null
+		this.setup.syncQuality(this.params)
+		this.notifyChange('*')
+	}
+
+	// The params as they will be when the running transition ends.
+	get targetParams() {
+		return this.transition ? this.transition.target : this.params
+	}
+
+	stepTransition(dt) {
+		const transition = this.transition
+		for (const path of transition.step(dt)) this.markDirty(path)
+		if (this.irisColorLut.blending) this.irisColorLut.setBlend(transition.progress)
+		this.invalidate()
+		if (transition.done) this.endTransition()
+	}
+
+	// Ends the running transition on its target, except under `keep` (a path
+	// someone just set).
+	finishTransition(keep = null) {
+		if (!this.transition) return
+		if (keep) this.transition.cancel(keep)
+		for (const path of this.transition.finish()) this.markDirty(path)
+		if (this.irisColorLut.blending) this.irisColorLut.setBlend(1)
+		this.endTransition()
+	}
+
+	endTransition() {
+		this.transition = null
+		this.poseFrom = null
+		this.notifyChange('*')
+	}
+
+	// An edit during a transition: a value read every frame just stops
+	// gliding; a baked or rebuilt one ends the transition, because the color
+	// lookup cannot crossfade under it.
+	interruptTransition(path, leaf) {
+		if (leaf?.kind === 'uniform') this.transition.cancel(path)
+		else this.finishTransition(path)
 	}
 
 	notifyChange(path) {
@@ -269,8 +348,14 @@ export default class EyeApp {
 			this.framing,
 		)
 		const camera = this.physicalCamera.camera.position
-		const result = this.animator.step(Math.min(delta, 0.1), this.params, {
-			sceneLuminance: this.lightRig.luminance,
+		let result = this.animator.step(Math.min(delta, 0.1), this.params, {
+			// The pupil weighs the light by its angle from the line of sight.
+			luminance: (yaw, pitch) =>
+				sceneLuminance(
+					this.params.lighting,
+					this.lightRig.emitters,
+					sphericalDirection(yaw, pitch),
+				),
 			pointer: this.pointer,
 			camera: {
 				yaw: (Math.atan2(camera.x, camera.z) * 180) / Math.PI,
@@ -278,6 +363,9 @@ export default class EyeApp {
 			},
 			nasalSign: this.eye.nasalSign,
 		})
+		if (this.poseFrom && this.transition)
+			result = blendPose(this.poseFrom, result, this.transition.progress)
+		this.lastPose = result
 		this.pupilDiameter = result.pupilDiameter
 		this.framing = result.framing
 		this.gaze.fromArray(gazeQuaternion(result.yaw, result.pitch))
@@ -298,6 +386,8 @@ export default class EyeApp {
 		requestAnimationFrame(this.frame)
 		const delta = this.lastTime === null ? 0 : time - this.lastTime
 		this.lastTime = time
+		// A long frame (a rebuild, a compile) does not skip the transition.
+		if (this.transition) this.stepTransition(Math.min(delta / 1000, 0.1))
 		if (this.dirty.has('rebuild')) this.rebuild()
 		if (this.dirty.has('rebuild') || this.dirty.has('bake')) this.bake()
 		if (this.dirty.has('define')) {
@@ -411,7 +501,12 @@ export default class EyeApp {
 			getRenderStats: () => this.setup.getStats(),
 			getState: () => encodeState(PARAM_SCHEMA, this.params),
 			getParams: () => cloneParams(this.params),
+			// A full params object to glide to (see main.js for presets).
+			transitionTo: (target, duration) => this.transitionTo(cloneParams(target), duration),
+			getTargetParams: () => cloneParams(this.targetParams),
+			isTransitioning: () => this.transition !== null,
 			setParams: (overrides) => {
+				this.finishTransition()
 				const unknown = applyOverrides(PARAM_SCHEMA, this.params, overrides)
 				this.dirty.add('rebuild').add('define')
 				this.notifyChange('*')
@@ -425,5 +520,20 @@ export default class EyeApp {
 			getCompileMs: () => this.compileMs,
 			getEyeGeometry: () => ({ apexZ: this.eye.apexZ, focusDepth: this.focusDepth }),
 		}
+	}
+}
+
+// The pose `k` (0 to 1) of the way from pose `a` to pose `b`.
+function blendPose(a, b, k) {
+	const mix = (x, y) => x + (y - x) * k
+	return {
+		pupilDiameter: mix(a.pupilDiameter, b.pupilDiameter),
+		yaw: mix(a.yaw, b.yaw),
+		pitch: mix(a.pitch, b.pitch),
+		lidFollow: [mix(a.lidFollow[0], b.lidFollow[0]), mix(a.lidFollow[1], b.lidFollow[1])],
+		framing: {
+			yaw: mix(a.framing.yaw, b.framing.yaw),
+			pitch: mix(a.framing.pitch, b.framing.pitch),
+		},
 	}
 }

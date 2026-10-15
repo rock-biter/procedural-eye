@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+	GAZE,
 	gazeQuaternion,
 	GazeModel,
 	saccadeDuration,
@@ -56,12 +57,54 @@ test('saccades follow the main sequence and land on target', () => {
 	close(saccadeDuration(10), 0.043, 1e-12)
 	assert.ok(saccadePeakVelocity(20) > saccadePeakVelocity(5))
 	const gaze = new GazeModel(createRandom('g'))
-	gaze.microsaccades = false
-	gaze.settings = { ...gaze.settings, driftSigma: 0 }
+	gaze.micro = 0
 	gaze.setTarget(10, -5)
 	for (let i = 0; i < 120; i++) gaze.step(1 / 120)
-	close(gaze.yaw, 10, 0.05)
-	close(gaze.pitch, -5, 0.05)
+	close(gaze.yaw, 10, 1e-9)
+	close(gaze.pitch, -5, 1e-9)
+	assert.equal(gaze.shifts, 1)
+})
+
+test('the slowdown stretches saccades along the same minimum-jerk profile', () => {
+	const path = (slowdown) => {
+		const gaze = new GazeModel(createRandom('s'))
+		gaze.micro = 0
+		gaze.slowdown = slowdown
+		gaze.setTarget(10, 0)
+		const yaws = []
+		for (let i = 0; i < 300; i++) yaws.push(gaze.step(1 / 1000).yaw)
+		return yaws
+	}
+	const real = path(1)
+	const slow = path(5)
+	// Halfway through: 21.5 ms at the main sequence, 107.5 ms five times slower.
+	close(real[21], 5, 0.3)
+	close(slow[106], 5, 0.3)
+	assert.ok(slow[42] < 2 && real[42] > 9.9)
+})
+
+test('the drift is smooth and scales with the micro-movements', () => {
+	const run = (micro) => {
+		const gaze = new GazeModel(createRandom('d'), { ...GAZE, microsaccadeRate: 0 })
+		gaze.micro = micro
+		let previous = 0
+		let maxStep = 0
+		let sum = 0
+		const frames = 60 * 120
+		for (let i = 0; i < frames; i++) {
+			const { yaw } = gaze.step(1 / 60)
+			maxStep = Math.max(maxStep, Math.abs(yaw - previous))
+			previous = yaw
+			sum += yaw * yaw
+		}
+		return { rms: Math.sqrt(sum / frames), maxStep }
+	}
+	const full = run(1)
+	close(full.rms, 0.11, 0.04, 'physiological RMS offset')
+	assert.ok(full.maxStep < 0.03, `no frame-to-frame jitter: ${full.maxStep}`)
+	const reduced = run(0.3)
+	close(reduced.rms / full.rms, 0.3, 0.05, 'linear in the scale')
+	assert.equal(run(0).rms, 0)
 })
 
 test("Listing's law: no torsion, the quaternion turns +Z onto the gaze", () => {
@@ -89,13 +132,13 @@ test('the animator looks at the camera along the visual axis and lids follow the
 	const { createDefaults } = await import('../src/params/params')
 	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
 	const params = createDefaults(PARAM_SCHEMA)
-	params.animation.microsaccades = false
+	params.animation.gaze = 'camera'
+	params.animation.microMovements = 0
 	const animator = new Animator(3)
-	animator.gaze.settings = { ...animator.gaze.settings, driftSigma: 0 }
 	let state
 	for (let i = 0; i < 240; i++) {
 		state = animator.step(1 / 60, params, {
-			sceneLuminance: 5,
+			luminance: () => 5,
 			pointer: { x: 0, y: 0 },
 			camera: { yaw: 0, pitch: 10 },
 			nasalSign: 1,
@@ -118,7 +161,7 @@ test('a still eye takes its pupil and gaze from the parameters, not the camera',
 	params.iris.pupilDiameter = 4.2
 	const animator = new Animator(3)
 	const context = {
-		sceneLuminance: 50,
+		luminance: () => 50,
 		pointer: { x: 0.5, y: 0.5 },
 		camera: { yaw: 30, pitch: 20 },
 	}
@@ -136,9 +179,10 @@ test('a living eye starts at rest on its target: a frozen start is the steady st
 	const { createDefaults } = await import('../src/params/params')
 	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
 	const params = createDefaults(PARAM_SCHEMA)
+	params.animation.gaze = 'camera'
 	const animator = new Animator(5)
 	const state = animator.step(0, params, {
-		sceneLuminance: 5,
+		luminance: () => 5,
 		pointer: { x: 0, y: 0 },
 		camera: { yaw: -26, pitch: -7.8 },
 		nasalSign: 1,
@@ -149,7 +193,7 @@ test('a living eye starts at rest on its target: a frozen start is the steady st
 	assert.deepEqual(state.framing, { yaw: -26, pitch: -7.8 })
 	params.animation.gaze = 'cursor'
 	const roaming = animator.step(1 / 60, params, {
-		sceneLuminance: 5,
+		luminance: () => 5,
 		pointer: { x: 0.5, y: 0.5 },
 		camera: { yaw: -26, pitch: -7.8 },
 		nasalSign: 1,
@@ -159,4 +203,93 @@ test('a living eye starts at rest on its target: a frozen start is the steady st
 		{ yaw: 0, pitch: 0 },
 		'a roaming eye moves within a still frame',
 	)
+})
+
+test('looking around: starts straight ahead, then looks within the range, framed still', async () => {
+	const { default: Animator } = await import('../src/animation/animator')
+	const { createDefaults } = await import('../src/params/params')
+	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(PARAM_SCHEMA)
+	assert.equal(params.animation.gaze, 'wander', 'the default')
+	params.animation.microMovements = 0
+	const animator = new Animator(7)
+	const context = {
+		luminance: () => 5,
+		pointer: { x: 0, y: 0 },
+		camera: { yaw: -26, pitch: -7.8 },
+		nasalSign: 1,
+	}
+	const first = animator.step(0, params, context)
+	close(first.yaw, -params.eye.kappa, 1e-9, 'straight ahead')
+	close(first.pitch, 0, 1e-9)
+	const lines = new Set()
+	let state
+	for (let i = 0; i < 60 * 30; i++) {
+		state = animator.step(1 / 60, params, context)
+		const yaw = state.yaw + params.eye.kappa
+		assert.ok(Math.hypot(yaw, state.pitch / 0.6) <= params.animation.lookRange + 1e-6)
+		assert.deepEqual(state.framing, { yaw: 0, pitch: 0 })
+		lines.add(`${Math.round(yaw)},${Math.round(state.pitch)}`)
+	}
+	assert.ok(animator.gaze.shifts >= 5, `${animator.gaze.shifts} looks in 30 s`)
+	assert.ok(lines.size >= 5)
+	// The looks move with their center.
+	params.animation.yaw = 10
+	for (let i = 0; i < 60 * 10; i++) state = animator.step(1 / 60, params, context)
+	assert.deepEqual(state.framing, { yaw: 10, pitch: 0 })
+})
+
+test('each look brings its own pupil size, eased in', async () => {
+	const { default: Animator } = await import('../src/animation/animator')
+	const { createDefaults } = await import('../src/params/params')
+	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const run = (response) => {
+		const params = createDefaults(PARAM_SCHEMA)
+		params.animation.microMovements = 0
+		params.animation.hippus = 0
+		params.animation.pupilResponse = response
+		const animator = new Animator(11)
+		const context = {
+			luminance: () => 5,
+			pointer: { x: 0, y: 0 },
+			camera: { yaw: 0, pitch: 0 },
+			nasalSign: 1,
+		}
+		const diameters = []
+		for (let i = 0; i < 60 * 30; i++)
+			diameters.push(animator.step(1 / 60, params, context).pupilDiameter)
+		return diameters
+	}
+	const still = run(0)
+	assert.ok(Math.max(...still) - Math.min(...still) < 1e-9, 'constant light, no look response')
+	const living = run(0.8)
+	assert.ok(Math.max(...living) - Math.min(...living) > 0.2, 'the pupil changes with the looks')
+	let maxStep = 0
+	for (let i = 1; i < living.length; i++)
+		maxStep = Math.max(maxStep, Math.abs(living[i] - living[i - 1]))
+	assert.ok(maxStep < 0.03, `smoothly: ${maxStep} mm per frame`)
+})
+
+test('the light along the line of sight sets the pupil', async () => {
+	const { default: Animator } = await import('../src/animation/animator')
+	const { createDefaults } = await import('../src/params/params')
+	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(PARAM_SCHEMA)
+	params.animation.gaze = 'fixed'
+	params.animation.microMovements = 0
+	params.animation.hippus = 0
+	params.animation.pupilResponse = 0
+	const settle = (yaw) => {
+		params.animation.yaw = yaw
+		const animator = new Animator(1)
+		const context = {
+			// A light toward +yaw.
+			luminance: (y) => 1 + 20 * Math.max(0, y / 20),
+			pointer: { x: 0, y: 0 },
+			camera: { yaw: 0, pitch: 0 },
+			nasalSign: 1,
+		}
+		return animator.step(0, params, context).pupilDiameter
+	}
+	assert.ok(settle(20) < settle(-20) - 0.5)
 })

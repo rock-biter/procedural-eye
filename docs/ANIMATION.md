@@ -17,21 +17,28 @@ The measurements behind the models are in [`docs/RESEARCH.md`](RESEARCH.md).
 
 The reference presets are still eyes, so their tuned pupil and gaze hold in captures.
 
+**Transitions**: a preset or a random eye glides in ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#transitions)). When it changes where the pose comes from (a still eye coming alive or the reverse, another gaze mode, the reflex toggled), `EyeApp` blends the pose from where it was with the transition's progress: pupil, gaze, lids and framing.
+
 ## Pupil
 
 [`src/animation/pupilDynamics.js`](../src/animation/pupilDynamics.js):
 
 - **Steady state**: Watson & Yellott's unified formula.
   - Its inputs are the luminance, a field area of 1250 deg², `eye.age`, and both eyes open.
-  - The luminance is the rig's `sceneLuminance()` × `animation.adaptation`, which converts rig units to cd/m².
-  - The default studio gives about 2.9 mm.
+  - The luminance is the rig's `sceneLuminance()` toward the line of sight × `animation.adaptation`, which converts rig units to cd/m².
+  - **Line of sight**: each emitter counts with a Gaussian of its angle from the line of sight (σ 30°), an approximation of the pupil's weaker response to peripheral light; the background surrounds the eye and counts fully. Looking toward a light constricts the pupil.
+  - The default studio gives about 2.9 mm, looking straight ahead.
+- **Looks**: each gaze shift (microsaccades excluded) brings its own pupil change within ±`animation.pupilResponse` mm.
+  - It is 0.5·N(0, 1) + (pitch of the look − `animation.pitch`) / 25°, clamped to ±1, times `pupilResponse`.
+  - Interest dilates the pupil (the psychosensory response); nearer things constrict it (the near response), and they lie more often below, so looks down constrict on average.
+  - The change eases in through two cascaded 0.3 s lags, then goes through the dynamics below.
 - **Dynamics**: Pamplona et al.'s model in M = atanh((D − 4.9) / 3).
   - **Latency**: the pupil answers the target of 0.23 s ago, kept in a history buffer.
   - **Approach**: exponential in M, with time constants of 0.22 s when constricting and 0.7 s when dilating.
   - **Speed**: capped at 4.2 mm/s when constricting and 1.1 mm/s when dilating.
   - **Step**: fixed sub-steps of 1/240 s, so the result does not depend on the frame rate.
 - **Hippus**: five seeded sines from 0.05 to 2.3 Hz, with amplitude `animation.hippus` (RMS about half of it).
-- **Toggle**: with `animation.pupilReflex` off, the pupil is `iris.pupilDiameter`.
+- **Toggle**: with `animation.pupilReflex` off, the pupil is `iris.pupilDiameter` (no look changes either).
 
 The iris follows any diameter through its rest space ([`docs/IRIS.md`](IRIS.md#rest-space-and-dilation)).
 
@@ -43,19 +50,23 @@ The iris follows any diameter through its rest space ([`docs/IRIS.md`](IRIS.md#r
 
   | Mode | Target |
   | --- | --- |
+  | `wander` (default) | Looks around `animation.yaw` / `animation.pitch`, straight ahead by default (below) |
   | `camera` | The camera, seen from the globe center |
   | `cursor` | The pointer over the canvas, up to ±25° by ±18° |
-  | `wander` | A new random target every 0.8–3 s, within ±12° by ±7° |
   | `fixed` | `animation.yaw`, `animation.pitch` |
 
   A still eye ignores the mode and looks along `animation.yaw` / `animation.pitch`.
+- **Looking around** (`wander`):
+  - The first look is the center. Each look holds for about `animation.lookInterval` seconds (log-normal, σ 0.4).
+  - Looks fall within `animation.lookRange` of the center, vertically 0.6 of it.
+  - One look in three comes back near the center (within 0.15 of the range); the others land at least a third of the range from the last one.
 - **Saccades**: they start when the target is more than 0.6° away.
-  - The duration follows the main sequence, 2.2 ms per degree + 21 ms; the peak velocity is ≈ 500·(1 − e^(−A/14)) °/s.
+  - The duration follows the main sequence, 2.2 ms per degree + 21 ms, stretched by `animation.saccadeSlowdown` (5 by default, 1 is physiological); the physiological peak velocity is ≈ 500·(1 − e^(−A/14)) °/s.
+  - **Slowdown**: a real 10° saccade lasts 43 ms, two or three frames, and reads as a jump in a macro close-up. Five times slower it lasts 0.2 s.
   - The profile is minimum-jerk.
-- **Microsaccades** (`animation.microsaccades`): a Poisson process at 1.5 Hz during fixation.
-  - Amplitudes are log-normal around 0.35°, capped at 1°.
-  - Each also corrects half of the accumulated drift.
-- **Drift**: an Ornstein–Uhlenbeck walk around the fixation point (σ 0.25 °/√s, return rate 2.5 /s).
+- **Micro-movements** (`animation.microMovements`, 0.3 by default) scale the microsaccades and the drift: 1 is physiological, 0 none.
+  - **Microsaccades**: a Poisson process at 1.5 Hz × the scale during fixation. Amplitudes are log-normal around 0.35° × the scale, capped at 1°. Each also corrects half of the line of sight's error, and is slowed like the saccades.
+  - **Drift**: smooth. Its velocity is an Ornstein–Uhlenbeck process (RMS 0.5 °/s × the scale, correlation time 0.2 s), and the offset returns at 2.5 /s toward the saccadic position. At full scale that is about 0.11° RMS, without frame-to-frame jitter.
 - **Visual axis**: the target is aimed by the visual axis; the optical axis turns `eye.kappa` temporal of it.
 - **Orientation**: `gazeQuaternion()` gives the shortest-arc rotation from primary position (Listing's law, no torsion). `EyeRig` applies it about the center of rotation.
 - **Start**: the first living step starts at rest on its target, so a frozen start is the steady state for the gaze as well as for the pupil.
@@ -68,10 +79,11 @@ The camera aims and focuses at the entrance pupil, turned about the center of ro
 | --- | --- |
 | Still eye, or `fixed` gaze | `animation.yaw`, `animation.pitch` |
 | `camera` gaze | The camera, so the eye looking into the lens stays centered and sharp as the camera orbits. The first frame starts at the settled point (the eye looking along the orbit). |
-| `cursor`, `wander` | Straight ahead, so the eye roams within a still frame |
+| `wander` | `animation.yaw`, `animation.pitch`: the center of the looks, so the eye looks around within a still frame |
+| `cursor` | Straight ahead, so the eye roams within a still frame |
 
 - **Photo mode**: the framing stays with the frozen eye, so the camera can circle it.
-- **Offset**: the framed point ignores κ, so a straight-ahead eye frames exactly as before; an eye turned to the camera sits about 0.9 mm off center.
+- **Offset**: the framed point ignores κ, so a straight-ahead eye frames as if κ were 0; an eye turned to the camera sits about 0.9 mm off center.
 
 ## Lid Follow
 

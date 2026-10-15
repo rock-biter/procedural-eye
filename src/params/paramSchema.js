@@ -8,6 +8,9 @@
 // A leaf whose default is a '#rrggbb' string is a color; one with `options`
 // is a choice; booleans are toggles. Lengths are millimeters unless the unit
 // says otherwise. Ranges come from the measurements in docs/RESEARCH.md.
+// Transitions (src/params/paramTransition.js) glide numbers and colors; a
+// `discrete` number (a seed, a count) changes in one step, and a toggle that
+// `fades` its sibling leaf fades it from or to zero instead of switching.
 
 const num = (value, min, max, step, unit, kind = 'uniform', label) => ({
 	default: value,
@@ -26,6 +29,8 @@ const choice = (value, options, kind = 'uniform', label) => ({
 	label,
 })
 const color = (value, kind = 'uniform', label) => ({ default: value, kind, label })
+const discrete = (leaf) => ({ ...leaf, discrete: true })
+const fading = (leaf, sibling = 'intensity') => ({ ...leaf, fades: sibling })
 
 export const DEBUG_VIEWS = [
 	'beauty',
@@ -51,12 +56,16 @@ export const PARAM_SCHEMA = {
 	animation: {
 		enabled: toggle(true, 'uniform', 'living eye'),
 		pupilReflex: toggle(true, 'uniform', 'pupil light reflex'),
-		adaptation: num(40, 1, 1000, 1, 'cd/m² per unit', 'uniform', 'luminance scale'),
+		adaptation: num(110, 1, 1000, 1, 'cd/m² per unit', 'uniform', 'luminance scale'),
 		hippus: num(0.15, 0, 0.6, 0.01, 'mm'),
-		gaze: choice('camera', ['camera', 'cursor', 'wander', 'fixed']),
+		pupilResponse: num(0.5, 0, 1.5, 0.01, 'mm', 'uniform', 'pupil change per look'),
+		gaze: choice('wander', ['camera', 'cursor', 'wander', 'fixed']),
 		yaw: num(0, -30, 30, 0.1, 'deg'),
 		pitch: num(0, -25, 25, 0.1, 'deg'),
-		microsaccades: toggle(true),
+		lookRange: num(12, 0, 25, 0.1, 'deg', 'uniform', 'look-around range'),
+		lookInterval: num(2.5, 0.5, 10, 0.1, 's', 'uniform', 'time between looks'),
+		saccadeSlowdown: num(5, 1, 12, 0.1, '×', 'uniform', 'saccade slowdown'),
+		microMovements: num(0.3, 0, 1, 0.01, '', 'uniform', 'micro-movements'),
 		lidFollow: num(1, 0, 1.5, 0.01, '', 'uniform', 'lid follow'),
 	},
 	globe: {
@@ -91,7 +100,7 @@ export const PARAM_SCHEMA = {
 		pupilDecentration: num(0.15, 0, 0.5, 0.01, 'mm', 'uniform', 'nasal decentration'),
 	},
 	irisStructure: {
-		seed: num(1, 1, 9999, 1, '', 'bake'),
+		seed: discrete(num(1, 1, 9999, 1, '', 'bake')),
 		marginThickness: num(0.45, 0.2, 0.8, 0.01, 'mm', 'bake', 'thickness at margin'),
 		collaretteThickness: num(0.6, 0.3, 0.9, 0.01, 'mm', 'bake', 'thickness at collarette'),
 		rootThickness: num(0.38, 0.2, 0.6, 0.01, 'mm', 'bake', 'thickness at root'),
@@ -99,20 +108,20 @@ export const PARAM_SCHEMA = {
 		collarette: {
 			position: num(0.3, 0.15, 0.5, 0.005, '', 'bake', 'position (share of width)'),
 			amplitude: num(0.05, 0, 0.15, 0.002, '', 'bake', 'zig-zag amplitude'),
-			teeth: num(16, 6, 40, 1, '', 'bake'),
+			teeth: discrete(num(16, 6, 40, 1, '', 'bake')),
 			irregularity: num(0.6, 0, 1, 0.01, '', 'bake'),
 			height: num(0.07, 0, 0.25, 0.005, 'mm', 'bake', 'ridge height'),
 			width: num(0.16, 0.03, 0.5, 0.005, 'mm', 'bake', 'ridge width'),
 		},
 		furrows: {
-			count: num(3, 0, 6, 1, '', 'bake'),
+			count: discrete(num(3, 0, 6, 1, '', 'bake')),
 			extent: num(0.75, 0, 1, 0.01, '', 'bake', 'extent (share of circle)'),
 			depth: num(0.05, 0, 0.15, 0.002, 'mm', 'bake'),
 			width: num(0.06, 0.02, 0.2, 0.002, 'mm', 'bake'),
 		},
 		surface: {
 			radialNoise: num(0.03, 0, 0.1, 0.001, 'mm', 'bake', 'radial streaks'),
-			radialFrequency: num(260, 40, 800, 1, '', 'bake', 'streaks around'),
+			radialFrequency: discrete(num(260, 40, 800, 1, '', 'bake', 'streaks around')),
 			undulation: num(0.04, 0, 0.15, 0.001, 'mm', 'bake'),
 		},
 		crypts: {
@@ -127,12 +136,12 @@ export const PARAM_SCHEMA = {
 			roundness: num(0.5, 0, 1, 0.01, '', 'bake', 'roundness (polygon → lens)'),
 		},
 		fibers: {
-			radialCount: num(150, 0, 300, 1, '', 'uniform', 'radial vessels'),
+			radialCount: discrete(num(150, 0, 300, 1, '', 'uniform', 'radial vessels')),
 			radialThickness: num(0.03, 0.008, 0.1, 0.001, 'mm', 'uniform', 'radial vessel radius'),
 			radialWaviness: num(0.22, 0, 0.8, 0.01, '', 'uniform', 'radial waviness'),
 			radialHeight: num(0.95, 0.5, 1.1, 0.005, '', 'uniform', 'radial height (share of surface)'),
 			radialCoverage: num(0.8, 0, 1, 0.01, '', 'uniform', 'radial coverage'),
-			arcCount: num(45, 0, 300, 1, '', 'uniform', 'collagen arcs (each way)'),
+			arcCount: discrete(num(45, 0, 300, 1, '', 'uniform', 'collagen arcs (each way)')),
 			arcThickness: num(0.026, 0.006, 0.08, 0.001, 'mm', 'uniform', 'arc radius'),
 			arcSpan: num(90, 0, 180, 1, 'deg', 'uniform', 'arc sweep root→margin'),
 			arcHeight: num(0.62, 0.2, 1, 0.005, '', 'uniform', 'arc height (share of surface)'),
@@ -141,16 +150,16 @@ export const PARAM_SCHEMA = {
 		},
 		ruff: {
 			width: num(0.085, 0.01, 0.2, 0.002, 'mm', 'uniform', 'pupillary ruff width'),
-			crenations: num(150, 20, 400, 1, '', 'uniform'),
+			crenations: discrete(num(150, 20, 400, 1, '', 'uniform')),
 		},
 		nodules: {
-			count: num(0, 0, 60, 1, '', 'bake', 'Wölfflin nodules'),
+			count: discrete(num(0, 0, 60, 1, '', 'bake', 'Wölfflin nodules')),
 			size: num(0.09, 0.02, 0.25, 0.002, 'mm', 'bake'),
 			ring: num(0.8, 0.5, 0.95, 0.005, '', 'bake', 'ring position'),
 		},
 		micro: {
 			amplitude: num(0.006, 0, 0.02, 0.0005, 'mm', 'uniform', 'micro striations'),
-			frequency: num(1400, 300, 4000, 10, '', 'uniform', 'striations around'),
+			frequency: discrete(num(1400, 300, 4000, 10, '', 'uniform', 'striations around')),
 		},
 	},
 	irisColor: {
@@ -179,7 +188,7 @@ export const PARAM_SCHEMA = {
 			width: num(0.15, 0.02, 0.4, 0.005, '', 'bake'),
 		},
 		freckles: {
-			count: num(2, 0, 32, 1, '', 'bake'),
+			count: discrete(num(2, 0, 32, 1, '', 'bake')),
 			size: num(0.3, 0.05, 1, 0.01, 'mm', 'bake'),
 			melanin: num(0.95, 0, 1, 0.01, '', 'bake'),
 			eumelanin: num(0.55, 0, 1, 0.01, '', 'bake'),
@@ -200,16 +209,22 @@ export const PARAM_SCHEMA = {
 		lidThickness: num(3.2, 1.5, 6, 0.05, 'mm', 'rebuild', 'lid thickness'),
 		creaseHeight: num(8, 4, 14, 0.1, 'mm', 'rebuild', 'upper crease height'),
 		creaseDepth: num(0.7, 0, 3, 0.05, 'mm', 'rebuild', 'upper crease depth'),
+		seed: discrete(num(1, 1, 9999, 1, '', 'rebuild', 'seed (shape, folds, skin)')),
+		irregularity: num(0.6, 0, 1, 0.01, '', 'rebuild', 'shape irregularity'),
+		hooding: num(0.45, 0, 2, 0.05, 'mm', 'rebuild', 'hooding over the crease'),
+		bags: num(0.35, 0, 1.5, 0.05, 'mm', 'rebuild', 'lower-lid fullness'),
+		folds: num(0.5, 0, 1, 0.01, '', 'rebuild', 'folds and crow’s feet'),
 		browDepth: num(4.5, -2, 12, 0.1, 'mm', 'rebuild', 'brow plane behind apex'),
 		cheekDepth: num(6.5, 0, 14, 0.1, 'mm', 'rebuild', 'cheek plane behind apex'),
+		templeDepth: num(5, 0, 12, 0.1, 'mm', 'rebuild', 'face receding toward the temple'),
 		meniscusLower: num(0.36, 0, 0.8, 0.005, 'mm', 'rebuild', 'lower tear meniscus radius'),
 		meniscusUpper: num(0.2, 0, 0.6, 0.005, 'mm', 'rebuild', 'upper tear meniscus radius'),
-		bubbles: num(14, 0, 60, 1, '', 'rebuild', 'tear bubbles'),
+		bubbles: discrete(num(14, 0, 60, 1, '', 'rebuild', 'tear bubbles')),
 	},
 	lashes: {
-		seed: num(1, 1, 9999, 1, '', 'rebuild'),
-		upperCount: num(105, 0, 200, 1, '', 'rebuild', 'upper count'),
-		lowerCount: num(70, 0, 120, 1, '', 'rebuild', 'lower count'),
+		seed: discrete(num(1, 1, 9999, 1, '', 'rebuild')),
+		upperCount: discrete(num(105, 0, 200, 1, '', 'rebuild', 'upper count')),
+		lowerCount: discrete(num(70, 0, 120, 1, '', 'rebuild', 'lower count')),
 		upperLength: num(9, 4, 14, 0.1, 'mm', 'rebuild', 'upper length'),
 		lowerLength: num(5.5, 2, 9, 0.1, 'mm', 'rebuild', 'lower length'),
 		thickness: num(0.07, 0.03, 0.14, 0.001, 'mm', 'rebuild'),
@@ -230,6 +245,9 @@ export const PARAM_SCHEMA = {
 		pores: num(0.5, 0, 1, 0.01),
 		wrinkles: num(0.5, 0, 1, 0.01),
 		translucency: num(0.5, 0, 1, 0.01, '', 'uniform', 'subsurface'),
+		freckles: num(0.15, 0, 1, 0.01),
+		veins: num(0.45, 0, 1, 0.01, '', 'uniform', 'veins (thin-skin tint)'),
+		pigmentation: num(0.4, 0, 1, 0.01, '', 'uniform', 'crease and canthi pigment'),
 	},
 	sclera: {
 		color: color('#e7ddd2', 'uniform', 'base color'),
@@ -237,9 +255,9 @@ export const PARAM_SCHEMA = {
 		redness: num(0.45, 0, 1, 0.01),
 		yellowing: num(0.15, 0, 1, 0.01),
 		vessels: {
-			seed: num(1, 1, 9999, 1, '', 'bake'),
-			conjunctival: num(28, 0, 80, 1, '', 'bake', 'conjunctival vessels'),
-			episcleral: num(14, 0, 40, 1, '', 'bake', 'episcleral vessels'),
+			seed: discrete(num(1, 1, 9999, 1, '', 'bake')),
+			conjunctival: discrete(num(28, 0, 80, 1, '', 'bake', 'conjunctival vessels')),
+			episcleral: discrete(num(14, 0, 40, 1, '', 'bake', 'episcleral vessels')),
 			tortuosity: num(1, 0.2, 2.5, 0.01, '', 'bake'),
 		},
 	},
@@ -250,7 +268,7 @@ export const PARAM_SCHEMA = {
 			floor: num(0.35, 0, 1, 0.01, '', 'uniform', 'floor brightness'),
 		},
 		key: {
-			enabled: toggle(true),
+			enabled: fading(toggle(true)),
 			shape: choice('rect', ['rect', 'disk', 'octagon']),
 			azimuth: num(38, -180, 180, 1, 'deg'),
 			elevation: num(28, -80, 80, 1, 'deg'),
@@ -263,7 +281,7 @@ export const PARAM_SCHEMA = {
 			softness: num(0.08, 0, 0.5, 0.01, '', 'uniform', 'edge softness'),
 		},
 		fill: {
-			enabled: toggle(true),
+			enabled: fading(toggle(true)),
 			shape: choice('rect', ['rect', 'disk', 'octagon']),
 			azimuth: num(-55, -180, 180, 1, 'deg'),
 			elevation: num(5, -80, 80, 1, 'deg'),
@@ -276,36 +294,36 @@ export const PARAM_SCHEMA = {
 			softness: num(0.15, 0, 0.5, 0.01, '', 'uniform', 'edge softness'),
 		},
 		window: {
-			enabled: toggle(false),
+			enabled: fading(toggle(false)),
 			azimuth: num(-35, -180, 180, 1, 'deg'),
 			elevation: num(15, -80, 80, 1, 'deg'),
 			distance: num(1800, 300, 6000, 10, 'mm'),
 			width: num(1200, 100, 4000, 10, 'mm'),
 			height: num(1500, 100, 4000, 10, 'mm'),
-			columns: num(2, 1, 6, 1, '', 'uniform', 'panes across'),
-			rows: num(3, 1, 6, 1, '', 'uniform', 'panes down'),
+			columns: discrete(num(2, 1, 6, 1, '', 'uniform', 'panes across')),
+			rows: discrete(num(3, 1, 6, 1, '', 'uniform', 'panes down')),
 			mullion: num(50, 0, 200, 1, 'mm', 'uniform', 'mullion width'),
 			intensity: num(14, 0, 200, 0.1),
 			skyTop: color('#9fc3ff'),
 			skyBottom: color('#f2f4f7'),
 		},
 		ring: {
-			enabled: toggle(false),
+			enabled: fading(toggle(false)),
 			innerRadius: num(45, 5, 200, 1, 'mm'),
 			outerRadius: num(60, 6, 220, 1, 'mm'),
 			intensity: num(25, 0, 400, 0.5),
 			temperature: num(5500, 2000, 12000, 50, 'K'),
 		},
 		leds: {
-			enabled: toggle(false),
-			count: num(12, 3, 48, 1),
+			enabled: fading(toggle(false)),
+			count: discrete(num(12, 3, 48, 1)),
 			radius: num(40, 5, 200, 1, 'mm'),
 			size: num(3, 0.5, 20, 0.1, 'mm'),
 			intensity: num(300, 0, 5000, 1),
 			temperature: num(6000, 2000, 12000, 50, 'K'),
 		},
 		sky: {
-			enabled: toggle(false),
+			enabled: fading(toggle(false)),
 			intensity: num(6, 0, 100, 0.1),
 			zenith: color('#4f8fe8'),
 			horizon: color('#cfe3f7'),
@@ -344,12 +362,12 @@ export const PARAM_SCHEMA = {
 	quality: {
 		adaptiveResolution: toggle(true, 'uniform', 'adaptive resolution'),
 		minPixelRatio: num(0.9, 0.5, 2, 0.05, '', 'uniform', 'min pixel ratio'),
-		photoSamples: num(256, 1, 4096, 1, '', 'uniform', 'photo samples'),
-		irisSteps: num(64, 16, 192, 1, '', 'uniform', 'iris march steps'),
-		irisShadowSteps: num(10, 0, 48, 1, '', 'uniform', 'iris shadow steps'),
-		irisAoSteps: num(5, 0, 8, 1, '', 'uniform', 'iris AO samples'),
-		interactiveShadowSteps: num(4, 0, 48, 1, '', 'uniform', 'shadow steps while moving'),
-		interactiveAoSteps: num(3, 0, 8, 1, '', 'uniform', 'AO samples while moving'),
+		photoSamples: discrete(num(256, 1, 4096, 1, '', 'uniform', 'photo samples')),
+		irisSteps: discrete(num(64, 16, 192, 1, '', 'uniform', 'iris march steps')),
+		irisShadowSteps: discrete(num(10, 0, 48, 1, '', 'uniform', 'iris shadow steps')),
+		irisAoSteps: discrete(num(5, 0, 8, 1, '', 'uniform', 'iris AO samples')),
+		interactiveShadowSteps: discrete(num(4, 0, 48, 1, '', 'uniform', 'shadow steps while moving')),
+		interactiveAoSteps: discrete(num(3, 0, 8, 1, '', 'uniform', 'AO samples while moving')),
 	},
 	debug: {
 		view: choice('beauty', DEBUG_VIEWS, 'define'),

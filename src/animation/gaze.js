@@ -1,14 +1,22 @@
 // Eye movements (pure): saccades to a target (main-sequence durations,
 // minimum-jerk profile), microsaccades during fixation (Poisson, ≤ 1°) and
-// slow drift (an Ornstein–Uhlenbeck process). Angles in degrees: yaw positive
-// toward +X (the right of the picture), pitch positive up. The orientation
-// follows Listing's law: the shortest-arc rotation from primary position.
+// slow drift. Angles in degrees: yaw positive toward +X (the right of the
+// picture), pitch positive up. The orientation follows Listing's law: the
+// shortest-arc rotation from primary position.
+//
+// The line of sight is a saccadic position plus a drift offset. The drift is
+// smooth: its velocity is an Ornstein–Uhlenbeck process and the offset returns
+// toward the saccadic position, so it has no frame-to-frame jitter. Two
+// scales leave physiology on demand: `slowdown` stretches every saccade (a
+// real one lasts two or three frames and reads as a jump in a macro close-up),
+// and `micro` scales the rate and size of the microsaccades and the drift.
 
 export const GAZE = Object.freeze({
 	saccadeThreshold: 0.6,
 	microsaccadeRate: 1.5, // per second
 	microsaccadeAmplitude: 0.35,
-	driftSigma: 0.25, // °/√s
+	driftSpeed: 0.5, // RMS drift velocity, °/s (about 0.11° RMS offset)
+	driftCorrelation: 0.2, // s
 	driftReturn: 2.5, // 1/s
 })
 
@@ -32,8 +40,16 @@ export class GazeModel {
 		this.pitch = 0
 		this.target = { yaw: 0, pitch: 0 }
 		this.saccade = null
+		// The saccadic position, and the drift offset with its velocity.
+		this.base = { yaw: 0, pitch: 0 }
 		this.drift = { yaw: 0, pitch: 0 }
-		this.microsaccades = true
+		this.driftVelocity = { yaw: 0, pitch: 0 }
+		// Saccade duration factor (1: the main sequence) and the scale of the
+		// micro-movements (0: none, 1: physiological).
+		this.slowdown = 1
+		this.micro = 1
+		// Saccades to a new target so far (microsaccades excluded).
+		this.shifts = 0
 	}
 
 	setTarget(yaw, pitch) {
@@ -43,19 +59,25 @@ export class GazeModel {
 	// Puts the eye at rest on (yaw, pitch), the steady state, without a saccade.
 	settle(yaw, pitch) {
 		this.target = { yaw, pitch }
+		this.base = { yaw, pitch }
+		this.drift = { yaw: 0, pitch: 0 }
+		this.driftVelocity = { yaw: 0, pitch: 0 }
+		this.saccade = null
 		this.yaw = yaw
 		this.pitch = pitch
-		this.saccade = null
 	}
 
-	startSaccade(yaw, pitch) {
-		const amplitude = Math.hypot(yaw - this.yaw, pitch - this.pitch)
+	// A saccade of the saccadic position to (yaw, pitch); `micro` for a
+	// microsaccade, which does not count as a shift.
+	startSaccade(yaw, pitch, micro = false) {
+		const amplitude = Math.hypot(yaw - this.base.yaw, pitch - this.base.pitch)
 		this.saccade = {
-			from: { yaw: this.yaw, pitch: this.pitch },
+			from: { ...this.base },
 			to: { yaw, pitch },
 			elapsed: 0,
-			duration: saccadeDuration(amplitude),
+			duration: saccadeDuration(amplitude) * this.slowdown,
 		}
+		if (!micro) this.shifts++
 	}
 
 	gaussian() {
@@ -70,32 +92,42 @@ export class GazeModel {
 			saccade.elapsed += dt
 			const t = Math.min(saccade.elapsed / saccade.duration, 1)
 			const k = minimumJerk(t)
-			this.yaw = saccade.from.yaw + (saccade.to.yaw - saccade.from.yaw) * k
-			this.pitch = saccade.from.pitch + (saccade.to.pitch - saccade.from.pitch) * k
+			this.base.yaw = saccade.from.yaw + (saccade.to.yaw - saccade.from.yaw) * k
+			this.base.pitch = saccade.from.pitch + (saccade.to.pitch - saccade.from.pitch) * k
 			if (t >= 1) this.saccade = null
 		} else {
-			const error = Math.hypot(this.target.yaw - this.yaw, this.target.pitch - this.pitch)
+			const error = Math.hypot(this.target.yaw - this.base.yaw, this.target.pitch - this.base.pitch)
 			if (error > s.saccadeThreshold) {
 				this.startSaccade(this.target.yaw, this.target.pitch)
-			} else if (this.microsaccades && this.random() < s.microsaccadeRate * dt) {
-				const amplitude = Math.min(1, s.microsaccadeAmplitude * Math.exp(0.5 * this.gaussian()))
+			} else if (this.micro > 0 && this.random() < s.microsaccadeRate * this.micro * dt) {
+				const size = s.microsaccadeAmplitude * this.micro * Math.exp(0.5 * this.gaussian())
+				const amplitude = Math.min(1, size)
 				const angle = this.random() * Math.PI * 2
-				// Microsaccades also correct the drift back toward the target.
-				const yaw =
-					this.target.yaw + 0.5 * (this.yaw - this.target.yaw) + amplitude * Math.cos(angle)
-				const pitch =
-					this.target.pitch + 0.5 * (this.pitch - this.target.pitch) + amplitude * Math.sin(angle)
-				this.startSaccade(yaw, pitch)
-			} else {
-				// Drift: mean-reverting random walk around the fixation point.
-				const decay = Math.exp(-s.driftReturn * dt)
-				const noise = s.driftSigma * Math.sqrt(dt)
-				this.yaw = this.target.yaw + (this.yaw - this.target.yaw) * decay + noise * this.gaussian()
-				this.pitch =
-					this.target.pitch + (this.pitch - this.target.pitch) * decay + noise * this.gaussian()
+				// Microsaccades also correct half of the line of sight's error.
+				const yaw = this.yaw + this.target.yaw
+				const pitch = this.pitch + this.target.pitch
+				this.startSaccade(
+					0.5 * yaw + amplitude * Math.cos(angle) - this.drift.yaw,
+					0.5 * pitch + amplitude * Math.sin(angle) - this.drift.pitch,
+					true,
+				)
 			}
 		}
+		this.stepDrift(dt)
+		this.yaw = this.base.yaw + this.drift.yaw
+		this.pitch = this.base.pitch + this.drift.pitch
 		return { yaw: this.yaw, pitch: this.pitch }
+	}
+
+	stepDrift(dt) {
+		const s = this.settings
+		const decay = Math.exp(-dt / s.driftCorrelation)
+		const noise = s.driftSpeed * this.micro * Math.sqrt(1 - decay * decay)
+		const back = Math.exp(-s.driftReturn * dt)
+		for (const axis of ['yaw', 'pitch']) {
+			this.driftVelocity[axis] = this.driftVelocity[axis] * decay + noise * this.gaussian()
+			this.drift[axis] = this.drift[axis] * back + this.driftVelocity[axis] * dt
+		}
 	}
 }
 

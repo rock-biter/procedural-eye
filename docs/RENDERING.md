@@ -78,7 +78,8 @@ The accumulation history keeps the alpha for the depth of field. The effects rec
 | `uIrisColorMisc`, `uIrisTint` | ABL share over the radial vessels, saturation, LUT stroma range; tint. |
 | `uIrisSteps`, `uIrisShadowSteps`, `uIrisAoSteps` | The quality tier of the frame. |
 | **Skin, lashes, tear film** | |
-| `uSkinColor`, `uSkin`, `uSkin2`, `uPixelAngle` | Skin color; (redness, roughness, wetness, pores); (wrinkles, translucency, lid profile ends). |
+| `uSkinColor`, `uSkin`, `uSkin2`, `uSkin3`, `uPixelAngle` | Skin color; (redness, roughness, wetness, pores); (wrinkles, translucency, lid profile ends); (freckles, veins, pigmentation, `lids.seed`). |
+| `uCanthi`, `uMarginLength`, `uDefocus` | The medial and lateral canthi in the front plane at rest; the upper and lower margin lengths; the camera's aperture diameter and focus distance, which widen the footprint of the skin's fine relief by the blur circle ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). |
 | `uLashColor`, `uLashShine` | Lash fiber color and cuticle shine. |
 | `uTearTint` | What the water shows of what lies behind. |
 
@@ -103,7 +104,7 @@ Defines:
 | `lid-follow.glsl` | Lid rotation with the gaze and its inverse for rest-space lookups. |
 | `key-shadow.glsl` | Shadow map lookup (Poisson PCF or hard). |
 | `lit-surface.glsl` | Shared lighting of the world-space surfaces (wrap diffuse, GGX with representative points, wet mirror). |
-| `skin-relief.glsl`, `noise3.glsl` | Worley skin micro-relief; 3D gradient noise with derivatives. |
+| `skin-relief.glsl`, `noise3.glsl` | Skin micro-relief with analytic gradients (furrows, fine network, pores, wrinkles, crow's feet), prefiltered by the pixel footprint, and the skin's pigment patterns (mottling, freckles, veins); 3D gradient noise with derivatives. |
 | `debug-views.glsl` | Debug view numbering. |
 | `eyeball-*.glsl`, `skin-*.glsl`, `lash-*.glsl`, `tear-*.glsl`, `shadow-depth-*.glsl` | Scene program entry points. |
 | `fullscreen-vertex.glsl`, `accumulate-fragment.glsl`, `present-fragment.glsl`, `dof-gather-fragment.glsl`, `dof-composite-fragment.glsl`, `color-grade-fragment.glsl`, `film-grain-fragment.glsl` | Pass and effect programs. |

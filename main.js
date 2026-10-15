@@ -3,11 +3,13 @@ import EyeApp from './src/app'
 import { PARAM_SCHEMA } from './src/params/paramSchema'
 import {
 	applyOverrides,
+	cloneParams,
 	createDefaults,
 	createParams,
 	decodeState,
 	setValue,
 } from './src/params/params'
+import { TRANSITION } from './src/params/paramTransition'
 import { ANCESTRIES, randomEye } from './src/params/populationPriors'
 import { PRESETS } from './src/params/presets'
 import RenderSetup from './src/renderSetup'
@@ -27,6 +29,33 @@ const setup = new RenderSetup({ params, urlParams })
 const app = new EyeApp({ setup, params, frozen: urlParams.has('photo') })
 // The app object itself, for console debugging.
 if (urlParams.has('debug')) window.__EYE_APP__ = app
+
+// The panel's random-eye ancestry and the length of preset and random-eye
+// transitions (seconds; 0 switches at once).
+const panelState = { ancestry: 'european', transition: TRANSITION.duration }
+
+// The groups a random eye resets to their defaults before applying its sample.
+const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera', 'lashes', 'skin']
+
+// Glides to the preset `name`: its overrides on the defaults.
+function loadPreset(name, duration = panelState.transition) {
+	if (!PRESETS[name]) return false
+	app.transitionTo(createParams(PARAM_SCHEMA, PRESETS[name].params), duration)
+	return true
+}
+
+// Glides to a random eye of `ancestry`. The other groups keep the values a
+// running transition is heading for.
+function loadRandomEye(ancestry = panelState.ancestry, seed, duration = panelState.transition) {
+	const { params: overrides, features } = randomEye(ancestry, seed)
+	const target = cloneParams(app.targetParams)
+	const defaults = createDefaults(PARAM_SCHEMA)
+	for (const group of RANDOM_EYE_GROUPS) target[group] = structuredClone(defaults[group])
+	applyOverrides(PARAM_SCHEMA, target, overrides)
+	app.transitionTo(target, duration)
+	return features
+}
+
 window.__EYE__ = {
 	...app.createApi(),
 	getPresetNames: () => Object.keys(PRESETS),
@@ -34,9 +63,9 @@ window.__EYE__ = {
 		const preset = PRESETS[name]
 		return preset ? { label: preset.label, references: preset.references ?? [] } : null
 	},
+	loadPreset,
+	randomEye: loadRandomEye,
 }
-
-const randomState = { ancestry: 'european' }
 
 // Downloads the current (accumulated) image with its state in a tEXt chunk.
 async function savePng() {
@@ -60,35 +89,12 @@ if (urlParams.get('gui') !== '0') {
 		params,
 		presets: PRESETS,
 		onChange: (path) => app.onParamChange(path),
-		onPreset: (name) => {
-			const fresh = createParams(PARAM_SCHEMA, PRESETS[name].params)
-			applyOverrides(PARAM_SCHEMA, params, fresh)
-			app.dirty.add('rebuild').add('define')
-			app.notifyChange('*')
-		},
+		onPreset: (name) => loadPreset(name),
 		actions: [
 			{ title: 'Photo (freeze / live) — Space', run: () => window.__EYE__.toggleFrozen() },
 			{
 				title: 'Random eye',
-				run: () => {
-					const { params: overrides, features } = randomEye(randomState.ancestry)
-					const defaults = createDefaults(PARAM_SCHEMA)
-					for (const group of [
-						'eye',
-						'iris',
-						'irisColor',
-						'irisStructure',
-						'sclera',
-						'lashes',
-						'skin',
-					]) {
-						params[group] = structuredClone(defaults[group])
-					}
-					applyOverrides(PARAM_SCHEMA, params, overrides)
-					console.log('Random eye', randomState.ancestry, features)
-					app.dirty.add('rebuild').add('bake').add('define')
-					app.notifyChange('*')
-				},
+				run: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
 			},
 			{ title: 'Save PNG', run: () => savePng() },
 			{
@@ -102,10 +108,17 @@ if (urlParams.get('gui') !== '0') {
 			},
 		],
 	})
-	gui.pane.addBinding(randomState, 'ancestry', {
+	gui.pane.addBinding(panelState, 'ancestry', {
 		label: 'random ancestry',
 		options: Object.fromEntries(ANCESTRIES.map((name) => [name, name])),
 		index: 1,
+	})
+	gui.pane.addBinding(panelState, 'transition', {
+		label: 'transition (s)',
+		min: 0,
+		max: 6,
+		step: 0.1,
+		index: 3,
 	})
 	app.listeners.add((path) => {
 		if (path === 'camera' || path === '*') gui.refresh()

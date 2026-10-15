@@ -276,15 +276,25 @@ export function packBackground(lighting) {
 }
 
 // Approximate photometric illuminance at the eye from the rig and background
-// (relative units), the input of the pupil model.
-export function sceneLuminance(lighting, list) {
+// (relative units), the input of the pupil model. With a line of sight
+// `direction` (unit, world space), each emitter is weighed as the pupil weighs
+// light: by a Gaussian of its angle from the line of sight (`fieldSigma`
+// degrees), so looking toward a light constricts the pupil. The background
+// surrounds the eye and keeps its full weight.
+export function sceneLuminance(lighting, list, direction = null, fieldSigma = 30) {
 	const { uRoom, uSkyHorizon } = packBackground(lighting)
 	let total = lighting.sky.enabled ? luminance(uSkyHorizon) * Math.PI : luminance(uRoom) * Math.PI
 	for (const item of list) {
 		if (item.type === EMITTER_TYPE.LENS || item.type === EMITTER_TYPE.BLOCKER) continue
 		const distance = vec3.length(item.center)
 		const area = 4 * item.halfWidth * item.halfHeight
-		total += (luminance(item.radiance) * area) / (distance * distance)
+		let weight = 1
+		if (direction) {
+			const cosine = vec3.dot(direction, item.center) / distance
+			const angle = Math.acos(Math.min(Math.max(cosine, -1), 1)) / DEG
+			weight = Math.exp(-0.5 * (angle / fieldSigma) ** 2)
+		}
+		total += (weight * luminance(item.radiance) * area) / (distance * distance)
 	}
 	return total
 }

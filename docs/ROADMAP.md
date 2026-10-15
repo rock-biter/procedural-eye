@@ -31,14 +31,18 @@
 - **Lid geometry**:
   - At the canthi the two lids meet in a sharp crease.
   - Extreme shapes crease the skin within a few millimeters of the canthi: very open or very thick lids, or MRD2 above about 6 mm.
-  - Strongly tilted, wide fissures, and ptosis, fold the far skin more than 20 mm from the axis, which is out of view in macro framings.
+  - Strongly tilted, wide fissures, and ptosis, fold the far skin about 19 mm or more from the axis, which is out of view in macro framings.
   - The lid surface is a ring offset from the fissure loop. A fold-free parameterization of the far skin, such as a conformal map of the annulus, would remove these.
+- **Skin**:
+  - The hooding is a bulge over the crease; it does not overhang it.
+  - The fine relief is evaluated in the front plane, so it stretches where the skin turns away from it, deep in the canthi.
+  - There are no vellus hairs.
 - **Lashes**: they have no minimum on-screen width, so far-off fine lashes alias in interactive frames until the accumulation resolves them.
 - **Export**: **Save PNG** writes the canvas resolution. Tiled high-resolution export is not implemented.
 - **Pupil**: the panel has no light-step button and no D(t) graph. The dynamics are covered by unit tests.
-- **Age**: `eye.age` only changes the pupil, not the scleral yellowing or the limbal ring.
+- **Age**: `eye.age` only changes the pupil, not the scleral yellowing, the limbal ring, or the lids' hooding, bags and folds.
 - **Self-test**: there is no `?selftest=1` comparison of GLSL twins against their JS versions. Shader–CPU agreement is checked visually (the refraction checker, captures).
-- **Gaze and orbit**: a living eye with `animation.gaze` = `camera` turns toward the camera as it orbits. Use `fixed`, photo mode, or a still eye to look at grazing angles.
+- **Gaze and orbit**: a living eye with `animation.gaze` = `camera` turns toward the camera as it orbits. Use the default `wander`, `fixed`, photo mode, or a still eye to look at grazing angles.
 
 ## Future Work
 

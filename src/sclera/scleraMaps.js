@@ -26,9 +26,14 @@ export default class ScleraMaps {
 		this.texture.minFilter = LinearMipmapLinearFilter
 		this.texture.magFilter = LinearFilter
 		this.texture.name = 'ScleraVessels'
+		this.key = null
 	}
 
+	// Rasterizes the network, unless its parameters and the globe are unchanged.
 	bake(params, scleraRadius) {
+		const key = JSON.stringify([params.sclera.vessels, scleraRadius])
+		if (key === this.key) return
+		this.key = key
 		const segments = generateVessels(params.sclera.vessels, scleraRadius)
 		const pixelsPerMm = HEIGHT / ((SCLERA_PSI.max - SCLERA_PSI.min) * scleraRadius)
 		const context = this.canvas.getContext('2d')
@@ -62,7 +67,6 @@ export default class ScleraMaps {
 			context.filter = 'none'
 		}
 		this.texture.needsUpdate = true
-		return segments.length
 	}
 
 	dispose() {

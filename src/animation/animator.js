@@ -3,11 +3,16 @@
 // axis orientation (yaw, pitch in degrees; the visual axis, which aims at the
 // target, lies `kappa` degrees nasal of it), the lids' follow angles and the
 // line of sight the camera frames (`framing`: the settled gaze, without the
-// micro-movements; straight ahead while the eye roams after the cursor or
-// wanders, so it moves within a still frame).
-import { createRandom } from '../random'
+// micro-movements; the center of the looks while the eye looks around,
+// straight ahead while it follows the cursor, so it moves within a still
+// frame).
+import { createRandom, gaussian } from '../random'
 import { GazeModel } from './gaze'
 import { PupilDynamics, watsonYellottDiameter } from './pupilDynamics'
+
+// The pupil change of a look settles through two cascaded lags (seconds), so
+// it eases in and out before the pupil dynamics take it.
+const LOOK_PUPIL_LAG = 0.3
 
 export default class Animator {
 	constructor(seed = 1) {
@@ -15,7 +20,15 @@ export default class Animator {
 		this.pupil = null
 		this.gaze = new GazeModel(this.random)
 		this.gazeStarted = false
-		this.wanderTimer = 0
+		// Looking around: the offset of the current look from the center and
+		// the time left on it.
+		this.look = { yaw: 0, pitch: 0 }
+		this.lookTimer = 0
+		// The pupil change of the current look (mm), its eased value, and the
+		// gaze shifts it belongs to.
+		this.lookPupil = 0
+		this.lookPupilEased = [0, 0]
+		this.shifts = 0
 		this.time = 0
 	}
 
@@ -27,20 +40,14 @@ export default class Animator {
 		})
 	}
 
-	// `pointer`: { x, y } in [-1, 1] (the canvas), `camera`: { yaw, pitch } of
-	// the camera seen from the eye, `nasalSign`: +1 for a right eye.
-	step(dt, params, { sceneLuminance, pointer, camera, nasalSign }) {
+	// `luminance(yaw, pitch)`: the scene luminance toward a line of sight
+	// (degrees), `pointer`: { x, y } in [-1, 1] (the canvas), `camera`:
+	// { yaw, pitch } of the camera seen from the eye, `nasalSign`: +1 for a
+	// right eye.
+	step(dt, params, { luminance, pointer, camera, nasalSign }) {
 		const a = params.animation
 		if (!a.enabled) return this.rest(params, nasalSign)
 		this.time += dt
-		const target = a.pupilReflex
-			? this.targetPupil(params, sceneLuminance)
-			: params.iris.pupilDiameter
-		this.pupil ??= new PupilDynamics(target, this.random)
-		this.pupil.step(dt, target)
-		const pupilDiameter = a.pupilReflex
-			? this.pupil.withHippus(a.hippus)
-			: params.iris.pupilDiameter
 
 		let yaw
 		let pitch
@@ -54,24 +61,82 @@ export default class Animator {
 			yaw = a.yaw
 			pitch = a.pitch
 		} else {
-			this.wanderTimer -= dt
-			if (this.wanderTimer <= 0) {
-				this.wanderTimer = 0.8 + 2.2 * this.random()
-				this.wanderTarget = { yaw: (this.random() - 0.5) * 24, pitch: (this.random() - 0.5) * 14 }
-			}
-			yaw = this.wanderTarget.yaw
-			pitch = this.wanderTarget.pitch
+			if (this.gazeStarted) this.lookTimer -= dt
+			if (this.lookTimer <= 0) this.nextLook(a)
+			yaw = a.yaw + this.look.yaw
+			pitch = a.pitch + this.look.pitch
 		}
-		this.gaze.microsaccades = a.microsaccades
+		this.gaze.micro = a.microMovements
+		this.gaze.slowdown = a.saccadeSlowdown
 		// The first step starts at rest on the target: a frozen start shows the
 		// steady state, as the pupil does.
 		if (!this.gazeStarted) this.gaze.settle(yaw, pitch)
 		this.gazeStarted = true
 		this.gaze.setTarget(yaw, pitch)
 		const gaze = this.gaze.step(dt)
-		const roams = a.gaze === 'cursor' || a.gaze === 'wander'
-		const framing = roams ? { yaw: 0, pitch: 0 } : { yaw, pitch }
+
+		// The light along the line of sight, and the pupil change of the look.
+		const look = this.stepLookPupil(dt, a, pitch)
+		const target = a.pupilReflex
+			? this.targetPupil(params, luminance(gaze.yaw, gaze.pitch)) + look
+			: params.iris.pupilDiameter
+		this.pupil ??= new PupilDynamics(target, this.random)
+		this.pupil.step(dt, Math.min(Math.max(target, 1.5), 8))
+		const pupilDiameter = a.pupilReflex
+			? this.pupil.withHippus(a.hippus)
+			: params.iris.pupilDiameter
+
+		let framing = { yaw, pitch }
+		if (a.gaze === 'cursor') framing = { yaw: 0, pitch: 0 }
+		else if (a.gaze === 'wander') framing = { yaw: a.yaw, pitch: a.pitch }
 		return pose(params, pupilDiameter, gaze.yaw, gaze.pitch, nasalSign, framing)
+	}
+
+	// The next look around animation.yaw / pitch: held for about
+	// lookInterval seconds (log-normal), within lookRange (vertically 0.6 of
+	// it); one look in three comes back near the center, the others land at
+	// least a third of the range from the last one.
+	nextLook(a) {
+		const random = this.random
+		const g = gaussian(random(), random())
+		this.lookTimer = a.lookInterval * Math.exp(0.4 * g - 0.08)
+		const range = a.lookRange
+		if (!this.gazeStarted) {
+			// The eye starts on the center.
+			this.look = { yaw: 0, pitch: 0 }
+			return
+		}
+		if (random() < 1 / 3) {
+			const angle = random() * Math.PI * 2
+			const radius = 0.15 * range * random()
+			this.look = { yaw: radius * Math.cos(angle), pitch: 0.6 * radius * Math.sin(angle) }
+			return
+		}
+		let look = this.look
+		for (let i = 0; i < 8; i++) {
+			const angle = random() * Math.PI * 2
+			const radius = range * Math.sqrt(random())
+			look = { yaw: radius * Math.cos(angle), pitch: 0.6 * radius * Math.sin(angle) }
+			if (Math.hypot(look.yaw - this.look.yaw, look.pitch - this.look.pitch) >= range / 3) break
+		}
+		this.look = look
+	}
+
+	// Each gaze shift brings its own pupil size, within ±pupilResponse mm:
+	// interest dilates it, nearer things constrict it (the near response),
+	// and those lie more often below, so looks down constrict on average.
+	// `pitch`: the line of sight of the look.
+	stepLookPupil(dt, a, pitch) {
+		if (this.gaze.shifts !== this.shifts) {
+			this.shifts = this.gaze.shifts
+			const g = gaussian(this.random(), this.random())
+			this.lookPupil = a.pupilResponse * Math.min(Math.max(0.5 * g + (pitch - a.pitch) / 25, -1), 1)
+		}
+		const k = 1 - Math.exp(-dt / LOOK_PUPIL_LAG)
+		const eased = this.lookPupilEased
+		eased[0] += (this.lookPupil - eased[0]) * k
+		eased[1] += (eased[0] - eased[1]) * k
+		return eased[1]
 	}
 
 	// A still eye (the living eye off), posed by its parameters alone: the

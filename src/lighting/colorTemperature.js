@@ -42,3 +42,13 @@ export function hexToLinearRgb(hex) {
 		return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
 	})
 }
+
+// Linear sRGB components (clamped to [0, 1]) to '#rrggbb' (sRGB).
+export function linearRgbToHex(rgb) {
+	const bytes = rgb.map((c) => {
+		const l = Math.min(Math.max(c, 0), 1)
+		const s = l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055
+		return Math.round(s * 255)
+	})
+	return `#${((1 << 24) | (bytes[0] << 16) | (bytes[1] << 8) | bytes[2]).toString(16).slice(1)}`
+}

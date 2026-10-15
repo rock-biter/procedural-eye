@@ -26,6 +26,7 @@ pnpm capture    # renders presets headlessly next to the reference photos
 - Every parameter.
 - One preset per reference photograph.
 - **Random eye**: an eye drawn from measured population data for the chosen ancestry.
+- Presets and random eyes glide in, so the eye transforms in place.
 - **Save PNG**: the file carries the state string of its eye.
 - **Copy state URL**.
 

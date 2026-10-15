@@ -77,3 +77,15 @@ test('packing writes six vec4s per emitter and transforms into another space', (
 	close(moved[6], data[6], 1e-6)
 	assert.ok(sceneLuminance(params.lighting, list) > 0)
 })
+
+test('the pupil weighs each light by its angle from the line of sight', () => {
+	const params = createDefaults(PARAM_SCHEMA)
+	const list = buildEmitters(params.lighting, camera)
+	const key = sphericalDirection(params.lighting.key.azimuth, params.lighting.key.elevation)
+	const away = sphericalDirection(-params.lighting.key.azimuth, -params.lighting.key.elevation)
+	const full = sceneLuminance(params.lighting, list)
+	const toward = sceneLuminance(params.lighting, list, key)
+	assert.ok(toward <= full && toward > 0.8 * full, 'the key light at full weight')
+	assert.ok(sceneLuminance(params.lighting, list, away) < 0.3 * toward)
+	assert.ok(sceneLuminance(params.lighting, list, [0, 0, 1]) < toward)
+})

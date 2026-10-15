@@ -6,6 +6,10 @@ import * as EssentialsPlugin from '@tweakpane/plugin-essentials'
 import { Pane } from 'tweakpane'
 import { isLeaf, leafType } from '../params/params'
 
+// Set while the panel reads the params back: Tweakpane reports those reads as
+// changes, and they are not edits.
+let refreshing = false
+
 function bindingOptions(leaf, key) {
 	const label = leaf.unit ? `${leaf.label ?? key} (${leaf.unit})` : (leaf.label ?? key)
 	const options = { label }
@@ -27,9 +31,9 @@ function buildFolder(container, schema, values, prefix, onChange) {
 	for (const [key, node] of Object.entries(schema)) {
 		const path = prefix ? `${prefix}.${key}` : key
 		if (isLeaf(node)) {
-			container
-				.addBinding(values, key, bindingOptions(node, key))
-				.on('change', (event) => onChange(path, event.value, event.last))
+			container.addBinding(values, key, bindingOptions(node, key)).on('change', (event) => {
+				if (!refreshing) onChange(path, event.value, event.last)
+			})
 		} else {
 			const folder = container.addFolder({ title: key, expanded: false })
 			buildFolder(folder, node, values[key], path, onChange)
@@ -54,5 +58,13 @@ export function createGui({ schema, params, onChange, actions = [], presets = nu
 	}
 	for (const action of actions) pane.addButton({ title: action.title }).on('click', action.run)
 	buildFolder(pane, schema, params, '', onChange)
-	return { pane, fps, refresh: () => pane.refresh() }
+	const refresh = () => {
+		refreshing = true
+		try {
+			pane.refresh()
+		} finally {
+			refreshing = false
+		}
+	}
+	return { pane, fps, refresh }
 }

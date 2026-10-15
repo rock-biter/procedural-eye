@@ -6,12 +6,13 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and the panel with its actions unless `?gui=0`. |
-| [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; poses the eye; drives the accumulation; exposes the API. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and the panel with its actions unless `?gui=0`. Builds the target params of presets and random eyes. |
+| [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
 | [`src/params/paramSchema.js`](../src/params/paramSchema.js) * | `PARAM_SCHEMA`: every tunable value with default, range, unit and `kind`; `DEBUG_VIEWS`. |
 | [`src/params/params.js`](../src/params/params.js) * | Create, sanitize, get/set by path, diff, overrides, state encoding. |
+| [`src/params/paramTransition.js`](../src/params/paramTransition.js) * | Transitions: numbers and colors glide to a target, the rest switches, lights fade. |
 | [`src/params/presets.js`](../src/params/presets.js) * | Named partial overrides, one per reference photograph. |
 | [`src/params/populationPriors.js`](../src/params/populationPriors.js) * | The random eye: features sampled from measured frequencies by ancestry, mapped onto parameters. |
 | **Eye** | |
@@ -25,14 +26,14 @@
 | [`src/iris/irisFeatures.js`](../src/iris/irisFeatures.js) * | Thickness profile, collarette curve, furrows, freckles (seeded). |
 | [`src/iris/irisAtlas.js`](../src/iris/irisAtlas.js) | GPU bake of the structure and pigment atlases. |
 | [`src/iris/irisColor.js`](../src/iris/irisColor.js) * | Spectral Kubelka–Munk model of the iris layers and its lookup table. |
-| [`src/iris/irisColorLut.js`](../src/iris/irisColorLut.js) | The lookup as a half-float `Data3DTexture`. |
+| [`src/iris/irisColorLut.js`](../src/iris/irisColorLut.js) | The lookup as a half-float `Data3DTexture`, rebuilt when the layer model changes, crossfaded during transitions. |
 | **Adnexa and sclera** ([`docs/ADNEXA.md`](ADNEXA.md)) | |
 | [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | Fissure, lid profile, skin surface, lid, fornix and meniscus meshes. |
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, lash, meniscus and bubble meshes with their materials. |
 | [`src/sclera/vesselGenerator.js`](../src/sclera/vesselGenerator.js) * | Seeded episcleral and conjunctival vessel network. |
-| [`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) | The network rasterized into the polar vessel map. |
+| [`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) | The network rasterized into the polar vessel map, when its parameters or the globe change. |
 | **Animation** ([`docs/ANIMATION.md`](ANIMATION.md)) | |
 | [`src/animation/pupilDynamics.js`](../src/animation/pupilDynamics.js) * | Watson–Yellott steady state, Pamplona dynamics, hippus. |
 | [`src/animation/gaze.js`](../src/animation/gaze.js) * | Saccades, microsaccades, drift, Listing's law. |
@@ -60,28 +61,29 @@
 
 `EyeApp.start()` applies the initial rebuild and bake and renders one frame. It then compiles every program with `renderer.compileAsync()` (recorded as `getCompileMs()`) before the first animation frame. `EyeApp.frame()` then runs on every animation frame:
 
-1. **Pending dirty kinds**
+1. **Transition** ([below](#transitions)): a running transition writes its next values, marks their kinds dirty, crossfades the color lookup and restarts the accumulation. Its time step is capped at 0.1 s, so a long frame does not skip it.
+2. **Pending dirty kinds**
    - `rebuild`:
      - the eye geometry (`createEyeGeometry()`);
      - the entrance-pupil depth the camera aims at;
      - the rig transform and the eyeball mesh;
-     - the lid mesh and the fissure map (baked in JS into a half-float texture);
+     - the lid mesh and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
      - the lashes and the tear film.
 
      A rebuild always bakes too.
    - `bake`:
      - the iris rest space;
-     - the structure and pigment atlases (GPU);
-     - the color lookup (spectral model in JS);
-     - the scleral vessel map.
+     - the structure and pigment atlases (GPU, under a millisecond);
+     - the color lookup (spectral model in JS, about 35 ms), only when the layer model changed, and not while it crossfades;
+     - the scleral vessel map, only when its parameters or the globe changed.
    - `define`: the debug view define of the eyeball, lid and lash materials. The tone-mapping mode is set by the post-processing every frame; `postprocessing` recompiles it.
-2. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
+3. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
    - A living eye steps the animator and restarts the accumulation.
    - In photo mode it keeps its instant.
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.
-3. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
-4. **Render one sample** (`renderSample()`)
+4. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
+5. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field.
    - Later frames take `accumulationSample(n)`: a subpixel jitter, a point on the lens and a point on the key light.
    - The steps, in order:
@@ -91,14 +93,33 @@
      4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window.
      5. The eyeball, lid and lash uniforms are refreshed from the params.
      6. The post-processing updates the lens of the depth of field and its fade, then the composer renders.
-5. **Adaptive resolution**: fresh frames feed the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation.
+6. **Adaptive resolution**: fresh frames feed the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation.
 
 ## Parameter Routing
 
 The panel, the camera controls and `window.__EYE__.setParams()` all edit the one params object.
 - **Changes**: `EyeApp.onParamChange(path)` looks up the schema leaf, records its `kind` as dirty and restarts the accumulation. Values of kind `uniform` need nothing else, because every frame reads the params.
-- **Listeners**: those added to `app.listeners` hear every change. The panel refreshes after camera moves and preset loads.
-- **Bulk changes**: loading a preset, **Random eye** and `setParams()` replace many values at once and mark everything for rebuild.
+- **Listeners**: those added to `app.listeners` hear every change. The panel refreshes after camera moves, and at the start and end of transitions. Tweakpane reports its own refreshes as changes; the panel ignores them, because they are not edits.
+- **Bulk changes**: loading a preset and **Random eye** glide to their values ([Transitions](#transitions)). `setParams()` ends a running transition, then replaces the values at once and marks everything for rebuild.
+
+## Transitions
+
+`EyeApp.transitionTo(target, duration)` carries the params to a full target params object, so the eye transforms in place. [`src/params/paramTransition.js`](../src/params/paramTransition.js) decides how each leaf gets there:
+
+| Leaf | Change |
+| --- | --- |
+| Numbers and colors | Glide along a minimum-jerk curve; colors in linear sRGB. In-between values are not snapped to the slider step. |
+| Toggles, choices, `discrete` numbers (seeds, counts), kinds `rebuild` and `define` | Switch at the start. Geometry cannot glide: a lid rebuild bakes the fissure map, which takes about 0.3 s. |
+| A toggle that `fades` a sibling (a light's `enabled`) | Turns on at the start with its `intensity` gliding up from zero, or fades the intensity to zero and turns off at the end. |
+
+- **Color lookup**: building it takes about 35 ms, too much for every frame. At the start, `IrisColorLut.beginBlend()` builds the target table once; every frame then mixes the old and the new table with the transition's progress (`setBlend()`). The pigment atlas re-bakes every frame (under a millisecond).
+- **Pose**: when the transition changes where the pose comes from, the pose blends too ([`docs/ANIMATION.md`](ANIMATION.md#modes)).
+- **Duration**: the panel's **transition (s)** (2 s by default; 0 switches at once). Captures and `?preset=` at start-up do not glide.
+- **Interruptions**:
+  - Orbiting the camera cancels the camera's glides; the rest goes on.
+  - A panel edit of a `uniform` leaf cancels that leaf's glide.
+  - A panel edit of any other kind ends the transition on its target (the edited leaf keeps the edit), because the color lookup cannot crossfade under a rebuild.
+  - A new preset or random eye starts from the current in-between values. A random eye keeps the target values of the groups it does not resample (`targetParams`).
 
 ## Parameters, Presets and the Random Eye
 
@@ -109,8 +130,11 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `lids`, `lashes`, `skin`, `sclera`;
   - `lighting`, `camera`, `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
-- **Seeds**: they are separate per subsystem (`irisStructure.seed`, `lashes.seed`, `sclera.vessels.seed`), so a new crypt pattern keeps the same lashes.
+  - `discrete: true` marks a seed or a count, which a transition switches instead of gliding.
+  - `fades: 'intensity'` marks a light's `enabled` toggle, which a transition fades through the sibling leaf.
+- **Seeds**: they are separate per subsystem (`irisStructure.seed`, `lashes.seed`, `lids.seed` for the lid shape, folds and skin patterns, `sclera.vessels.seed`), so a new crypt pattern keeps the same lashes.
 - **Presets** ([`src/params/presets.js`](../src/params/presets.js)): deep partial overrides of the defaults.
+  - Choosing one in the panel glides to its overrides on the defaults ([Transitions](#transitions)).
   - Each reference preset names its photographs (`references`, shown by the capture contact sheet).
   - Reference presets keep the living eye off, so their pupil and gaze are the tuned ones.
   - They also pin the frontal 100 mm framing they were tuned with (`frontal`). The default camera looks from 26° to the side and 7.8° below, with a 110 mm lens.
@@ -120,7 +144,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - A Gaussian copula carries the measured correlations between them.
   - Larsson's peripupillary ring is added to 91% of green and hazel eyes.
   - The result maps onto the age, the pupil, the iris structure and color, the sclera, the lash seed and the skin color.
-  - The panel resets those groups to their defaults before applying it.
+  - `main.js` resets those groups to their defaults before applying it, and glides to the result.
 - **State**: `encodeState()` writes the non-default values as base64url JSON. **Copy state URL** puts it in `?state=`; **Save PNG** stores it in a `tEXt` chunk named `eye-state` ([`src/render/pngMetadata.js`](../src/render/pngMetadata.js)).
 
 ## Coordinate Spaces

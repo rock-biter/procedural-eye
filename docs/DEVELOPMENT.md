@@ -80,7 +80,7 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 - The wheel changes `camera.distance`, which is also the focus distance.
 - **Space** toggles photo mode when the page, not a panel control, has the focus.
 
-The panel also has the actions **Photo (freeze / live)**, **Random eye** (with the **random ancestry** choice), **Save PNG** and **Copy state URL**.
+The panel also has the actions **Photo (freeze / live)**, **Random eye** (with the **random ancestry** choice), **Save PNG** and **Copy state URL**. **transition (s)** sets how long a preset or a random eye takes to glide in (0 switches at once).
 
 ## Console API
 
@@ -93,7 +93,9 @@ The panel also has the actions **Photo (freeze / live)**, **Random eye** (with t
 | `getRenderStats()` | Frame telemetry and the adaptive pixel ratio state. |
 | `getState()` | The non-default values as a `?state=` string. |
 | `getParams()` | A deep copy of the params. |
-| `setParams(overrides)` | Applies a deep partial override, rebuilds, and returns the unknown paths. |
+| `setParams(overrides)` | Ends a running transition, applies a deep partial override at once, rebuilds, and returns the unknown paths. |
+| `transitionTo(params, duration)` | Glides to a full params object over `duration` seconds ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#transitions)). |
+| `getTargetParams()`, `isTransitioning()` | The params a running transition is heading for (the current ones otherwise); whether one runs. |
 | `capture()` | The current accumulated image as a PNG data URL. |
 | `toggleFrozen()`, `isFrozen()` | Photo mode. |
 | `measure(frames)` | Interactive frames back to back; resolves with frame statistics. |
@@ -101,6 +103,7 @@ The panel also has the actions **Photo (freeze / live)**, **Random eye** (with t
 | `getCompileMs()` | The time spent compiling programs at start-up. |
 | `getEyeGeometry()` | `{ apexZ, focusDepth }`. |
 | `getPresetNames()`, `getPresetInfo(name)` | Preset names, labels and reference photographs. |
+| `loadPreset(name, duration)`, `randomEye(ancestry, seed, duration)` | Glide to a preset or to a random eye, as the panel does; `randomEye` returns the sampled features. |
 
 ## Debugging Notes
 

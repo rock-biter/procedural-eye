@@ -8,8 +8,10 @@ import {
 	Mesh,
 	ShaderMaterial,
 	Uniform,
+	Vector2,
 	Vector4,
 } from 'three'
+import { apertureRadius } from '../camera/cameraOptics'
 import { debugViewDefine } from '../debug/debugViews'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
@@ -25,7 +27,11 @@ export default class Lids {
 			uSkinColor: new Uniform(new Color()),
 			uSkin: new Uniform(new Vector4()),
 			uSkin2: new Uniform(new Vector4()),
+			uSkin3: new Uniform(new Vector4()),
+			uCanthi: new Uniform(new Vector4()),
+			uMarginLength: new Uniform(new Vector2(28, 28)),
 			uPixelAngle: new Uniform(0.001),
+			uDefocus: new Uniform(new Vector2(0, 1)),
 			...envUniforms,
 			...shadowUniforms,
 		}
@@ -60,6 +66,7 @@ export default class Lids {
 			new BufferAttribute(join(data.positions, fornix.positions), 3),
 		)
 		geometry.setAttribute('lid', new BufferAttribute(join(data.lid, fornix.lid), 4))
+		geometry.setAttribute('relief', new BufferAttribute(join(data.relief, fornix.relief), 4))
 		geometry.setAttribute('follow', new BufferAttribute(join(data.follow, fornix.follow), 2))
 		geometry.setIndex(
 			new BufferAttribute(
@@ -75,6 +82,9 @@ export default class Lids {
 		this.mesh.geometry.dispose()
 		this.mesh.geometry = geometry
 		this.fissure = data.fissure
+		const { medial, lateral, lengths } = data.fissure
+		this.uniforms.uCanthi.value.set(medial[0], medial[1], lateral[0], lateral[1])
+		this.uniforms.uMarginLength.value.fromArray(lengths)
 	}
 
 	setDebugView(view) {
@@ -88,9 +98,14 @@ export default class Lids {
 		const skin = params.skin
 		const u = this.uniforms
 		u.uPixelAngle.value = pixelAngle
+		// The camera's aperture diameter and focus distance (src/camera/): the
+		// fine relief fades where the depth of field blurs it.
+		const lens = params.camera
+		u.uDefocus.value.set(2 * apertureRadius(lens.focalLength, lens.fNumber), lens.distance)
 		u.uSkinColor.value.set(skin.color)
 		u.uSkin.value.set(skin.redness, skin.roughness, skin.wetness, skin.pores)
 		u.uSkin2.value.set(skin.wrinkles, skin.translucency, LID_PROFILE.wall, LID_PROFILE.edge)
+		u.uSkin3.value.set(skin.freckles, skin.veins, skin.pigmentation, params.lids.seed)
 	}
 
 	dispose() {
