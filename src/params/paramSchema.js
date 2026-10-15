@@ -365,13 +365,23 @@ export const BASE_PARAM_SCHEMA = {
 		focalLength: num(110, 35, 200, 1, 'mm', 'uniform', 'focal length'),
 		fNumber: num(8, 1.4, 32, 0.1, '', 'uniform', 'f-number'),
 		sensorHeight: num(24, 8, 36, 0.1, 'mm', 'uniform', 'sensor height'),
-		distance: num(185, 60, 600, 0.5, 'mm', 'uniform', 'focus distance'),
+		distance: num(185, 60, 1000, 0.5, 'mm', 'uniform', 'focus distance'),
 		azimuth: num(-26, -80, 80, 0.1, 'deg'),
 		elevation: num(-7.8, -60, 60, 0.1, 'deg'),
 		targetX: num(0, -20, 20, 0.05, 'mm', 'uniform', 'target x'),
 		targetY: num(0, -20, 20, 0.05, 'mm', 'uniform', 'target y'),
+		targetZ: num(0, -20, 20, 0.05, 'mm', 'uniform', 'target z'),
 		exposure: num(0, -6, 6, 0.05, 'EV'),
 		whiteBalance: num(5600, 2500, 12000, 50, 'K', 'uniform', 'white balance'),
+	},
+	// The Zoom out and Zoom in buttons (main.js): the camera distance Zoom out
+	// glides to, farther on portrait (mobile) screens, which are much narrower,
+	// and how long a zoom takes. Zoom in glides back to the distance the camera
+	// started at.
+	zoom: {
+		out: num(480, 60, 1000, 0.5, 'mm', 'uniform', 'zoom out distance'),
+		mobileOut: num(820, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom out distance'),
+		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),
 	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),

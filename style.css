@@ -12,7 +12,7 @@ canvas {
 }
 
 /* The panel scrolls when its open folders outgrow the viewport, and stops
-   above the Random eye button (8px top + 84px kept for the button). */
+   above the dock (8px top + 84px kept for its buttons). */
 .tp-dfwv {
 	width: 320px !important;
 	max-height: calc(100vh - 92px);
@@ -22,13 +22,19 @@ canvas {
 	scrollbar-width: thin;
 }
 
-.random-eye {
+/* The dock: Zoom out, Zoom in and Random eye, bottom right. */
+.dock {
 	position: fixed;
 	right: 24px;
 	bottom: 24px;
 	z-index: 10;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.dock button {
 	min-height: 44px;
-	padding: 0 22px;
 	border: 1px solid rgba(255, 255, 255, 0.18);
 	border-radius: 999px;
 	background: rgba(28, 28, 32, 0.62);
@@ -39,6 +45,7 @@ canvas {
 		-apple-system,
 		sans-serif;
 	letter-spacing: 0.02em;
+	white-space: nowrap;
 	cursor: pointer;
 	-webkit-backdrop-filter: blur(10px);
 	backdrop-filter: blur(10px);
@@ -48,29 +55,46 @@ canvas {
 		transform 0.15s;
 }
 
-.random-eye:hover {
+.dock button:hover {
 	background: rgba(48, 48, 54, 0.75);
 }
 
-.random-eye:active {
+.dock button:active {
 	transform: scale(0.97);
 }
 
-.random-eye:focus-visible {
+.dock button:focus-visible {
 	outline: 2px solid #fff;
 	outline-offset: 2px;
 }
 
+.random-eye {
+	padding: 0 22px;
+}
+
+/* Round icon buttons: a magnifier with a plus or a minus. */
+.zoom {
+	display: grid;
+	place-items: center;
+	width: 44px;
+	padding: 0;
+}
+
+.zoom svg {
+	width: 20px;
+	height: 20px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+}
+
 /* Phones and tablets: bottom center, clear of the home indicator. */
 @media (max-width: 640px), (pointer: coarse) {
-	.random-eye {
+	.dock {
 		right: auto;
 		left: 50%;
 		bottom: calc(20px + env(safe-area-inset-bottom));
 		transform: translateX(-50%);
-	}
-
-	.random-eye:active {
-		transform: translateX(-50%) scale(0.97);
 	}
 }

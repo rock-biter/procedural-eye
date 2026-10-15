@@ -82,9 +82,15 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 - The wheel changes `camera.distance`, which is also the focus distance.
 - **Space** toggles photo mode when the page, not a panel control, has the focus.
 
-**Random eye** is a button outside the panel, always in view: bottom right, or bottom center on phones and tablets. It blurs itself after a click, so Space still toggles photo mode.
+**The dock** holds three buttons outside the panel, always in view: bottom right, or bottom center on phones and tablets (`style.css`). Each blurs itself after a click, so Space still toggles photo mode.
 
-The panel starts collapsed. When its open folders outgrow the viewport it scrolls, and it stops above the Random eye button (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
+- **Zoom out** and **Zoom in** (magnifiers) glide `camera.distance` over `zoom.duration`:
+  - Zoom out to `zoom.out`, which frames the whole figure; portrait screens (phones held upright), much narrower, to `zoom.mobileOut`.
+  - Zoom in back to the distance the camera started at, on every screen.
+- Portrait screens start, and load presets, with `camera.targetZ` 0.
+- **Random eye**.
+
+The panel starts collapsed. When its open folders outgrow the viewport it scrolls, and it stops above the dock (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
 
 ## Console API
 
@@ -108,6 +114,7 @@ The panel starts collapsed. When its open folders outgrow the viewport it scroll
 | `getEyeGeometry()` | `{ apexZ, focusDepth }`. |
 | `getPresetNames()`, `getPresetInfo(name)` | Preset names, labels and reference photographs. |
 | `loadPreset(name, duration)`, `randomEye(ancestry, seed, duration)` | Glide to a preset or to a random eye, as the panel does; `randomEye` returns the sampled features and the color shade. |
+| `zoom('in' \| 'out')` | Glide the camera as the dock's zoom buttons do. |
 
 ## Debugging Notes
 

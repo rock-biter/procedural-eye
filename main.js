@@ -20,10 +20,22 @@ import RenderSetup from './src/renderSetup'
 const urlParams = new URLSearchParams(window.location.search)
 const presetName = PRESETS[urlParams.get('preset')] ? urlParams.get('preset') : 'default'
 const state = urlParams.get('state') ? decodeState(urlParams.get('state')) : null
-const params = createParams(PARAM_SCHEMA, PRESETS[presetName].params, state)
+// Portrait screens (phones held upright) keep the camera target at the
+// entrance pupil's depth: camera.targetZ 0.
+const portrait = () => window.innerWidth < window.innerHeight
+function fitScreen(target) {
+	if (portrait()) setValue(PARAM_SCHEMA, target, 'camera.targetZ', 0)
+	return target
+}
+
+const params = fitScreen(createParams(PARAM_SCHEMA, PRESETS[presetName].params, state))
 if (urlParams.has('photo'))
 	setValue(PARAM_SCHEMA, params, 'quality.photoSamples', urlParams.get('photo'))
 if (urlParams.has('view')) setValue(PARAM_SCHEMA, params, 'debug.view', urlParams.get('view'))
+
+// Zoom in glides back to the distance the camera started at. Portrait screens
+// are narrow: the whole figure needs a farther camera to fit across.
+const startDistance = params.camera.distance
 
 const setup = new RenderSetup({ params, urlParams })
 // Captures (?photo=) start frozen: a deterministic instant.
@@ -41,7 +53,7 @@ const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera'
 // Glides to the preset `name`: its overrides on the defaults.
 function loadPreset(name, duration = panelState.transition) {
 	if (!PRESETS[name]) return false
-	app.transitionTo(createParams(PARAM_SCHEMA, PRESETS[name].params), duration)
+	app.transitionTo(fitScreen(createParams(PARAM_SCHEMA, PRESETS[name].params)), duration)
 	return true
 }
 
@@ -57,6 +69,18 @@ function loadRandomEye(ancestry = panelState.ancestry, seed, duration = panelSta
 	return features
 }
 
+// Glides the camera back to its start ('in') or out to the whole figure
+// ('out', by the screen's shape), over zoom.duration. The rest keeps the
+// values a running transition is heading for.
+function zoom(direction) {
+	const settings = app.targetParams.zoom
+	const out = portrait() ? settings.mobileOut : settings.out
+	const distance = direction === 'in' ? startDistance : out
+	const target = cloneParams(app.targetParams)
+	setValue(PARAM_SCHEMA, target, 'camera.distance', distance)
+	app.transitionTo(target, settings.duration)
+}
+
 window.__EYE__ = {
 	...app.createApi(),
 	getPresetNames: () => Object.keys(PRESETS),
@@ -66,6 +90,7 @@ window.__EYE__ = {
 	},
 	loadPreset,
 	randomEye: loadRandomEye,
+	zoom,
 }
 
 // Downloads the current (accumulated) image with its state in a tEXt chunk.
@@ -97,19 +122,40 @@ function download(blob, filename) {
 	setTimeout(() => URL.revokeObjectURL(link.href), 1000)
 }
 
-if (urlParams.get('gui') !== '0') {
-	// Random eye, always in view outside the panel: bottom right, or bottom
-	// center on phones and tablets (style.css).
-	const randomButton = document.createElement('button')
-	randomButton.type = 'button'
-	randomButton.className = 'random-eye'
-	randomButton.textContent = 'Random eye'
-	randomButton.addEventListener('click', () => {
-		console.log('Random eye', panelState.ancestry, loadRandomEye())
-		// Space toggles photo mode only when the page has the focus.
-		randomButton.blur()
+// A magnifier with a plus (zoom in) or a minus (zoom out).
+function magnifier(plus) {
+	return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 20.5 20.5M7.5 10.5h6${plus ? 'M10.5 7.5v6' : ''}"/></svg>`
+}
+
+// A button of the dock; it blurs itself after a click, because Space toggles
+// photo mode only when the page has the focus.
+function dockButton(className, label, content, run) {
+	const button = document.createElement('button')
+	button.type = 'button'
+	button.className = className
+	button.setAttribute('aria-label', label)
+	button.title = label
+	button.innerHTML = content
+	button.addEventListener('click', () => {
+		run()
+		button.blur()
 	})
-	document.body.appendChild(randomButton)
+	return button
+}
+
+if (urlParams.get('gui') !== '0') {
+	// Zoom out, zoom in and Random eye, always in view outside the panel:
+	// bottom right, or bottom center on phones and tablets (style.css).
+	const dock = document.createElement('div')
+	dock.className = 'dock'
+	dock.append(
+		dockButton('zoom', 'Zoom out', magnifier(false), () => zoom('out')),
+		dockButton('zoom', 'Zoom in', magnifier(true), () => zoom('in')),
+		dockButton('random-eye', 'Random eye', 'Random eye', () =>
+			console.log('Random eye', panelState.ancestry, loadRandomEye()),
+		),
+	)
+	document.body.appendChild(dock)
 
 	const { createGui } = await import('./src/debug/gui')
 	const gui = createGui({

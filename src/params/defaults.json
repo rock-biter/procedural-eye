@@ -304,13 +304,19 @@
     "focalLength": 110,
     "fNumber": 8,
     "sensorHeight": 24,
-    "distance": 204,
-    "azimuth": -55.7,
-    "elevation": -19.6,
+    "distance": 193,
+    "azimuth": -52.1,
+    "elevation": -21.8,
     "targetX": 0,
     "targetY": 0,
+    "targetZ": -2.15,
     "exposure": 0,
     "whiteBalance": 5600
+  },
+  "zoom": {
+    "out": 480,
+    "mobileOut": 820,
+    "duration": 1.2
   },
   "post": {
     "toneMapping": "agx",

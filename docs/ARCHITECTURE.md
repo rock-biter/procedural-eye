@@ -6,7 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the Random eye button and the collapsed panel with its actions. Builds the target params of presets and random eyes. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the dock (Zoom out, Zoom in, Random eye) and the collapsed panel with its actions. Builds the target params of presets, random eyes and zooms; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
@@ -105,7 +105,7 @@
 The panel, the camera controls and `window.__EYE__.setParams()` all edit the one params object.
 - **Changes**: `EyeApp.onParamChange(path)` looks up the schema leaf, records its `kind` as dirty and restarts the accumulation. Values of kind `uniform` need nothing else, because every frame reads the params.
 - **Listeners**: those added to `app.listeners` hear every change. The panel refreshes after camera moves, and at the start and end of transitions. Tweakpane reports its own refreshes as changes; the panel ignores them, because they are not edits.
-- **Bulk changes**: loading a preset and **Random eye** glide to their values ([Transitions](#transitions)). `setParams()` ends a running transition, then replaces the values at once and marks everything for rebuild.
+- **Bulk changes**: loading a preset, **Random eye** and the zoom buttons glide to their values ([Transitions](#transitions)); a zoom changes only `camera.distance`, over `zoom.duration`. `setParams()` ends a running transition, then replaces the values at once and marks everything for rebuild.
 
 ## Transitions
 
@@ -119,7 +119,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 
 - **Color lookup**: building it takes about 35 ms, too much for every frame. At the start, `IrisColorLut.beginBlend()` builds the target table once; every frame then mixes the old and the new table with the transition's progress (`setBlend()`). The pigment atlas re-bakes every frame (under a millisecond).
 - **Pose**: when the transition changes where the pose comes from, the pose blends too ([`docs/ANIMATION.md`](ANIMATION.md#modes)).
-- **Duration**: the panel's **transition (s)** (2 s by default; 0 switches at once). Captures and `?preset=` at start-up do not glide.
+- **Duration**: the panel's **transition (s)** (1 s by default; 0 switches at once); a zoom takes `zoom.duration`. Captures and `?preset=` at start-up do not glide.
 - **Interruptions**:
   - Orbiting the camera cancels the camera's glides; the rest goes on.
   - A panel edit of a `uniform` leaf cancels that leaf's glide.
@@ -133,7 +133,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `globe`, `cornea`, `chamber`, `limbus`;
   - `iris`, `irisStructure`, `irisColor`;
   - `lids`, `lashes`, `skin`, `sclera`;
-  - `lighting`, `camera`, `post`, `quality`, `debug`.
+  - `lighting`, `camera`, `zoom` (the dock's zoom distances and duration), `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
 - **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.
   - `paramSchema.js` writes `BASE_PARAM_SCHEMA` with a `default` per leaf, then `withDefaults()` replaces each default the file names (sanitized like any override) to make `PARAM_SCHEMA`. A leaf the file does not name, such as a new one, keeps the default written in the schema; a name the file has but the schema lacks is reported with a console warning.

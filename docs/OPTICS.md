@@ -100,7 +100,7 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 
 [`src/camera/cameraOptics.js`](../src/camera/cameraOptics.js) and [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js):
 
-- **Placement**: the camera orbits a target at `camera.distance`, which is also the focus distance. The target is the entrance pupil (its depth behind the apex) turned about the center of rotation along the eye's settled line of sight ([`docs/ANIMATION.md`](ANIMATION.md#framing)), plus `camera.targetX` and `camera.targetY`. The iris therefore stays framed and in focus when the eye turns.
+- **Placement**: the camera orbits a target at `camera.distance`, which is also the focus distance. The target is the entrance pupil (its depth behind the apex) turned about the center of rotation along the eye's settled line of sight ([`docs/ANIMATION.md`](ANIMATION.md#framing)), plus `camera.targetX`, `camera.targetY` and `camera.targetZ` (world axes, mm; +Z out of the face). The iris therefore stays framed and in focus when the eye turns. The offsets carry the camera and its focus with the target, so `targetZ` moves the plane in focus forward or back.
 - **Field of view**: that of a thin lens focused there, fov = 2·atan(h / 2s_i) with s_i = f·s / (s − f).
   - The field narrows as the focus gets closer (focus breathing).
   - At the default 185 mm with the default 110 mm lens, the magnification is about 1.5:1. The reference presets use 100 mm, about 1.2:1.
