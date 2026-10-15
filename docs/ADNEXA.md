@@ -38,7 +38,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 - **Columns**:
   - They are laid out on the open fissure, spaced by their length along the loop plus 3 mm per radian of turning, so the corners get enough columns.
   - The canthi are rounded as the columns go round them, by a cubic Bézier tangent to both margins: the medial angle into a U around the caruncle (1 mm radius), the lateral one into an acute corner (0.5 mm).
-- **Rows**: each column is traced outward in the front plane to the edge of the patch (an ellipse about 76 × 80 mm).
+- **Rows**: each column is traced outward in the front plane to the edge of the patch, an ellipse about 65 × 68 mm centered on the pupil.
   - Near the margin a row follows the margin's normal; far out it follows a ray from the fissure's center, so rows never cross.
   - The trace ends exactly at the patch's edge, so neighboring rows stay even.
   - `a` is the distance traveled, in mm.

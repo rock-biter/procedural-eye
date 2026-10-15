@@ -49,10 +49,10 @@ const TURN_WEIGHT = 3
 // medial one rounds into a U around the caruncle.
 const LATERAL_ROUND = 0.5
 const MEDIAL_ROUND = 1
-// The rows' step (mm) when tracing a column outward, and the patch of face
-// (an ellipse around the eye: center offset temporal and down, semi-axes).
+// The rows' step (mm) when tracing a column outward, and the patch of face:
+// an ellipse centered on the eye (on the pupil), its semi-axes.
 const TRACE_STEP = 0.2
-const PATCH = { temporal: 3, down: 4, width: 38, height: 40 }
+const PATCH = { width: 32.3, height: 34 }
 // Far from the margin the rows turn from the margin's normal to rays from the
 // fissure's center, which never cross.
 const RADIAL = { start: 2, end: 16 }
@@ -312,13 +312,11 @@ function columnProfile(context, column) {
 // Traces a column outward in the front plane: the polyline of its row, from
 // the open margin to the edge of the patch, by arc length `a`.
 function traceColumn(context, column, maxReach = 70) {
-	const { center, nasalSign } = context
+	const { center } = context
 	const xs = [column.point[0]]
 	const ys = [column.point[1]]
 	let [x, y] = column.point
-	const patchCenter = [center[0] - nasalSign * PATCH.temporal, -PATCH.down]
-	const outside = (px, py) =>
-		((px - patchCenter[0]) / PATCH.width) ** 2 + ((py - patchCenter[1]) / PATCH.height) ** 2 - 1
+	const outside = (px, py) => (px / PATCH.width) ** 2 + (py / PATCH.height) ** 2 - 1
 	let reach = maxReach
 	for (let a = 0; a < maxReach; a += TRACE_STEP) {
 		const rx = x - center[0]

@@ -32,7 +32,7 @@
   - Extreme shapes still crease the skin near the medial lower lid: a fissure under 25 mm with a full pretarsal roll (`lowerRoll` near 1).
   - The upper lid's fold cannot overhang its crease: the skin row runs outward without turning back, so hooding (the preseptal skin folding down over the crease, common with age) and the lateral overlap are shaped as steps, not undercuts.
   - The lids pass in front of the globe toward the canthi. Where the margin leaves the globe, the meniscus fades, and a small gap under the margin shows the conjunctiva behind it.
-- **Face**: a thin-plate spline through anatomical landmarks, kept as a hint (softer than the measured brow, nose and cheek projections) and without eyebrow hairs. The skin is a patch about 76 × 80 mm: wide or grazing framings show its edge, and from the side, past its edge, the back of the globe and the conjunctiva.
+- **Face**: a thin-plate spline through anatomical landmarks, kept as a hint (softer than the measured brow, nose and cheek projections) and without eyebrow hairs. The skin is a patch about 65 × 68 mm around the eye: wide or grazing framings show its edge, and from the side, past its edge, the back of the globe and the conjunctiva.
 - **Baked occlusion**: it is baked with the lids at rest; as the lids follow the gaze it stays where it was baked, and an animated blink would need a closed bake to morph with.
 - **Blink**: `lids.closure` closes the lids as a rebuild (a still pose). The mesh keeps its layout at any closure, so an animated blink can morph between an open and a closed mesh in the vertex shader; that, the cornea pushing the closing lid out, and Bell's phenomenon are not implemented.
 - **Skin**:
