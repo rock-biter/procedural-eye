@@ -20,11 +20,13 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
 5. **Effect pass**, in order:
    1. color grade: white balance from `camera.whiteBalance`, saturation and contrast, in linear light;
    2. chromatic aberration: `post.chromaticAberration` pixels, radially modulated;
-   3. vignette;
+   3. vignette (`post.vignette`);
    4. tone mapping: `post.toneMapping`, with exposure 2^`camera.exposure` through `renderer.toneMappingExposure`;
    5. static film grain, in display space.
 
-The canvas has no depth, alpha or MSAA: everything reaches it through the composer. **Photo mode** is the same pipeline with the eye frozen: samples accumulate until `quality.photoSamples`, then rendering stops.
+The canvas has no depth, alpha or MSAA: everything reaches it through the composer.
+
+**Backdrop**: past the skin's outer edge the scene shows the clear color, set every frame by `EyeApp`: the tone of the lit skin (its albedo raised to 1.3, as saturated as the subsurface shading makes it, times the rig's luminance), `skin.backdrop` as bright, so it blends with the skin a little darker. **Photo mode** is the same pipeline with the eye frozen: samples accumulate until `quality.photoSamples`, then rendering stops.
 
 ## Alpha Contract
 
@@ -32,7 +34,7 @@ Scene materials write the **apparent focus distance** (mm from the camera) into 
 
 - **Opaque surfaces** (sclera, skin, lashes, tear film): the true distance.
 - **The cornea**: the distance of what is seen through it or in it. For refraction, that is the paraxial image of the refracted point. For reflection, it is the convex-mirror image R/2 behind the surface. The two are blended by luminance.
-- **Background**: the clear alpha is 1e5 (at infinity).
+- **Background**: the clear alpha is `FOCUS_AT_INFINITY` (6e4 mm, [`src/renderSetup.js`](../src/renderSetup.js)). It must stay finite in the half-float scene buffer (at most 65504): an infinite alpha made the accumulation drop every background sample, so the background kept earlier frames. The renderer clears without premultiplied alpha, which would multiply that alpha into the clear color.
 
 The accumulation history keeps the alpha for the depth of field. The effects receive alpha 1, because `postprocessing`'s blend functions read alpha as opacity. A future transparent material must not overwrite it (`blendSrcAlpha` Zero, `blendDstAlpha` One). The tear film is drawn opaque for this reason.
 

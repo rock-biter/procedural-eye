@@ -11,18 +11,27 @@ import {
 } from './adaptivePixelRatio'
 import FrameStats from './frameStats'
 
+// The focus distance (mm) of background pixels: far enough to count as
+// infinity, and finite in the half-float scene buffer (at most 65504), where
+// an infinite alpha would make the accumulation drop every background sample.
+export const FOCUS_AT_INFINITY = 6e4
+
 export default class RenderSetup {
 	constructor({ params, urlParams }) {
+		// No premultiplied alpha: the clear alpha is the focus distance, which
+		// three would otherwise multiply into the clear color.
 		this.renderer = new WebGLRenderer({
 			antialias: false,
 			depth: false,
 			alpha: false,
+			premultipliedAlpha: false,
 			powerPreference: 'high-performance',
 		})
 		this.renderer.outputColorSpace = SRGBColorSpace
 		this.renderer.toneMapping = NoToneMapping
-		// Background pixels: black, focused at infinity (alpha is the focus distance).
-		this.renderer.setClearColor(0x000000, 1e5)
+		// Background pixels: the backdrop color (set every frame by the app),
+		// focused at infinity.
+		this.renderer.setClearColor(0x000000, FOCUS_AT_INFINITY)
 		document.body.appendChild(this.renderer.domElement)
 
 		this.scene = new Scene()

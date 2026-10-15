@@ -80,7 +80,9 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 - The wheel changes `camera.distance`, which is also the focus distance.
 - **Space** toggles photo mode when the page, not a panel control, has the focus.
 
-The panel also has the actions **Photo (freeze / live)**, **Random eye** (with the **random ancestry** choice), **Save PNG** and **Copy state URL**. **transition (s)** sets how long a preset or a random eye takes to glide in (0 switches at once).
+**Random eye** is a button outside the panel, always in view: bottom right, or bottom center on phones and tablets. It blurs itself after a click, so Space still toggles photo mode.
+
+The panel starts collapsed. It has the actions **Photo (freeze / live)**, **Save PNG** and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
 
 ## Console API
 

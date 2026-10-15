@@ -15,8 +15,8 @@ const params = createDefaults(PARAM_SCHEMA)
 const eye = createEyeGeometry(params)
 const close = (a, b, tolerance, label) =>
 	assert.ok(Math.abs(a - b) < tolerance, `${label ?? ''} ${a} vs ${b}`)
-// The most irregular, hooded, baggy and folded lids the schema allows.
-const aged = { ...params.lids, irregularity: 1, hooding: 2, bags: 1.5, folds: 1 }
+// The most irregular, full, baggy and folded lids the schema allows.
+const aged = { ...params.lids, irregularity: 1, fullness: 1.5, bags: 1.5, folds: 1 }
 
 test('the fissure has the measured width, MRD1, MRD2 and canthal tilt', () => {
 	// The margins wander off their arches by the seed, MRD1 and MRD2 hold.
@@ -164,8 +164,9 @@ test('relief attributes: the outward direction, the folds and the place along th
 			assert.ok(relief[k + 2] <= 0, 'folds are grooves')
 			deepest = Math.min(deepest, relief[k + 2])
 			// `a` grows along `across`, away from the opening.
-			if (t === 0.25 && j > 0) assert.ok(lid[k + 2] >= lid[k - 2])
+			if (j > 0) assert.ok(lid[k + 2] >= lid[k - 2], `a grows at t ${t}, row ${j}`)
 		}
+		close(lid[(i * across + across - 1) * 4 + 2], 34, 1e-6, 'the skin reaches out 34 mm')
 	}
 	close(relief[3], 0, 1e-9, 'medial canthus')
 	close(relief[(around / 2) * across * 4 + 3], 1, 1e-9, 'lateral canthus')

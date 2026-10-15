@@ -50,4 +50,5 @@ export const vec3 = {
 		return l > 0 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0]
 	},
 	madd: (a, b, s) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s],
+	lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
 }

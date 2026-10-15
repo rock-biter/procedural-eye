@@ -4,6 +4,7 @@
 // samples the camera moves to a point on the emitter's area, so the averaged
 // hard shadows form the real penumbra; interactive frames filter instead.
 import {
+	Color,
 	DoubleSide,
 	Vector2,
 	FloatType,
@@ -37,6 +38,8 @@ export default class KeyShadow {
 		this.camera = new OrthographicCamera(-EXTENT, EXTENT, EXTENT, -EXTENT, 1, 400)
 		this.camera.layers.set(SHADOW_LAYER)
 		this.matrix = new Matrix4()
+		// The renderer's clear state, restored after the shadow pass.
+		this.clearColor = new Color()
 		// Shared with every material near the lids: the shadow map, and the
 		// lids' gaze follow (lid-follow.glsl), which the casters need too.
 		this.uniforms = {
@@ -89,10 +92,12 @@ export default class KeyShadow {
 		scene.overrideMaterial = this.material
 		scene.background = null
 		renderer.setRenderTarget(this.target)
+		const clearColor = renderer.getClearColor(this.clearColor)
+		const clearAlpha = renderer.getClearAlpha()
 		renderer.setClearColor(0xffffff, 1)
 		renderer.clear(true, true, false)
 		renderer.render(scene, this.camera)
-		renderer.setClearColor(0x000000, 1e5)
+		renderer.setClearColor(clearColor, clearAlpha)
 		scene.overrideMaterial = previousOverride
 		scene.background = previousBackground
 		renderer.setRenderTarget(previousTarget)

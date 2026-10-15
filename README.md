@@ -21,11 +21,12 @@ pnpm capture    # renders presets headlessly next to the reference photos
 - Drag to orbit, shift- or right-drag to pan, scroll to change the distance (the focus stays on the pupil plane).
 - **Space** toggles photo mode: the eye freezes and the image converges.
 
-**Panel** (`?gui=0` hides it)
+**Random eye** (the button at the bottom): an eye drawn from measured population data for the chosen ancestry.
+
+**Panel** (collapsed at the top; `?gui=0` hides it and the button)
 
 - Every parameter.
 - One preset per reference photograph.
-- **Random eye**: an eye drawn from measured population data for the chosen ancestry.
 - Presets and random eyes glide in, so the eye transforms in place.
 - **Save PNG**: the file carries the state string of its eye.
 - **Copy state URL**.

@@ -7,6 +7,7 @@
 // transitionTo() carries the params to new values over a couple of seconds
 // (src/params/paramTransition.js), so the eye transforms in place.
 import {
+	Color,
 	DataTexture,
 	DataUtils,
 	HalfFloatType,
@@ -39,6 +40,7 @@ import { applyOverrides, cloneParams, encodeState, getLeaf } from './params/para
 import { PARAM_SCHEMA } from './params/paramSchema'
 import { ParamTransition, TRANSITION } from './params/paramTransition'
 import PostProcessing from './render/postProcessing'
+import { FOCUS_AT_INFINITY } from './renderSetup'
 import ScleraMaps from './sclera/scleraMaps'
 import { SCLERA_PSI } from './sclera/vesselGenerator'
 
@@ -122,6 +124,7 @@ export default class EyeApp {
 			this.notifyChange('camera')
 		})
 		this.cameraEye = new Vector3()
+		this.backdropColor = new Color()
 		// Continuous interactive frames for measure(): { remaining, resolve }.
 		this.benchmark = null
 		this.compileMs = null
@@ -431,6 +434,10 @@ export default class EyeApp {
 		this.physicalCamera.update(this.params, this.eye, this.focusDepth, size, sample, this.framing)
 		this.eyeRig.updateMatrices()
 		this.lightRig.update(this.params.lighting, this.physicalCamera.camera, this.eyeRig.worldToEye)
+		this.setup.renderer.setClearColor(
+			this.backdropColor.setRGB(...this.backdropRadiance()),
+			FOCUS_AT_INFINITY,
+		)
 		// The key light casts the lid and lash shadows (studio panels and windows only).
 		const key = this.lightRig.emitters[0]
 		const casts = key && key.type <= EMITTER_TYPE.WINDOW
@@ -466,6 +473,13 @@ export default class EyeApp {
 			sensorHeight: lens.sensorHeight,
 		})
 		this.post.render()
+	}
+
+	// The backdrop beyond the skin: the tone of the lit skin (its albedo,
+	// saturated as the subsurface shading saturates it), skin.backdrop as bright.
+	backdropRadiance() {
+		const light = this.lightRig.luminance * 0.05 * this.params.skin.backdrop
+		return hexToLinearRgb(this.params.skin.color).map((c) => c ** 1.3 * light)
 	}
 
 	// Approximate radiance of a diffuse surface of sRGB `hex` near the eye, lit

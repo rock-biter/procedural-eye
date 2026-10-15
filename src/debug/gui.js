@@ -43,7 +43,7 @@ function buildFolder(container, schema, values, prefix, onChange) {
 
 // `actions`: [{ title, run }] buttons above the folders; `presets`: { name: { label } }.
 export function createGui({ schema, params, onChange, actions = [], presets = null, onPreset }) {
-	const pane = new Pane({ title: 'Procedural eye' })
+	const pane = new Pane({ title: 'Procedural eye', expanded: false })
 	pane.registerPlugin(EssentialsPlugin)
 	const fps = pane.addBlade({ view: 'fpsgraph', label: 'fps', rows: 2 })
 	if (presets) {

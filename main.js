@@ -83,6 +83,19 @@ async function savePng() {
 }
 
 if (urlParams.get('gui') !== '0') {
+	// Random eye, always in view outside the panel: bottom right, or bottom
+	// center on phones and tablets (style.css).
+	const randomButton = document.createElement('button')
+	randomButton.type = 'button'
+	randomButton.className = 'random-eye'
+	randomButton.textContent = 'Random eye'
+	randomButton.addEventListener('click', () => {
+		console.log('Random eye', panelState.ancestry, loadRandomEye())
+		// Space toggles photo mode only when the page has the focus.
+		randomButton.blur()
+	})
+	document.body.appendChild(randomButton)
+
 	const { createGui } = await import('./src/debug/gui')
 	const gui = createGui({
 		schema: PARAM_SCHEMA,
@@ -92,10 +105,6 @@ if (urlParams.get('gui') !== '0') {
 		onPreset: (name) => loadPreset(name),
 		actions: [
 			{ title: 'Photo (freeze / live) — Space', run: () => window.__EYE__.toggleFrozen() },
-			{
-				title: 'Random eye',
-				run: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
-			},
 			{ title: 'Save PNG', run: () => savePng() },
 			{
 				title: 'Copy state URL',
