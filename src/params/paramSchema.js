@@ -173,7 +173,7 @@ export const PARAM_SCHEMA = {
 		ablScattering: num(3, 0, 20, 0.1, '1/mm', 'bake', 'ABL scattering'),
 		melanosomeScattering: num(0, 0, 40, 0.5, '1/mm', 'bake', 'melanosome scattering'),
 		fiberAbl: num(0.7, 0, 1, 0.01, '', 'uniform', 'ABL over fibers'),
-		saturation: num(1.15, 0, 2, 0.01),
+		saturation: num(1.15, 0, 3, 0.01),
 		tint: color('#ffffff'),
 		variation: num(0.3, 0, 1, 0.01, '', 'bake', 'radial melanin variation'),
 		heterochromia: {

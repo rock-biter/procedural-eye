@@ -24,7 +24,7 @@ CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs lint, format
 | `vessels.test.js` | The vessel network is seeded, stays on the visible sclera, has both layers, deep vessels wider. |
 | `animation.test.js` | Watson–Yellott trends; latency, faster constriction than dilation, settling; frame-rate independence; saccade main sequence and the slowdown; a smooth drift that scales with the micro-movements; the animator's visual axis and lid follow; the still pose; a living start at rest on its target; the framed line of sight per gaze mode; looking around within the range; a smooth pupil change per look; the light along the line of sight. |
 | `paramTransition.test.js` | Glide or switch per leaf; switches at the start, a minimum-jerk glide, an exact landing; lights fading in and out; cancelled glides; every preset reachable from every other within the ranges. |
-| `params.test.js` | Defaults valid; clamping and choices; overrides and unknown paths; state round trip; presets name only existing parameters; random eyes valid with the measured marginals (±2% over 10k); PNG text chunks round-trip with a valid CRC. |
+| `params.test.js` | Defaults valid; clamping and choices; overrides and unknown paths; state round trip; presets name only existing parameters; random eyes valid with the measured marginals (±2% over 10k); color shades within the ranges, and over 1000 European eyes more than 10% vivid blue and 5% amber albedos; PNG text chunks round-trip with a valid CRC. |
 
 ## Captures
 

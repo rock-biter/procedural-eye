@@ -155,7 +155,9 @@ Little melanin over the dark epithelium gives blue (Rayleigh scattering); pheome
 | Want | Parameters |
 | --- | --- |
 | Blue, grey | Low `irisColor.ablMelanin` (< 0.1), high `eumelanin`, `stromaScattering` 2.5–3.5, `fiberAbl` near 0 |
+| Deep, vivid blue | `ablMelanin` < 0.025 (a trace greys it), `ablScattering` < 1.5, `stromaScattering` 0.7–2.5 (lower is deeper), `stromaMelanin` near 0, `saturation` 1.8–2.6 |
 | Green, hazel | Medium `ablMelanin` (0.2–0.35), low `eumelanin` (pheomelanin), central `heterochromia` |
+| Amber, orange | `ablMelanin` 0.6–0.95 with `eumelanin` < 0.15, low `rayleighShare` (0.05–0.3) and `stromaScattering` 4.5–7, `saturation` 1.4–1.8 |
 | Brown | High `ablMelanin` (> 0.6), `fiberAbl` near 1 |
 | Lattice of deep crypts | `crypts.grade` 3–4, `size` > 1, `band` 0.4–0.5, low `roundness` |
 | Fine radial texture | `fibers.radialCount` 180–220, `radialThickness` ≈ 0.028 |

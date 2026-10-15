@@ -145,7 +145,8 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 - **Random eye** ([`src/params/populationPriors.js`](../src/params/populationPriors.js)): `randomEye(ancestry)`, with ancestry `european`, `east-asian` or `south-asian`.
   - It samples color class, crypt grade, furrow grade, pigment spots and Wölfflin nodules from Edwards et al. 2016.
   - A Gaussian copula carries the measured correlations between them.
-  - Larsson's peripupillary ring is added to 91% of green and hazel eyes.
+  - Within its color class, a shade (`SHADES`: pale or deep blue, green, grey, hazel, light brown, amber, brown, chestnut, black) sets ranges for the whole layer model of the color and its `saturation` (`SHADE_COLORS`), not only the melanin; the shades and their shares are approximations ([`docs/RESEARCH.md`](RESEARCH.md#color)).
+  - Larsson's peripupillary ring is added to 91% of green, hazel and light brown eyes.
   - The result maps onto the age, the pupil, the iris structure and color, the sclera, the lash seed and the skin color.
   - `main.js` resets those groups to their defaults before applying it, and glides to the result.
 - **State**: `encodeState()` writes the non-default values as base64url JSON. **Copy state URL** puts it in `?state=`; **Save PNG** stores it in a `tEXt` chunk named `eye-state` ([`src/render/pngMetadata.js`](../src/render/pngMetadata.js)).

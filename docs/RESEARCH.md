@@ -59,6 +59,15 @@ Edwards et al. 2016 (photo grading; European n = 619 / East Asian n = 467 / Sout
 - ILIT melanin by class (dark / moderate / light): eumelanin 2.53e-2 / 6.33e-3 / 1.0e-4 mg; pheomelanin 6.90e-3 / 1.75e-3 / 3.0e-5 mg; share of melanin in the ABL 90 / 50 / 10%; blood in the stroma 7 / 4 / 1%. Refractive indices: fibroblasts 1.42, ground substance 1.35.
 - Absorption (Donner & Jensen 2006, λ in nm): eumelanin σ = 6.6×10¹⁰·λ^−3.33 mm⁻¹; pheomelanin σ = 2.9×10¹⁴·λ^−4.75 mm⁻¹; baseline tissue 0.0244 + 8.53·e^(−(λ−154)/66.2) mm⁻¹. Per layer: µa = C·[β·σ_eu + (1−β)·σ_pheo].
 - Kubelka–Munk, one layer of thickness d over a background of reflectance R_g: a = 1 + K/S, b = √(a²−1), R = (1 − R_g(a − b·coth bSd)) / (a − R_g + b·coth bSd), T = b / (a·sinh bSd + b·cosh bSd). Two layers: R = R1 + T1²·R23 / (1 − R1·R23).
+- In this model *(calc)*:
+  - A thin Rayleigh stroma caps the ratio of blue to red reflectance at about (650/450)⁴ ≈ 4.4.
+  - Little ABL melanin greys a blue: an `ablMelanin` of 0.05 takes about 40% of its chroma, and 0.1 turns it teal-grey.
+  - Pheomelanin over a Rayleigh stroma stays yellow-olive (OKLCH hue ≈ 90°). Dense pheomelanin over a stroma of large scatterers keeps the reds and reaches amber-orange (≈ 70°).
+- Shades of the random eye *(approximation)*: each Edwards class is split into shades with approximate shares, not measured:
+  - light classes: blue 55%, green 30%, grey 15%;
+  - hazel/light brown: hazel 45%, light brown 30%, amber 25%;
+  - dark brown: brown 65%, chestnut 35%.
+- The tone mapping and the corneal reflections wash out the rendered chroma. The shades therefore raise `irisColor.saturation` *(artistic)*, up to 2.6 for a deep blue; real photographs such as `eye-05.jpg` are this vivid.
 
 ## Pupil and gaze dynamics
 

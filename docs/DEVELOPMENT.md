@@ -105,7 +105,7 @@ The panel starts collapsed. It has the actions **Photo (freeze / live)**, **Save
 | `getCompileMs()` | The time spent compiling programs at start-up. |
 | `getEyeGeometry()` | `{ apexZ, focusDepth }`. |
 | `getPresetNames()`, `getPresetInfo(name)` | Preset names, labels and reference photographs. |
-| `loadPreset(name, duration)`, `randomEye(ancestry, seed, duration)` | Glide to a preset or to a random eye, as the panel does; `randomEye` returns the sampled features. |
+| `loadPreset(name, duration)`, `randomEye(ancestry, seed, duration)` | Glide to a preset or to a random eye, as the panel does; `randomEye` returns the sampled features and the color shade. |
 
 ## Debugging Notes
 

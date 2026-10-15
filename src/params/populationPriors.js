@@ -4,8 +4,10 @@
 // correlations (crypts–furrows −0.47, darker color–furrows +0.46, …) through
 // a Gaussian copula, then mapped onto the parameters. Returns a deep partial
 // override of the params. Color classes outside Europe are approximate
-// (mostly brown); docs/RESEARCH.md.
-import { createRandom, gaussian } from '../random'
+// (mostly brown). Within a class, a shade (deep blue, green, amber, …) sets
+// the whole layer model of the color, not only its melanin; the shades and
+// their shares are approximations, not measurements; docs/RESEARCH.md.
+import { createRandom, gaussian, pickWeighted } from '../random'
 
 export const ANCESTRIES = ['european', 'east-asian', 'south-asian']
 
@@ -39,6 +41,198 @@ export const PRIORS = Object.freeze({
 		european: [0.12, 0.45, 0.23, 0.19, 0.01],
 		'east-asian': [0, 0.005, 0.06, 0.84, 0.095],
 		'south-asian': [0.005, 0.03, 0.15, 0.72, 0.095],
+	},
+})
+
+// The shades of each color class above, with their share of the class.
+export const SHADES = Object.freeze([
+	[
+		['pale-blue', 0.55],
+		['pale-green', 0.3],
+		['grey', 0.15],
+	],
+	[
+		['blue', 0.55],
+		['green', 0.3],
+		['grey', 0.15],
+	],
+	[
+		['hazel', 0.45],
+		['light-brown', 0.3],
+		['amber', 0.25],
+	],
+	[
+		['brown', 0.65],
+		['chestnut', 0.35],
+	],
+	[['black', 1]],
+])
+
+// The irisColor leaves of each shade, as [min, max], and its chance of a
+// peripupillary ring (91% of green or hazel eyes, Larsson 2011).
+// - Blue: a clear ABL (little scattering, a mere trace of melanin, which
+//   greys it) over a Rayleigh stroma without melanin; the less the stroma
+//   scatters, the deeper the blue over the black epithelium.
+// - Grey: a hazy ABL over a stroma of larger scatterers.
+// - Green: some pheomelanin in the ABL over the blue stroma.
+// - Amber, chestnut: dense pheomelanin over a stroma of large scatterers,
+//   which keeps the reds that a Rayleigh stroma would lose.
+// The `saturation` (artistic) makes up for the tone mapping and the corneal
+// reflections, which wash the chromatic shades out: up to 2.6 for blue.
+export const SHADE_COLORS = Object.freeze({
+	'pale-blue': {
+		ring: 0.35,
+		color: {
+			ablMelanin: [0, 0.03],
+			eumelanin: [0.75, 0.95],
+			stromaMelanin: [0, 0.015],
+			stromaScattering: [2, 3.5],
+			rayleighShare: [0.85, 1],
+			blood: [0.0005, 0.003],
+			ablScattering: [0.6, 2.5],
+			saturation: [1.4, 2],
+			fiberAbl: [0, 0.35],
+		},
+	},
+	blue: {
+		ring: 0.35,
+		color: {
+			ablMelanin: [0, 0.025],
+			eumelanin: [0.75, 0.95],
+			stromaMelanin: [0, 0.01],
+			stromaScattering: [0.7, 2.5],
+			rayleighShare: [0.9, 1],
+			blood: [0.0005, 0.002],
+			ablScattering: [0.3, 1.5],
+			saturation: [1.8, 2.6],
+			fiberAbl: [0, 0.35],
+		},
+	},
+	'pale-green': {
+		ring: 0.91,
+		color: {
+			ablMelanin: [0.12, 0.2],
+			eumelanin: [0, 0.12],
+			stromaMelanin: [0, 0.015],
+			stromaScattering: [2.5, 4],
+			rayleighShare: [0.85, 1],
+			blood: [0.001, 0.003],
+			ablScattering: [0.6, 2],
+			saturation: [1.5, 2],
+			fiberAbl: [0.1, 0.5],
+		},
+	},
+	green: {
+		ring: 0.91,
+		color: {
+			ablMelanin: [0.16, 0.28],
+			eumelanin: [0, 0.15],
+			stromaMelanin: [0, 0.02],
+			stromaScattering: [2, 3.5],
+			rayleighShare: [0.85, 1],
+			blood: [0.001, 0.004],
+			ablScattering: [0.6, 2],
+			saturation: [1.6, 2.2],
+			fiberAbl: [0.1, 0.5],
+		},
+	},
+	grey: {
+		ring: 0.35,
+		color: {
+			ablMelanin: [0.02, 0.08],
+			eumelanin: [0.8, 0.95],
+			stromaMelanin: [0.01, 0.04],
+			stromaScattering: [2.5, 4.5],
+			rayleighShare: [0.35, 0.65],
+			blood: [0.002, 0.004],
+			ablScattering: [2, 4.5],
+			saturation: [0.95, 1.2],
+			fiberAbl: [0, 0.35],
+		},
+	},
+	hazel: {
+		ring: 0.91,
+		color: {
+			ablMelanin: [0.25, 0.45],
+			eumelanin: [0.15, 0.5],
+			stromaMelanin: [0, 0.03],
+			stromaScattering: [2, 4],
+			rayleighShare: [0.6, 0.95],
+			blood: [0.002, 0.005],
+			ablScattering: [1, 3],
+			saturation: [1.35, 1.8],
+			fiberAbl: [0.5, 0.9],
+		},
+	},
+	'light-brown': {
+		ring: 0.91,
+		color: {
+			ablMelanin: [0.45, 0.65],
+			eumelanin: [0.35, 0.7],
+			stromaMelanin: [0.02, 0.15],
+			stromaScattering: [3, 5],
+			rayleighShare: [0.3, 0.6],
+			blood: [0.002, 0.006],
+			ablScattering: [2, 4],
+			saturation: [1.2, 1.5],
+			fiberAbl: [0.7, 1],
+		},
+	},
+	amber: {
+		ring: 0.35,
+		color: {
+			ablMelanin: [0.6, 0.95],
+			eumelanin: [0, 0.15],
+			stromaMelanin: [0.1, 0.4],
+			stromaScattering: [4.5, 7],
+			rayleighShare: [0.05, 0.3],
+			blood: [0.003, 0.012],
+			ablScattering: [1, 3],
+			saturation: [1.4, 1.8],
+			fiberAbl: [0.8, 1],
+		},
+	},
+	brown: {
+		ring: 0.15,
+		color: {
+			ablMelanin: [0.6, 0.88],
+			eumelanin: [0.6, 0.9],
+			stromaMelanin: [0.05, 0.3],
+			stromaScattering: [3, 5],
+			rayleighShare: [0.2, 0.5],
+			blood: [0.003, 0.007],
+			ablScattering: [2, 4],
+			saturation: [1.1, 1.4],
+			fiberAbl: [0.8, 1],
+		},
+	},
+	chestnut: {
+		ring: 0.15,
+		color: {
+			ablMelanin: [0.65, 0.9],
+			eumelanin: [0.3, 0.55],
+			stromaMelanin: [0.1, 0.35],
+			stromaScattering: [4, 6],
+			rayleighShare: [0.1, 0.35],
+			blood: [0.004, 0.01],
+			ablScattering: [2, 4],
+			saturation: [1.3, 1.6],
+			fiberAbl: [0.8, 1],
+		},
+	},
+	black: {
+		ring: 0.15,
+		color: {
+			ablMelanin: [0.9, 1],
+			eumelanin: [0.85, 0.95],
+			stromaMelanin: [0.2, 0.5],
+			stromaScattering: [3, 5],
+			rayleighShare: [0.2, 0.5],
+			blood: [0.003, 0.006],
+			ablScattering: [2, 4],
+			saturation: [1, 1.2],
+			fiberAbl: [0.85, 1],
+		},
 	},
 })
 
@@ -84,48 +278,31 @@ export function sampleFeatures(ancestry, random) {
 
 const between = (random, a, b) => a + (b - a) * random()
 
+// A shade of color class `colorClass` and its irisColor values.
+export function sampleIrisColor(colorClass, random) {
+	const shade = pickWeighted(SHADES[colorClass], random())
+	const color = {}
+	for (const [leaf, [min, max]] of Object.entries(SHADE_COLORS[shade].color))
+		color[leaf] = between(random, min, max)
+	return { shade, color }
+}
+
 export function randomEye(ancestry = 'european', seed = Math.floor(Math.random() * 1e9)) {
 	const random = createRandom(`eye:${ancestry}:${seed}`)
 	const f = sampleFeatures(ancestry, random)
-	const green = random() < 0.35
-	const color = [
-		{
-			ablMelanin: between(random, 0, 0.05),
-			eumelanin: green ? 0.15 : 0.88,
-			rayleighShare: between(random, 0.5, 0.95),
-		},
-		{
-			ablMelanin: between(random, 0.04, 0.18),
-			eumelanin: green ? 0.12 : 0.85,
-			rayleighShare: between(random, 0.55, 0.95),
-		},
-		{
-			ablMelanin: between(random, 0.25, 0.5),
-			eumelanin: between(random, 0.3, 0.6),
-			rayleighShare: 0.8,
-		},
-		{
-			ablMelanin: between(random, 0.6, 0.85),
-			eumelanin: between(random, 0.7, 0.9),
-			rayleighShare: 0.8,
-		},
-		{ ablMelanin: between(random, 0.9, 1), eumelanin: 0.95, rayleighShare: 0.8 },
-	][f.colorClass]
-	// The peripupillary ring: 91% of green or hazel eyes (Larsson 2011).
-	const ringChance = green || f.colorClass === 2 ? 0.91 : f.colorClass <= 1 ? 0.35 : 0.15
-	const ring = random() < ringChance
+	const { shade, color } = sampleIrisColor(f.colorClass, random)
+	const ring = random() < SHADE_COLORS[shade].ring
 	const spots = [0, 1 + Math.floor(random() * 2), 3 + Math.floor(random() * 6)][f.spotGrade]
 	const furrowCount = [0, 1 + Math.floor(random() * 2), 2 + Math.floor(random() * 3)][f.furrowGrade]
 	const age = Math.round(between(random, 18, 72))
 	const skin = { european: '#d39b7c', 'east-asian': '#c9966f', 'south-asian': '#9c6a4a' }[ancestry]
 	return {
-		features: f,
+		features: { ...f, shade },
 		params: {
 			eye: { age },
 			iris: { pupilDiameter: between(random, 2.6, 4.6) },
 			irisColor: {
 				...color,
-				fiberAbl: f.colorClass <= 1 ? between(random, 0, 0.35) : between(random, 0.7, 1),
 				heterochromia: {
 					amount: ring ? between(random, 0.55, 0.95) : 0,
 					melanin: Math.min(1, color.ablMelanin + between(random, 0.25, 0.5)),

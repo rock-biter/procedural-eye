@@ -90,6 +90,36 @@ test('random eyes: valid overrides and the measured marginals (±2% over 10k)', 
 	)
 })
 
+test('random eyes: shades within the ranges, with vivid blues and ambers', async () => {
+	const { SHADE_COLORS, SHADES, randomEye } = await import('../src/params/populationPriors')
+	const { irisColorRgb, irisLayerModel } = await import('../src/iris/irisColor')
+	SHADES.forEach((shades, colorClass) => {
+		const total = shades.reduce((sum, [, share]) => sum + share, 0)
+		assert.ok(Math.abs(total - 1) < 1e-9, `class ${colorClass}`)
+		for (const [shade] of shades) {
+			for (const [leaf, [min, max]] of Object.entries(SHADE_COLORS[shade].color)) {
+				const range = PARAM_SCHEMA.irisColor[leaf]
+				assert.ok(range.min <= min && min <= max && max <= range.max, `${shade} ${leaf}`)
+			}
+		}
+	})
+	// The albedo at a typical stroma thickness, with its saturation.
+	let blue = 0
+	let amber = 0
+	for (let seed = 0; seed < 1000; seed++) {
+		const params = createDefaults(PARAM_SCHEMA)
+		applyOverrides(PARAM_SCHEMA, params, randomEye('european', seed).params)
+		const color = params.irisColor
+		const rgb = irisColorRgb(color.ablMelanin, color.eumelanin, 0.45, irisLayerModel(color))
+		const luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+		const [r, g, b] = rgb.map((v) => Math.max(luma + (v - luma) * color.saturation, 0))
+		if (b > 3 * r) blue++
+		if (r > 2 * g && g > b) amber++
+	}
+	assert.ok(blue > 100, `vivid blue ${blue}/1000`)
+	assert.ok(amber > 50, `amber ${amber}/1000`)
+})
+
 test('PNG text metadata round-trips and keeps the chunk CRC valid', async () => {
 	const { crc32, insertPngText, readPngText } = await import('../src/render/pngMetadata')
 	assert.equal(crc32(new TextEncoder().encode('IEND')), 0xae426082)
