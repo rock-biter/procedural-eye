@@ -16,7 +16,9 @@ import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { createRandom } from '../random'
 import fragmentShader from '../shaders/tear-fragment.glsl'
 import vertexShader from '../shaders/tear-vertex.glsl'
-import { createFissure, createMeniscusMesh, eyeSurfaceAt } from './lidGeometry'
+import { createFissure } from './fissure'
+import { createMeniscusMesh } from './lidGeometry'
+import { supportAt } from './periocular'
 
 const MAX_BUBBLES = 60
 
@@ -75,7 +77,7 @@ export default class TearFilm {
 			const inset = params.lids.meniscusLower * (0.2 + 0.5 * random())
 			const x = mx - nx * inset
 			const y = my - ny * inset
-			const surface = eyeSurfaceAt(eye, x, y)
+			const surface = supportAt(eye, params.lids, fissure, x, y)
 			matrix.makeScale(radius, radius, radius)
 			matrix.setPosition(
 				surface.point[0] + surface.normal[0] * (0.05 + radius),

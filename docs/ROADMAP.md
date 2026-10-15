@@ -29,26 +29,26 @@
 
 - **Iris**: fiber translucency (light through thin bridging fibers) is not modeled; fibers are opaque.
 - **Lid geometry**:
-  - At the canthi the two lids meet in a sharp crease.
-  - Extreme shapes crease the skin within a few millimeters of the canthi: very open or very thick lids, or MRD2 above about 6 mm.
-  - Strongly tilted, wide fissures, and ptosis, fold the far skin about 19 mm or more from the axis, which is out of view in macro framings.
-  - The lid surface is a ring offset from the fissure loop. A fold-free parameterization of the far skin, such as a conformal map of the annulus, would remove these.
-- **Face**: the skin ends 34 mm from the fissure, so wide or grazing framings show its edge against the backdrop. The face around the orbit is a sculpted height field without eyebrow hairs.
+  - Extreme shapes still crease the skin near the medial lower lid: a fissure under 25 mm with a full pretarsal roll (`lowerRoll` near 1).
+  - The upper lid's fold cannot overhang its crease: the skin row runs outward without turning back, so hooding (the preseptal skin folding down over the crease, common with age) and the lateral overlap are shaped as steps, not undercuts.
+  - The lids pass in front of the globe toward the canthi. Where the margin leaves the globe, the meniscus fades, and a small gap under the margin shows the conjunctiva behind it.
+- **Face**: a thin-plate spline through anatomical landmarks, kept as a hint (softer than the measured brow, nose and cheek projections) and without eyebrow hairs. The skin is a patch about 76 × 80 mm: wide or grazing framings show its edge, and from the side, past its edge, the back of the globe and the conjunctiva.
+- **Blink**: `lids.closure` closes the lids as a rebuild (a still pose). The mesh keeps its layout at any closure, so an animated blink can morph between an open and a closed mesh in the vertex shader; that, the cornea pushing the closing lid out, and Bell's phenomenon are not implemented.
 - **Skin**:
   - The fine relief is evaluated in the front plane, so it stretches where the skin turns away from it, deep in the canthi.
   - There are no vellus hairs.
 - **Lashes**: they have no minimum on-screen width, so far-off fine lashes alias in interactive frames until the accumulation resolves them.
 - **Export**: **Save PNG** writes the canvas resolution. Tiled high-resolution export is not implemented.
 - **Pupil**: the panel has no light-step button and no D(t) graph. The dynamics are covered by unit tests.
-- **Age**: `eye.age` only changes the pupil, not the scleral yellowing, the limbal ring, or the lids' fullness, bags and folds.
-- **Hooding**: the lid bands keep the crease in view, as in the sculpting reference; skin folding down over the crease (hooding, common with age) is not modeled.
+- **Age**: `eye.age` only changes the pupil, not the scleral yellowing, the limbal ring, or the lids (folds, bags, hooding).
 - **Self-test**: there is no `?selftest=1` comparison of GLSL twins against their JS versions. Shader–CPU agreement is checked visually (the refraction checker, captures).
 - **Gaze and orbit**: a living eye with `animation.gaze` = `camera` turns toward the camera as it orbits. Use the default `wander`, `fixed`, photo mode, or a still eye to look at grazing angles.
 
 ## Future Work
 
 - Limbus: palisades of Vogt; arcus senilis with age.
-- A detailed caruncle and plica semilunaris at the medial canthus. Today a smooth wet fornix surface fills both canthi.
+- Caruncle and plica shading: today they share the wet-mucosa shading of the conjunctiva (no fine hairs, no sebaceous texture).
+- Skin relief in the geometry: the lid folds, the tear trough and the crow's feet are shaded only (the rewritten lids carry the crease, the pretarsal roll and the lateral overlap).
 - Purkinje III/IV refinements, the red reflex with coaxial light, corneal and limbal caustics.
 - Axial chromatic fringing.
 - A 3D bake of the iris field for cheaper interactive frames.

@@ -1,632 +1,506 @@
-// Eyelid geometry (pure): the palpebral fissure, the lid margins and the skin
-// around them, as a ring of quads around the fissure. World space at primary
-// gaze (the globe center is the origin; +X is the right of the picture, +Y up).
+// Eyelid geometry (pure): the two lids around the palpebral fissure
+// (src/adnexa/fissure.js) as one ring of quads, the conjunctiva and caruncle
+// in the canthi, and the tear meniscus along the margins. World millimeters at
+// primary gaze (the globe center at the origin, +Z toward the viewer).
 //
-// The fissure is an almond: from the medial to the lateral canthus the upper
-// margin arches up to MRD1 above the pupil center and the lower margin down to
-// MRD2 below it (Rana 2023), the lateral canthus raised by the canthal tilt.
-// Around it the surface is built from the volumes of the region, as a sculptor
-// blocks them out:
-// - the margins: the posterior margin rests on the eye surface (cornea
-//   included, which the upper lid covers), the intermarginal strip rises
-//   `marginThickness` off the globe, a rounded anterior edge carries the lashes;
-// - the lids (lidShell()): two convex crescent bands wrapped over the globe,
-//   the upper one up to its crease, the lower one down to the lid–cheek
-//   junction, both narrowing toward the canthi where they meet;
-// - the face around the orbit (faceDepth()): soft, broad volumes, the brow
-//   over the upper lid, the cheek below, the nose, the face curving back
-//   toward the temple;
-//   past the edge of each band the skin turns from the lid into the face (from
-//   the crease up under the brow, from the lid–cheek junction onto the cheek).
-//
-// Seeded by `lids.seed`, the margins wander a little off their arches, the
-// tissue is uneven, soft folds run along the lids and fan out of the lateral
-// canthus (skinRelief()), and the face is a little asymmetric.
-import { clamp01, smoothstep, vec3 } from '../math'
-import { hash01 } from '../random'
+// The ring's columns leave the fissure loop: the upper lid from the medial to
+// the lateral canthus, the lower lid back. They meet in a U at the medial
+// canthus, around the caruncle (the margins' angle rounded by MEDIAL_ROUND),
+// and in an acute angle at the lateral one (LATERAL_ROUND), where the columns
+// fan out of the corner and the upper lid laps over the end of the lower one. Each column carries the
+// lid's profile, drawn on the support (src/adnexa/periocular.js) at a
+// front-plane distance `a` from the margin:
+// - the intermarginal strip: the posterior margin rests on the support, the
+//   strip rises `marginThickness` off it;
+// - the anterior edge, rounded with `marginRadius`, where the lashes grow;
+// - the lid: a shell over the support that thickens to the lid's thickness,
+//   with the upper lid's crease under its fold and the lower lid's pretarsal
+//   roll;
+// - the face (createFace()), which the lid turns into away from the margin:
+//   the brow above, the nose medially, the cheek below, the temple laterally.
+//   The face passes through the lid's shell along a ring around the fissure,
+//   so the lids flow into it.
+// The columns are laid out on the open fissure. As the lids close
+// (`lids.closure`), each column's margin slides to the closing margin and the
+// lid stretches over the globe, while the face stays put: the mesh keeps its
+// layout at any closure (a blink can morph between two of them).
+import { smoothstep, smootherstep, vec3 } from '../math'
+import { createFissure } from './fissure'
+import {
+	conjunctivaZ,
+	createFace,
+	FORNIX_START,
+	smoothMax,
+	supportAt,
+	supportLift,
+} from './periocular'
 
 // Profile partition: s in [0, WALL) the intermarginal strip, [WALL, EDGE) the
 // rounded anterior edge, [EDGE, 1] the skin.
-export const LID_PROFILE = Object.freeze({ wall: 0.07, edge: 0.14, reach: 34 })
+export const LID_PROFILE = Object.freeze({ wall: 0.07, edge: 0.14 })
 
-// Samples of the margins' arc-length tables.
-const ARC_SAMPLES = 256
+// The posterior margin's clearance off the support (mm).
+const GAP = 0.03
+// Weight of the columns' turning against their spacing along the loop (mm per
+// radian): the corners and the medial U get columns enough to fan out.
+const TURN_WEIGHT = 3
+// Radii (mm) of the canthi's corners, as the columns go round them: the
+// medial one rounds into a U around the caruncle.
+const LATERAL_ROUND = 0.5
+const MEDIAL_ROUND = 1
+// The rows' step (mm) when tracing a column outward, and the patch of face
+// (an ellipse around the eye: center offset temporal and down, semi-axes).
+const TRACE_STEP = 0.2
+const PATCH = { temporal: 3, down: 4, width: 38, height: 40 }
+// Far from the margin the rows turn from the margin's normal to rays from the
+// fissure's center, which never cross.
+const RADIAL = { start: 2, end: 16 }
+// How far from the margin (mm) a closing lid stretches: past it the skin
+// stays put.
+const SLIDE = 12
+// The lateral overlap: the upper lid laps over the lower one along a fold
+// running out of the lateral canthus, this much below the chord (radians).
+const LATERAL_FOLD = { slant: 0.35, length: 4.5, width: 0.8 }
+// How much further from the margin (mm) the upper lid's fold lies when the lid
+// is closed: open, the skin above the crease folds down over it (the pretarsal
+// show, 2–3.5 mm, Price 2009); closed, the crease is 6–7.5 mm above the margin.
+const CREASE_UNFOLD = 4
+// Points of the lids' shell the face passes through, around the fissure.
+const FACE_RING = 32
+// The lower margin is thinner than the upper one (the intermarginal strip
+// 1.0 against 1.36 mm, Zhu 2022).
+const LOWER_MARGIN = 0.8
+// The thinnest the lid gets off the globe (mm), in its crease.
+const MIN_THICKNESS = 0.6
 
-// Skewed arch in [0, 1] with its maximum at `peak` (0–1).
-function arch(s, peak, sharpness) {
-	const k = Math.log(0.5) / Math.log(Math.min(Math.max(peak, 0.05), 0.95))
-	const u = clamp01(s) ** k
-	return (4 * u * (1 - u)) ** sharpness
-}
+const bell = (value, width) => Math.exp(-((value / width) ** 2))
+const angleOf = (v) => Math.atan2(v[1], v[0])
 
-// Seeded 2D gradient noise (quintic fade), about [-1, 1].
-export function noise2(x, y, seed) {
-	const ix = Math.floor(x)
-	const iy = Math.floor(y)
-	const fx = x - ix
-	const fy = y - iy
-	const corner = (i, j) => {
-		const angle = 2 * Math.PI * hash01(ix + i, iy + j, seed)
-		return Math.cos(angle) * (fx - i) + Math.sin(angle) * (fy - j)
+// The lid's thickness grows off the support along its normal, tilted at most
+// MAX_TILT from the front (the lids stay in front of the globe).
+const MAX_TILT = (35 * Math.PI) / 180
+function thicknessDirection(normal) {
+	let [x, y, z] = normal
+	const tilt = Math.hypot(x, y)
+	const limit = Math.tan(MAX_TILT) * z
+	if (tilt > limit) {
+		x *= limit / tilt
+		y *= limit / tilt
 	}
-	const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10)
-	const uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10)
-	const a = corner(0, 0)
-	const b = corner(1, 0)
-	const c = corner(0, 1)
-	const d = corner(1, 1)
-	return 1.4 * (a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy)
+	return vec3.normalize([x, y, z])
 }
 
-// Seeded noise along a closed curve parameter u (period 1), with about
-// `cycles` undulations per period: the noise sampled on a circle.
-function loopNoise(u, cycles, seed) {
-	const radius = cycles / (2 * Math.PI)
-	const angle = 2 * Math.PI * u
-	return noise2(radius * Math.cos(angle) + 17.3, radius * Math.sin(angle) - 5.1, seed)
+// Upper-lid share of a direction leaving the margin: 1 on the upper lid, 0 on
+// the lower one, blended across the canthi (by the direction against the
+// chord's normal, so the fan of the lateral corner blends too).
+export function upperShare(direction, up) {
+	return smoothstep(-0.6, 0.6, direction[0] * up[0] + direction[1] * up[1])
 }
 
-// Integer seed of the lid features (`lids.seed`, 1 when absent).
-function lidSeed(lids) {
-	return (Math.round(lids.seed ?? 1) * 64) >>> 0
-}
-
-// The fissure outline in the front plane. `nasalSign` is +1 for a right eye
-// (the nose toward +X).
-export function createFissure(lids, nasalSign = 1) {
-	const width = lids.fissureWidth
-	const medialX = nasalSign * width * 0.52
-	const lateralX = -nasalSign * width * 0.48
-	const medialY = lids.medialHeight
-	const lateralY = medialY + width * Math.tan((lids.canthalTilt * Math.PI) / 180)
-	// Peak positions as a share of the way from the medial canthus.
-	const upperPeak = 0.5 + lids.upperPeak
-	const lowerPeak = 0.5 + lids.lowerPeak
-	const baseline = (s) => medialY + (lateralY - medialY) * s
-	// A margin is not a perfect arch: it wanders off it by up to about 0.12 mm
-	// (`irregularity`), in two or three gentle undulations that vanish at the
-	// canthi. The amplitudes below include it, so MRD1 and MRD2 still hold.
-	const seed = lidSeed(lids)
-	const wander = (s, k) =>
-		0.12 *
-		(lids.irregularity ?? 0) *
-		Math.sin(Math.PI * clamp01(s)) ** 1.5 *
-		noise2(clamp01(s) * 2.6, 0.5 + 3 * k, seed + k)
-	// The arch amplitude whose extreme over the sloping baseline is `target`
-	// (bisection: the extreme grows monotonically with the amplitude).
-	const amplitudeFor = (target, peak, sharpness, sign, k) => {
-		const extreme = (amplitude) => {
-			let best = -Infinity
-			for (let i = 0; i <= 200; i++) {
-				const s = i / 200
-				best = Math.max(
-					best,
-					sign * (baseline(s) + sign * amplitude * arch(s, peak, sharpness) + wander(s, k)),
-				)
-			}
-			return best
-		}
-		let low = 0
-		let high = 40
-		for (let i = 0; i < 50; i++) {
-			const mid = (low + high) / 2
-			if (extreme(mid) < sign * target) low = mid
-			else high = mid
-		}
-		return (low + high) / 2
-	}
-	const upperAmplitude = amplitudeFor(lids.mrd1, upperPeak, lids.upperShape, 1, 0)
-	const lowerAmplitude = amplitudeFor(-lids.mrd2, lowerPeak, lids.lowerShape, -1, 1)
-	const x = (s) => medialX + (lateralX - medialX) * s
-	const upper = (s) => [
-		x(s),
-		baseline(s) + upperAmplitude * arch(s, upperPeak, lids.upperShape) + wander(s, 0),
-	]
-	const lower = (s) => [
-		x(s),
-		baseline(s) - lowerAmplitude * arch(s, lowerPeak, lids.lowerShape) + wander(s, 1),
-	]
-	// t in [0, 0.5): upper margin medial → lateral; [0.5, 1): lower lateral → medial.
-	const loop = (t) => {
-		const u = ((t % 1) + 1) % 1
-		return u < 0.5 ? upper(u * 2) : lower(2 - u * 2)
-	}
-	// Outward normal of the loop (away from the opening), by central difference.
-	// Memoized: the mesh averages it over grids of samples shared by every
-	// vertex of a ring row (smoothedNormal()).
-	const normals = new Map()
-	const normal = (t) => {
-		let n = normals.get(t)
-		if (n) return n
-		const h = 1e-4
-		const a = loop(t - h)
-		const b = loop(t + h)
-		const tx = b[0] - a[0]
-		const ty = b[1] - a[1]
-		const length = Math.hypot(tx, ty) || 1
-		// The loop runs medial→lateral on top: for a right eye that is toward −X,
-		// so the outward (upward) normal is (ty, −tx) / |t|; mirrored for left.
-		n = [(nasalSign * ty) / length, (-nasalSign * tx) / length]
-		normals.set(t, n)
-		return n
-	}
-	// Arc length along each margin from the medial canthus (tables over the
-	// arch parameter), for `along`: 0 at the medial, 1 at the lateral canthus.
-	const arcTable = (curve) => {
-		const lengths = new Float64Array(ARC_SAMPLES + 1)
-		let previous = curve(0)
-		for (let i = 1; i <= ARC_SAMPLES; i++) {
-			const p = curve(i / ARC_SAMPLES)
-			lengths[i] = lengths[i - 1] + Math.hypot(p[0] - previous[0], p[1] - previous[1])
-			previous = p
-		}
-		return lengths
-	}
-	const arcs = [arcTable(upper), arcTable(lower)]
-	const along = (t) => {
-		const u = ((t % 1) + 1) % 1
-		const lengths = arcs[u < 0.5 ? 0 : 1]
-		const f = (u < 0.5 ? u * 2 : 2 - u * 2) * ARC_SAMPLES
-		const i = Math.min(Math.floor(f), ARC_SAMPLES - 1)
-		const length = lengths[i] + (lengths[i + 1] - lengths[i]) * (f - i)
-		return length / lengths[ARC_SAMPLES]
-	}
-	return {
-		upper,
-		lower,
-		loop,
-		normal,
-		along,
-		medial: [medialX, medialY],
-		lateral: [lateralX, lateralY],
-		width,
-		// Margin lengths (mm), upper and lower.
-		lengths: arcs.map((lengths) => lengths[ARC_SAMPLES]),
-	}
-}
-
-// Past this share of the sclera radius the support surface of the lids leaves
-// the globe. The canthi lie beyond the globe's outline (a 27 mm fissure around
-// a 24 mm globe), where the lids wrap around it toward the orbit: there the
-// support leaves the sphere tangentially and its slope eases off over
-// SUPPORT_EASE mm, so the margin stays smooth, outside the globe and about at
-// the equator, instead of piling every vertex onto the outline.
-const SUPPORT_EDGE = 0.96
-const SUPPORT_EASE = 1.5
-
-// Height and slope of the lids' support surface at radius r: the analytic eye
-// profile, continued past SUPPORT_EDGE with a slope that eases off (C1, and
-// above the sphere because it is never steeper than the sphere's tangent).
-function supportProfile(eye, r) {
-	const edge = eye.scleraRadius * SUPPORT_EDGE
-	if (r <= edge) return { z: eye.surfaceZ(r), slope: eye.surfaceSlope(r) }
-	const edgeSlope = eye.surfaceSlope(edge)
-	const ease = Math.exp(-(r - edge) / SUPPORT_EASE)
-	return {
-		z: eye.surfaceZ(edge) + edgeSlope * SUPPORT_EASE * (1 - ease),
-		slope: edgeSlope * ease,
-	}
-}
-
-// Outward normal of a surface of revolution with dz/dr = slope at (x, y).
-function profileNormal(x, y, slope) {
-	const r = Math.hypot(x, y)
-	const radial = r > 1e-9 ? [x / r, y / r] : [0, 0]
-	return vec3.normalize([-slope * radial[0], -slope * radial[1], 1])
-}
-
-// The eye surface point and outward normal under a front-plane point (world
-// space at primary gaze): the analytic profile, continued past the globe's
-// outline (supportProfile).
-export function eyeSurfaceAt(eye, x, y) {
-	const { z, slope } = supportProfile(eye, Math.hypot(x, y))
-	return { point: [x, y, z], normal: profileNormal(x, y, slope) }
-}
-
-// Polynomial smooth maximum (iq), as in common.glsl.
-function smoothMax(a, b, k) {
-	const h = Math.max(k - Math.abs(a - b), 0) / k
-	return Math.max(a, b) + h * h * k * 0.25
-}
-
-const bell = (value, center, width) => Math.exp(-(((value - center) / width) ** 2))
-
-// 0 at the medial canthus, 1 at the lateral one, for loop parameter t.
-function sideOf(t) {
-	const u = ((t % 1) + 1) % 1
-	return u < 0.5 ? u * 2 : 2 - u * 2
-}
-
-// The face around the orbit: its depth behind the corneal apex (mm, negative
-// in front of it) at front-plane point (x, y), `nasalSign` +1 when the nose is
-// toward +X. A smooth height field of broad, soft volumes, with no step
-// anywhere:
-// - the face, 5 mm behind the apex around the eye, curving back above,
-//   below and toward the temple (`templeDepth` further);
-// - the orbit: a soft hollow around the eye, where the face lies behind the
-//   lids, deeper under the brow than over the cheek, deepest between the
-//   eye, the brow and the nose;
-// - the brow: an arch over the eye at `browDepth`, its head low by the nose,
-//   its peak above the lateral limbus, its tail falling toward the temple;
-// - the cheek: a round swell below and lateral of the eye at `cheekDepth`;
-// - the nose: a ridge along the midline, narrow and low at its root between
-//   the eyes, wider and higher downward, with its ala; the glabella above the
-//   root; a shallow recess at the medial canthus;
-// - a seeded asymmetry (`irregularity`) away from the lids.
-export function faceDepth(lids, x, y, nasalSign = 1) {
-	const n = x * nasalSign
-	const FACE = 5
-	let depth =
-		FACE + Math.max(0, -n - 4) ** 2 / 70 + (y * y) / 180 + lids.templeDepth * smoothstep(14, 34, -n)
-	// The orbit.
-	const orbit = Math.exp(-(((n - 1) / 15) ** 2) - ((y - 0.5) / 13) ** 2)
-	depth += 5.5 * orbit * (0.4 + 0.6 * smoothstep(-12, 12, y))
-	// Deepest between the eye, the brow and the nose.
-	depth += 2 * Math.exp(-(((n - 12) / 7) ** 2) - ((y - 7) / 6) ** 2)
-	// The brow: an arch over the eye, its head low by the nose, its peak above
-	// the lateral limbus, its tail falling faster toward the temple.
-	const arch = n + 6
-	const browY = 17.5 - (arch > 0 ? 0.006 : 0.012) * arch * arch
-	const brow = bell(y, browY, y < browY ? 5.5 : 6) * Math.exp(-((n / 27) ** 4))
-	depth -= (FACE - lids.browDepth) * brow
-	// The cheek.
-	depth -= (FACE - lids.cheekDepth) * Math.exp(-(((n + 5) / 17) ** 2) - ((y + 17) / 11) ** 2)
-	// The nose: a ridge along the midline of the face, 31.5 mm medial of the
-	// pupil, narrow and low at its root between the eyes, wider and higher
-	// downward, its ala on the eye's side; the glabella above the root, between
-	// the brows; a shallow recess at the medial canthus.
-	const midline = Math.abs(31.5 - n)
-	const width = 9 + 9 * smoothstep(10, -30, y)
-	const height = (5 + 11 * smoothstep(10, -35, y)) * (1 - smoothstep(12, 26, y))
-	const across = clamp01(midline / width)
-	depth -= height * (1 - across * across) ** 2
-	depth -= 4 * Math.exp(-(((midline - 11) / 4.5) ** 2) - ((y + 30) / 5) ** 2)
-	depth -= 0.6 * (FACE - lids.browDepth) * Math.exp(-((midline / 9) ** 2) - ((y - 14) / 8) ** 2)
-	depth += 1.5 * Math.exp(-(((n - 15) / 5) ** 2) - ((y + 3) / 6) ** 2)
-	const seed = lidSeed(lids) + 30
-	const asymmetry =
-		(lids.irregularity ?? 0) *
-		(1 - orbit) *
-		(0.8 * noise2(x / 11, y / 11, seed) + 0.3 * noise2(x / 4.5, y / 4.5, seed + 1))
-	return depth + asymmetry
-}
-
-// Height (z) of a dome over the globe, the sclera sphere grown by `b` mm,
-// continued past 0.88 of its radius by its tangent, so it never stands up in
-// a wall at its outline (at the lateral canthus).
-function domeZ(eye, r, b) {
-	const radius = eye.scleraRadius + b
-	const edge = 0.88 * radius
-	const edgeZ = Math.sqrt(radius * radius - edge * edge)
-	return r < edge ? Math.sqrt(radius * radius - r * r) : edgeZ - (edge / edgeZ) * (r - edge)
-}
-
-// The surface around the lids at front-plane point (x, y): the dome `b` mm off
-// the globe merged by smooth maximum into the face (faceDepth()), so neither
-// can cut into the other.
-function outerSurface(eye, lids, x, y, b, nasalSign) {
-	const face = eye.apexZ - faceDepth(lids, x, y, nasalSign)
-	return [x, y, smoothMax(domeZ(eye, Math.hypot(x, y), b), face, 4)]
-}
-
-// Outward normal of the outer surface, averaged over a few millimeters (wide
-// central differences): the relief rides on it.
-function outerNormal(eye, lids, x, y, b, nasalSign) {
-	const h = 2.5
-	const at = (dx, dy) => outerSurface(eye, lids, x + dx, y + dy, b, nasalSign)
-	return vec3.normalize(vec3.cross(vec3.sub(at(h, 0), at(-h, 0)), vec3.sub(at(0, h), at(0, -h))))
-}
-
-// The smooth sclera-sphere normal under a front-plane point (the support's
-// past the support edge).
-function sphereNormal(eye, x, y) {
-	const r = Math.hypot(x, y)
-	const edge = eye.scleraRadius * SUPPORT_EDGE
-	if (r > edge) return profileNormal(x, y, supportProfile(eye, r).slope)
-	return vec3.normalize([x, y, eye.scleraZ(r)])
-}
-
-// The loop normal averaged over a window that widens away from the margin
-// (`far` 0–1): around the canthi the outward directions turn by more than
-// 90°, and averaging fans the outer skin evenly instead of in a few huge
-// triangles. The samples sit on grids fixed along the loop, not at offsets
-// from t, and the kernel is smooth and compact: the average then turns
-// smoothly with t across the corners, where the loop normal jumps (offset
-// samples would cross the jump one by one and fold the outer skin). The grid
-// steps are powers of two, the average blended between the two around the
-// window's width, so it also changes smoothly with `far` (a step following
-// the width would move the samples, and the dense rows of the lid fold would
-// zigzag around the corners).
-function smoothedNormal(fissure, t, far) {
-	const sigma = 0.003 + 0.06 * far
-	const radius = 3 * sigma
-	const average = (step) => {
-		let x = 0
-		let y = 0
-		let total = 0
-		for (let k = Math.ceil((t - radius) / step); k <= Math.floor((t + radius) / step); k++) {
-			const u = k * step
-			const w = (1 - ((u - t) / radius) ** 2) ** 3
-			const [nx, ny] = fissure.normal(u)
-			x += nx * w
-			y += ny * w
-			total += w
-		}
-		return [x / total, y / total]
-	}
-	const level = Math.log2(sigma / 4)
-	const low = Math.floor(level)
-	const f = level - low
-	const fine = average(2 ** low)
-	const coarse = average(2 ** (low + 1))
-	const x = fine[0] + (coarse[0] - fine[0]) * f
-	const y = fine[1] + (coarse[1] - fine[1]) * f
-	const length = Math.hypot(x, y) || 1
-	return [x / length, y / length]
-}
-
-// Margin thickness shrinks to nothing at the canthi.
-function cantalTaper(t) {
-	const u = ((t % 1) + 1) % 1
-	const side = u < 0.5 ? u * 2 : 2 - u * 2
-	return smoothstep(0, 0.12, side) * smoothstep(0, 0.12, 1 - side)
-}
-
-// Soft fold lines across `phase` (in units of their mean spacing), at
-// irregular positions and depths, each broken into segments along the skin
-// (2D noise at the front-plane point x, y): a sum of bumps of `width`.
-function foldLines(phase, x, y, width, seed) {
-	const k = Math.floor(phase)
-	let sum = 0
-	for (let j = k - 1; j <= k + 1; j++) {
-		const center = j + 0.2 + 0.6 * hash01(j, 7, seed)
-		const depth = 0.4 + 0.6 * hash01(j, 9, seed)
-		const segment = smoothstep(-0.2, 0.35, noise2(x / 2.4 + 0.37 * j, y / 2.4 - 0.53 * j, seed))
-		sum += depth * segment * bell(phase, center, width)
-	}
-	return sum
-}
-
-// The crescent of a lid band along it (`side` 0–1 from the medial canthus):
-// 0 at the canthi, 1 at `peak`, rounded, with no kink at the ends.
-function crescent(side, peak) {
-	const k = Math.log(0.5) / Math.log(peak)
-	const u = clamp01(side) ** k
-	return Math.sin(Math.PI * u * u * (3 - 2 * u))
-}
-
-// The lid bands' height at the canthi (mm), where the upper and lower meet.
-const CANTHAL_BAND = 2
-
-// The lid band at loop parameter t: its height from the margin (mm along the
-// skin; to the crease on the upper lid, `creaseHeight` in the middle, to the
-// lid–cheek junction on the lower lid, `lowerHeight`), its crescent (0 at the
-// canthi), and its thickness off the globe (the upper lid `lidThickness`, the
-// lower one 0.7 of it, blended across the canthi).
-function lidBand(lids, t) {
-	const upper = ((t % 1) + 1) % 1 < 0.5
-	const side = sideOf(t)
-	const shape = crescent(side, upper ? 0.45 : 0.55)
-	const middle = upper ? lids.creaseHeight : lids.lowerHeight
-	const wave = 0.5 * lids.irregularity * loopNoise(t, 3, lidSeed(lids) + 4)
-	const share = upperShare(t)
-	return {
-		upper,
-		shape,
-		height: CANTHAL_BAND + (middle - CANTHAL_BAND + wave) * shape,
-		thickness: lids.lidThickness * (0.7 + 0.3 * share),
-		fullness: upper ? lids.fullness : lids.bags,
-	}
-}
-
-// The lid's thickness off the globe at `a` mm from the margin, from where the
-// rounded anterior edge ends (`edge` = { a, thickness }, the thickness tapered
-// at the canthi) with the edge's flat tangent, so the skin carries on without
-// a step:
-// - it reaches the band's thickness within 2.5 mm in the middle of the lid
-//   (6 mm at the canthi, where the lids wrap past the globe's outline and a
-//   steep rise would fold them), from `margin`, the thickness the margin has
-//   away from the canthi;
-// - the canthal taper of the margin fades within 1.5 mm, so it does not run
-//   on as a groove out of the corner where the two lids meet;
-// - it swells by the band's fullness around 0.6 of its height (the convex
-//   lid over the tarsus and the fat behind the septum), less on a band
-//   under 7 mm, which could not hold it without folding;
-// - it dips into the groove at the band's edge, the crease (`creaseDepth`)
-//   or the lid–cheek junction.
-// Returns the thickness and the groove (≥ 0, for the shading).
-function lidShell(lids, band, a, edge, margin) {
-	const from = edge.a
-	const ramp = smoothstep(from, from + 6 - 3.5 * band.shape, a)
-	const taper = (edge.thickness - margin) * (1 - smoothstep(from, from + 1.5, a))
-	const base = margin + (band.thickness - margin) * ramp + taper
-	const swell =
-		band.fullness *
-		band.shape *
-		Math.min(1, band.height / 7) *
-		bell(a, 0.6 * band.height, 0.3 * band.height) *
-		smoothstep(from, from + 2, a)
-	const depth = band.upper ? lids.creaseDepth : 0.25 + 0.2 * lids.bags
-	const groove =
-		depth * band.shape * bell(a, band.height, band.upper ? 0.6 + 0.3 * lids.creaseDepth : 1.3)
-	return { thickness: base + swell - groove, groove }
-}
-
-// The seeded relief of the skin at `a` mm from the margin, front-plane point
-// (x, y): `offset` (mm along the surface normal) and `grooves` (≥ 0, for the
-// shading). Every term that depends on the place along the lid vanishes at the
-// canthi; the rest depends on (x, y) only.
-function skinRelief(lids, fissure, t, a, x, y, upperLid) {
-	const side = sideOf(t)
-	const seed = lidSeed(lids)
-	// Soft-tissue unevenness, growing away from the margin.
-	const offset =
-		0.16 *
-		lids.irregularity *
-		(noise2(x / 4.5, y / 4.5, seed + 2) + 0.4 * noise2(x / 1.9, y / 1.9, seed + 3)) *
-		smoothstep(1, 5, a)
-	let grooves = 0
-	const [medialX, medialY] = fissure.medial
-	const [lateralX, lateralY] = fissure.lateral
-	// Outward along the fissure axis, from the medial to the lateral canthus.
-	const ox = (lateralX - medialX) / fissure.width
-	const oy = (lateralY - medialY) / fissure.width
-	// The tear trough: a groove from below the medial canthus down and out.
-	{
-		const sx = x - medialX - ox * 1.5
-		const sy = y - medialY + 4
-		const dx = ox * 0.55
-		const dy = -0.83
-		const along = sx * dx + sy * dy
-		const across = Math.abs(sx * dy - sy * dx)
-		const reach = smoothstep(-1, 2, along) * (1 - smoothstep(6, 14, along)) * smoothstep(2.5, 5, a)
-		grooves += 0.35 * lids.bags * reach * bell(across, 0, 1.4)
-	}
-	// Crow's feet: folds fanning out of the lateral canthus, curving a little.
-	const dx = x - lateralX
-	const dy = y - lateralY
-	const r = Math.hypot(dx, dy)
-	const angle = Math.atan2(dy * ox - dx * oy, dx * ox + dy * oy)
-	const fan =
-		smoothstep(3, 7, r) * (1 - smoothstep(14, 22, r)) * (1 - smoothstep(0.8, 1.3, Math.abs(angle)))
-	if (fan > 0) {
-		const phase =
-			(angle * 9 + 0.01 * r * r * Math.sign(angle) + 0.7 * noise2(x / 5, y / 5, seed + 20)) / 2.2
-		grooves += 0.14 * lids.folds * fan * foldLines(phase, x, y, 0.22, seed + 21)
-	}
-	// Soft folds along the lids, irregular and broken, giving way to the
-	// crow's feet laterally; finer and deeper on the thin lower lid.
-	const lidFolds =
-		smoothstep(1.8, 3.5, a) * (1 - smoothstep(14, 20, a)) * (1 - fan) * smoothstep(0, 0.15, side)
-	if (lidFolds > 0) {
-		const spacing = upperLid ? 1.6 : 1.25
-		const depth = upperLid ? 0.1 : 0.13
-		const phase = (a + 0.7 * noise2(x / 3.2, y / 3.2, seed + 22)) / spacing
-		grooves += depth * lids.folds * lidFolds * foldLines(phase, x, y, 0.24, seed + 23)
-	}
-	return { offset: offset - grooves, grooves }
-}
-
-// World position of ring vertex (t, s), whether it is on the upper lid, the
-// distance `a` from the margin, the outward direction in the front plane
-// (`across`, along which `a` grows), the depth of the grooves (`fold`, ≤ 0)
-// and the band's height (for the gaze follow).
-export function lidPoint(t, s, fissure, eye, lids) {
-	const u = ((t % 1) + 1) % 1
-	const upperLid = u < 0.5
-	const [mx, my] = fissure.loop(t)
-	const taper = cantalTaper(t)
-	// The margin's thickness and the roundness of its anterior edge vary a
-	// little along the lid, not near the canthi, where the lids meet.
-	const seed = lidSeed(lids)
-	const side = sideOf(t)
-	const away = smoothstep(0.1, 0.3, Math.min(side, 1 - side))
-	const vary = (k, cycles) => 1 + 0.2 * lids.irregularity * away * loopNoise(t, cycles, seed + k)
-	// The margin's thickness, and the same without the canthal taper.
-	const untapered = lids.marginThickness * vary(0, 5)
-	const margin = untapered * (0.5 + 0.5 * taper)
-	const edgeRadius = Math.min(0.65, margin * 0.42) * vary(1, 4)
-	const gap = 0.03
-	const { wall, edge, reach } = LID_PROFILE
-	const band = lidBand(lids, t)
-
-	// Profile coordinates: `a` along the skin away from the fissure (mm, in the
-	// front plane), `b` off the eye surface along its normal (mm).
-	let a
-	let b
-	let groove = 0
-	if (s < wall) {
-		a = 0
-		b = gap + (margin - edgeRadius - gap) * (s / wall)
-	} else if (s < edge) {
-		const phi = Math.PI - (Math.PI / 2) * ((s - wall) / (edge - wall))
-		a = edgeRadius + edgeRadius * Math.cos(phi)
-		b = margin - edgeRadius + edgeRadius * Math.sin(phi)
-	} else {
-		const k = (s - edge) / (1 - edge)
-		a = edgeRadius + (reach - edgeRadius) * k ** 1.7
-		const anterior = { a: edgeRadius, thickness: margin }
-		;({ thickness: b, groove } = lidShell(lids, band, a, anterior, untapered))
-	}
-	const far = s < edge ? 0 : (s - edge) / (1 - edge)
-	const [nx, ny] = smoothedNormal(fissure, t, far)
-	const x = mx + nx * a
-	const y = my + ny * a
-
-	// The lid: the eye surface (cornea included) offset along the smooth
-	// sphere normal near the margin, so the corneal bulge does not fold it,
-	// turning within 3 mm into a dome over the globe. The lower lid rests on
-	// the cheek too where the cheek stands in front of that dome (it does not
-	// sink between globe and cheek); the lid–cheek groove is cut after.
-	const nasalSign = Math.sign(fissure.medial[0] - fissure.lateral[0])
-	const contact = eyeSurfaceAt(eye, x, y)
-	const drape = vec3.madd(contact.point, sphereNormal(eye, x, y), b)
-	const k = smoothstep(0.3, 3, a)
-	let p = drape
-	if (k > 0) {
-		const r = Math.hypot(x, y)
-		let z = domeZ(eye, r, b)
-		// Full on the lower lid, none on the upper, blended across the canthi.
-		const rest = 1 - upperShare(t)
-		if (rest > 0) {
-			const face = eye.apexZ - faceDepth(lids, x, y, nasalSign)
-			z += (smoothMax(domeZ(eye, r, b + groove), face, 3) - groove - z) * rest
-		}
-		p = vec3.lerp(drape, [x, y, z], k)
-	}
-	let fold = -groove
-	if (s >= edge) {
-		// Past the band's edge the skin turns into the face around the orbit.
-		const edgeThickness = band.thickness
-		const turn = smoothstep(band.height, band.height + (band.upper ? 3.5 : 4.5), a)
-		if (turn > 0) p = vec3.lerp(p, outerSurface(eye, lids, x, y, edgeThickness, nasalSign), turn)
-		// The relief, along the averaged normal, kept 0.3 mm clear of the globe.
-		const relief = skinRelief(lids, fissure, t, a, x, y, upperLid)
-		const normal = outerNormal(eye, lids, x, y, edgeThickness, nasalSign)
-		const offset = smoothMax(b + relief.offset, 0.3, 0.3) - b
-		p = vec3.madd(p, normal, offset)
-		fold -= relief.grooves
-	}
-	return { position: p, upperLid, a, b, across: [nx, ny], fold, band: band.height }
-}
-
-// How much a lid vertex follows the gaze (lid-follow.glsl): fully over most
-// of its lid band, not at all once past its edge (the brow and the cheek
-// stay put).
+// How much a lid vertex follows the gaze (lid-follow.glsl): fully over most of
+// its lid band, not at all once past its edge (the brow and the cheek stay put).
 export function followWeight(a, bandHeight = 8) {
 	return 1 - smoothstep(0.5 * bandHeight, bandHeight + 3, a)
 }
 
-// Upper-lid share along the fissure loop, blended across the canthi.
-export function upperShare(t) {
-	const u = ((t % 1) + 1) % 1
-	const side = u < 0.5 ? u * 2 : 2 - u * 2
-	const edge = Math.min(side, 1 - side)
-	return u < 0.5 ? 0.5 + 0.5 * smoothstep(0, 0.08, edge) : 0.5 - 0.5 * smoothstep(0, 0.08, edge)
+// What every lid point needs: the settings, the eye, the open and the current
+// fissure, the face and the open fissure's center. Memoized per fissure (the
+// lashes ask point by point).
+const contexts = new WeakMap()
+function lidContext(lids, eye, fissure) {
+	let context = contexts.get(fissure)
+	if (!context || context.lids !== lids || context.eye !== eye) {
+		const nasalSign = Math.sign(fissure.medial[0] - fissure.lateral[0])
+		const open = fissure.closure > 0 ? createFissure(lids, nasalSign, 0) : fissure
+		context = { lids, eye, open, fissure, nasalSign, center: fissureCenter(open) }
+		// The face passes through the lids' shell along a ring around the
+		// fissure, so the lids turn into it smoothly.
+		// The open lids' shell: the face stays put as they close.
+		const openContext = { ...context, fissure: open }
+		const ring = []
+		for (let i = 0; i < FACE_RING; i++) {
+			const t = (i + 0.5) / FACE_RING
+			const column = { t, point: open.loop(t), direction: open.normal(t) }
+			const { profile, trace } = columnAt(openContext, column)
+			ring.push(shellPoint(openContext, profile, trace, profile.ring).position)
+		}
+		context.face = createFace(eye, lids, ring)
+		contexts.set(fissure, context)
+	}
+	return context
 }
 
-// Ring mesh data: `around` vertices along the fissure loop, `across` along the
-// profile. Attributes `lid` = (t, s, a, upper ? 1 : 0) and `relief` = (across x,
-// across y, fold, along): the front-plane direction in which `a` grows, the
-// folds (mm, ≤ 0) and the share of the way along the margin from the medial
-// canthus (0) to the lateral one (1), continuous around the whole ring.
-export function createLidMesh(lids, eye, nasalSign = 1, { around = 480, across = 144 } = {}) {
+// The fissure's center: the open loop is star-shaped around it.
+function fissureCenter(fissure) {
+	const { medial, lateral, chord } = fissure
+	const mid = [(medial[0] + lateral[0]) / 2, (medial[1] + lateral[1]) / 2]
+	const height = (p) => (p[0] - mid[0]) * chord.up[0] + (p[1] - mid[1]) * chord.up[1]
+	const lift = (height(fissure.upper(0.5)) + height(fissure.lower(0.5))) / 2
+	return [mid[0] + chord.up[0] * lift, mid[1] + chord.up[1] * lift]
+}
+
+// Replaces the stations within reach of a canthus by a rounded corner of
+// `radius`: a cubic Bézier tangent to both margins.
+function roundCorner(stations, corner, cornerT, toward, radius, nasalSign) {
+	const [cx, cy] = corner
+	const [up, down] = toward.map((p) => vec3.normalize([p[0] - cx, p[1] - cy, 0]))
+	const half = Math.acos(Math.min(1, up[0] * down[0] + up[1] * down[1])) / 2
+	const reach = radius / Math.tan(half)
+	const near = (station) =>
+		Math.hypot(station.point[0] - cx, station.point[1] - cy) < reach &&
+		Math.abs(station.t - cornerT) < 0.25
+	const first = stations.findIndex(near)
+	let last = first
+	while (last + 1 < stations.length && near(stations[last + 1])) last++
+	const before = stations[first - 1]
+	const after = stations[last + 1]
+	// Travel directions along the loop at both ends of the rounding.
+	const travel = (station) => [-nasalSign * station.normal[1], nasalSign * station.normal[0]]
+	const d0 = travel(before)
+	const d1 = travel(after)
+	const handle =
+		0.55 * Math.hypot(after.point[0] - before.point[0], after.point[1] - before.point[1])
+	const b0 = before.point
+	const b1 = [b0[0] + d0[0] * handle, b0[1] + d0[1] * handle]
+	const b3 = after.point
+	const b2 = [b3[0] - d1[0] * handle, b3[1] - d1[1] * handle]
+	const rounded = []
+	const count = last - first + 1
+	for (let k = 1; k <= count; k++) {
+		const u = k / (count + 1)
+		const v = 1 - u
+		const point = [0, 1].map(
+			(c) => v * v * v * b0[c] + 3 * v * v * u * b1[c] + 3 * v * u * u * b2[c] + u * u * u * b3[c],
+		)
+		const tangent = [0, 1].map(
+			(c) =>
+				3 * v * v * (b1[c] - b0[c]) + 6 * v * u * (b2[c] - b1[c]) + 3 * u * u * (b3[c] - b2[c]),
+		)
+		const length = Math.hypot(tangent[0], tangent[1]) || 1
+		rounded.push({
+			t: before.t + (after.t - before.t) * u,
+			point,
+			normal: [(nasalSign * tangent[1]) / length, (-nasalSign * tangent[0]) / length],
+		})
+	}
+	return [...stations.slice(0, first), ...rounded, ...stations.slice(last + 1)]
+}
+
+// Stations along the open loop, from the middle of the upper margin round
+// (loop parameter t from 0.25 to 1.25): point and outward normal angle
+// (unwrapped), the canthi rounded.
+function loopStations(open, nasalSign, samples = 4096) {
+	let stations = []
+	for (let i = 0; i <= samples; i++) {
+		const t = 0.25 + i / samples
+		stations.push({ t, point: open.loop(t), normal: open.normal(t) })
+	}
+	stations = roundCorner(
+		stations,
+		open.lateral,
+		0.5,
+		[open.upper(1 - 1e-4), open.lower(1 - 1e-4)],
+		LATERAL_ROUND,
+		nasalSign,
+	)
+	stations = roundCorner(
+		stations,
+		open.medial,
+		1,
+		[open.upper(1e-4), open.lower(1e-4)],
+		MEDIAL_ROUND,
+		nasalSign,
+	)
+	let previous = null
+	for (const station of stations) {
+		let angle = angleOf(station.normal)
+		if (previous) {
+			while (angle - previous.angle > Math.PI) angle -= 2 * Math.PI
+			while (angle - previous.angle < -Math.PI) angle += 2 * Math.PI
+		}
+		station.angle = angle
+		previous = station
+	}
+	return stations
+}
+
+// Columns around the open loop, spaced by their length along it plus
+// TURN_WEIGHT × their turning.
+function loopColumns(open, nasalSign, count) {
+	const stations = loopStations(open, nasalSign)
+	let total = 0
+	stations[0].weight = 0
+	for (let i = 1; i < stations.length; i++) {
+		const a = stations[i - 1]
+		const b = stations[i]
+		total +=
+			Math.hypot(b.point[0] - a.point[0], b.point[1] - a.point[1]) +
+			TURN_WEIGHT * Math.abs(b.angle - a.angle)
+		b.weight = total
+	}
+	const columns = []
+	let k = 1
+	for (let j = 0; j < count; j++) {
+		const target = (j / count) * total
+		while (k < stations.length - 1 && stations[k].weight < target) k++
+		const a = stations[k - 1]
+		const b = stations[k]
+		const f = b.weight > a.weight ? (target - a.weight) / (b.weight - a.weight) : 0
+		const angle = a.angle + (b.angle - a.angle) * f
+		columns.push({
+			t: a.t + (b.t - a.t) * f,
+			point: [
+				a.point[0] + (b.point[0] - a.point[0]) * f,
+				a.point[1] + (b.point[1] - a.point[1]) * f,
+			],
+			direction: [Math.cos(angle), Math.sin(angle)],
+		})
+	}
+	return columns
+}
+
+// The lid's settings at a column: the margin's thickness and edge radius, the
+// lid's thickness, the crease's distance from the margin and the band height.
+function columnProfile(context, column) {
+	const { lids, open, fissure } = context
+	const t = ((column.t % 1) + 1) % 1
+	const along = open.along(t)
+	const share = upperShare(column.direction, open.chord.up)
+	// The lids thin toward the canthi, where they meet: medially along the
+	// lacrimal part of the margin, from the punctum on.
+	const canthi = smoothstep(0, 0.2, along) * smoothstep(0, 0.06, 1 - along)
+	// The lid's volume (its thickness, where it turns into the face) tapers
+	// over a third of the margin: quicker, neighboring columns would part.
+	const volume = smootherstep(0, 0.35, along) * smootherstep(0, 0.3, 1 - along)
+	const thickness =
+		lids.marginThickness * (LOWER_MARGIN + (1 - LOWER_MARGIN) * share) * (0.6 + 0.4 * canthi)
+	const radius = Math.min(lids.marginRadius, thickness * 0.45)
+	const lidThickness = lids.lowerThickness + (lids.lidThickness - lids.lowerThickness) * share
+	// The fold over the crease, lower toward the canthi; it unfolds as the lid
+	// closes.
+	const s = t < 0.5 ? t * 2 : 2 - t * 2
+	const crease =
+		(lids.creaseHeight + CREASE_UNFOLD * fissure.closure) *
+		(0.35 + 0.65 * Math.sin(Math.PI * s) ** 0.7)
+	const band = share * (crease + 1) + (1 - share) * 7
+	// Where the face meets the lid (lidContext()): above the fold, below the
+	// pretarsal roll, closer to the margin toward the canthi.
+	const ring = (share * (crease + 2.5) + (1 - share) * 6) * (0.5 + 0.5 * volume)
+	// How far the closing margin has slid from the open one.
+	const [ox, oy] = open.loop(t)
+	const [cx, cy] = fissure.loop(t)
+	return {
+		t,
+		along,
+		share,
+		canthi,
+		volume,
+		thickness,
+		radius,
+		lidThickness: thickness + (lidThickness - thickness) * volume,
+		crease,
+		band,
+		ring,
+		slide: [cx - ox, cy - oy],
+	}
+}
+
+// Traces a column outward in the front plane: the polyline of its row, from
+// the open margin to the edge of the patch, by arc length `a`.
+function traceColumn(context, column, maxReach = 70) {
+	const { center, nasalSign } = context
+	const xs = [column.point[0]]
+	const ys = [column.point[1]]
+	let [x, y] = column.point
+	const patchCenter = [center[0] - nasalSign * PATCH.temporal, -PATCH.down]
+	const outside = (px, py) =>
+		((px - patchCenter[0]) / PATCH.width) ** 2 + ((py - patchCenter[1]) / PATCH.height) ** 2 - 1
+	let reach = maxReach
+	for (let a = 0; a < maxReach; a += TRACE_STEP) {
+		const rx = x - center[0]
+		const ry = y - center[1]
+		const r = Math.hypot(rx, ry) || 1
+		const w = smoothstep(RADIAL.start, RADIAL.end, a)
+		const dx = column.direction[0] * (1 - w) + (rx / r) * w
+		const dy = column.direction[1] * (1 - w) + (ry / r) * w
+		const length = Math.hypot(dx, dy) || 1
+		x += (dx / length) * TRACE_STEP
+		y += (dy / length) * TRACE_STEP
+		xs.push(x)
+		ys.push(y)
+		const now = outside(x, y)
+		if (now > 0) {
+			// Where the step crossed the patch's edge, so neighboring columns end
+			// smoothly.
+			const before = outside(xs.at(-2), ys.at(-2))
+			reach = a + (TRACE_STEP * -before) / (now - before)
+			break
+		}
+	}
+	return { xs, ys, reach }
+}
+
+// Front-plane point and row direction at distance `a` along a traced column,
+// moved with the closing margin near it.
+function alongTrace(trace, a, profile) {
+	const f = Math.min(Math.max(a / TRACE_STEP, 0), trace.xs.length - 1.000001)
+	const i = Math.floor(f)
+	const k = f - i
+	const stay = smootherstep(0, SLIDE, a)
+	const x = trace.xs[i] + (trace.xs[i + 1] - trace.xs[i]) * k + profile.slide[0] * (1 - stay)
+	const y = trace.ys[i] + (trace.ys[i + 1] - trace.ys[i]) * k + profile.slide[1] * (1 - stay)
+	const dx = trace.xs[i + 1] - trace.xs[i]
+	const dy = trace.ys[i + 1] - trace.ys[i]
+	const length = Math.hypot(dx, dy) || 1
+	return { point: [x, y], direction: [dx / length, dy / length] }
+}
+
+// Distance `a` (mm from the margin, in the front plane) and height `b` (off the
+// support) of profile coordinate s on a column; skin rows reach `reach`.
+function profileAt(s, profile, reach) {
+	const { wall, edge } = LID_PROFILE
+	const { thickness, radius } = profile
+	if (s < wall) return { a: 0, b: GAP + (thickness - radius - GAP) * (s / wall) }
+	if (s < edge) {
+		const phi = Math.PI - (Math.PI / 2) * ((s - wall) / (edge - wall))
+		return { a: radius + radius * Math.cos(phi), b: thickness - radius + radius * Math.sin(phi) }
+	}
+	const k = (s - edge) / (1 - edge)
+	return { a: radius + (reach - radius) * k ** 1.8, b: null }
+}
+
+// The lateral overlap: a fold out of the lateral canthus, the upper lid's skin
+// standing over the lower lid's. Returns the offset along the normal (mm) and
+// the fold's groove depth (≤ 0).
+function lateralFold(lids, fissure, x, y) {
+	const { lateral, chord } = fissure
+	const c = Math.cos(LATERAL_FOLD.slant)
+	const s = Math.sin(LATERAL_FOLD.slant)
+	// The fold runs on along the chord, turned down by the slant.
+	const along = [chord.along[0] * c - chord.up[0] * s, chord.along[1] * c - chord.up[1] * s]
+	const up = [chord.up[0] * c + chord.along[0] * s, chord.up[1] * c + chord.along[1] * s]
+	const u = (x - lateral[0]) * along[0] + (y - lateral[1]) * along[1]
+	const v = (x - lateral[0]) * up[0] + (y - lateral[1]) * up[1]
+	const window = smoothstep(-1, 0.5, u) * (1 - smoothstep(0.4, 1, u / LATERAL_FOLD.length))
+	const step = 2 * smoothstep(-LATERAL_FOLD.width, LATERAL_FOLD.width, v) - 1
+	const overlap = lids.lateralOverlap * window
+	// The step stays within a few millimeters of the fold.
+	const near = bell(v, 4 * LATERAL_FOLD.width)
+	return { offset: 0.5 * overlap * step * near, groove: -overlap * bell(v, LATERAL_FOLD.width) }
+}
+
+// The lid's shell at distance `a` from the margin: off the support by the
+// margin's thickness at the edge, by the lid's past 2.5 mm.
+function shellPoint(context, profile, trace, a) {
+	const { lids, eye, fissure } = context
+	const { point: q, direction } = alongTrace(trace, a, profile)
+	const support = supportAt(eye, lids, fissure, q[0], q[1])
+	const normal = thicknessDirection(support.normal)
+	const rise = smootherstep(profile.radius, 2.5 + 2 * (1 - profile.volume), a)
+	const b = profile.thickness + (profile.lidThickness - profile.thickness) * rise
+	return {
+		position: vec3.madd(support.point, normal, b),
+		support: support.point,
+		normal,
+		q,
+		direction,
+	}
+}
+
+// The skin point of a column at distance `a` from the margin: the lid's shell
+// turning into the face, which passes through the shell along a ring around
+// the fissure (lidContext()), so the two meet without a seam; over them the
+// crease under its fold, the pretarsal roll and the lateral overlap.
+function skinPoint(context, profile, trace, a) {
+	const { lids, open, face } = context
+	const shell = shellPoint(context, profile, trace, a)
+	const [x, y, z] = shell.position
+	const toFace = smootherstep(1.5, profile.ring + 4, a)
+	const position = [x, y, z + (face(x, y) - z) * toFace]
+	const upper = profile.share * profile.canthi
+	const creaseGroove = -lids.creaseDepth * bell(a - profile.crease, 0.9) * upper
+	let relief = creaseGroove + lids.creaseFold * bell(a - profile.crease - 2.4, 2) * upper
+	// The pretarsal roll, fullest in the middle of the lower lid.
+	relief +=
+		lids.lowerRoll * bell(a - 2.2, 1.1) * (1 - profile.share) * Math.sin(Math.PI * profile.along)
+	const fold = lateralFold(lids, open, shell.q[0], shell.q[1])
+	relief += fold.offset * smoothstep(profile.radius, profile.radius + 0.6, a)
+	// However deep the crease, the skin stays clear of the globe.
+	const skin = vec3.madd(position, shell.normal, relief)
+	const r = Math.hypot(skin[0], skin[1])
+	if (r < context.eye.scleraRadius) {
+		skin[2] = smoothMax(skin[2], context.eye.surfaceZ(r) + MIN_THICKNESS, 0.3)
+	}
+	return {
+		position: skin,
+		direction: shell.direction,
+		fold: Math.min(0, creaseGroove) + fold.groove,
+	}
+}
+
+// Everything a column's points need.
+function columnAt(context, column) {
+	return { column, profile: columnProfile(context, column), trace: traceColumn(context, column) }
+}
+
+// World position of profile coordinate s on a column, the distance `a` from
+// the margin, the direction in which `a` grows, the groove depth and the
+// upper-lid share.
+function pointOn(context, data, s) {
+	const { lids, eye, fissure } = context
+	const { column, profile, trace } = data
+	const { a, b } = profileAt(s, profile, trace.reach)
+	if (b !== null) {
+		const { point: q, direction } = alongTrace(trace, a, profile)
+		const support = supportAt(eye, lids, fissure, q[0], q[1])
+		return {
+			position: vec3.madd(support.point, thicknessDirection(support.normal), b),
+			a,
+			direction: a > 0 ? direction : column.direction,
+			fold: 0,
+			share: profile.share,
+		}
+	}
+	const skin = skinPoint(context, profile, trace, a)
+	return { ...skin, a, share: profile.share }
+}
+
+// The face the lids turn into (its height at x, y), for these settings.
+export function lidFace(lids, eye, nasalSign = 1) {
+	return lidContext(lids, eye, createFissure(lids, nasalSign)).face
+}
+
+// A lid point at loop parameter t (0–0.5 the upper margin medial → lateral,
+// 0.5–1 the lower one back) and profile coordinate s, for the lash roots.
+export function lidPoint(t, s, fissure, eye, lids) {
+	const context = lidContext(lids, eye, fissure)
+	const column = { t, point: context.open.loop(t), direction: context.open.normal(t) }
+	return pointOn(context, columnAt(context, column), s)
+}
+
+// Ring mesh data: `around` columns, `across` rows along the profile.
+// Attributes `lid` = (t, s, a, upper share), `relief` = (row direction x, y,
+// groove depth (mm, ≤ 0), share of the way along the margin from the medial
+// canthus) and `follow` = (upper share, follow weight).
+export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across = 150 } = {}) {
 	const fissure = createFissure(lids, nasalSign)
+	const context = lidContext(lids, eye, fissure)
+	const columns = loopColumns(context.open, nasalSign, around)
 	const positions = new Float32Array(around * across * 3)
 	const lid = new Float32Array(around * across * 4)
 	const relief = new Float32Array(around * across * 4)
 	const follow = new Float32Array(around * across * 2)
 	for (let i = 0; i < around; i++) {
-		const t = i / around
-		const along = fissure.along(t)
+		const data = columnAt(context, columns[i])
+		const { profile } = data
 		for (let j = 0; j < across; j++) {
 			const s = j / (across - 1)
-			const point = lidPoint(t, s, fissure, eye, lids)
+			const point = pointOn(context, data, s)
 			const index = i * across + j
 			positions.set(point.position, index * 3)
-			lid.set([t, s, point.a, point.upperLid ? 1 : 0], index * 4)
-			relief.set([point.across[0], point.across[1], point.fold, along], index * 4)
-			follow.set([upperShare(t), followWeight(point.a, point.band)], index * 2)
+			lid.set([profile.t, s, point.a, profile.share], index * 4)
+			relief.set([point.direction[0], point.direction[1], point.fold, profile.along], index * 4)
+			follow.set([profile.share, followWeight(point.a, profile.band)], index * 2)
 		}
 	}
 	const indices = new Uint32Array(around * (across - 1) * 6)
@@ -647,15 +521,21 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 480, across =
 	return { positions, lid, relief, follow, indices, fissure }
 }
 
-// The conjunctival fornix and caruncle at the canthi: where the fissure
-// reaches past the globe's outline, the opening shows the tissue the
-// conjunctiva folds into, not the background. An annulus on the lids' support
-// surface past SUPPORT_EDGE, dipping under the globe at its inner edge so the
-// sclera meets it in a clean line; the lids cover all but the corners. The
-// skin program shades it as wet mucosa (`lid` s = 0); it does not follow the
-// gaze. Front faces toward +Z.
-export function createFornixMesh(eye, { around = 256, across = 24, reach = 16 } = {}) {
-	const inner = eye.scleraRadius * SUPPORT_EDGE
+// The conjunctiva in the canthi: where the lids pass in front of the receding
+// globe, the opening shows the conjunctiva turning into the fornix and the
+// caruncle, not the background. An annulus on conjunctivaZ() from inside the
+// globe's outline, dipping under the globe there so the sclera meets it in a
+// clean line, and falling back behind the skin at its edge. The skin program
+// shades it as wet mucosa (`lid` s = 0); it does not follow the gaze. Front
+// faces toward +Z.
+export function createConjunctivaMesh(
+	lids,
+	eye,
+	nasalSign = 1,
+	{ around = 256, across = 40 } = {},
+) {
+	const fissure = createFissure(lids, nasalSign)
+	const inner = eye.scleraRadius * (FORNIX_START - 0.06)
 	const positions = new Float32Array(around * across * 3)
 	const lid = new Float32Array(around * across * 4)
 	const relief = new Float32Array(around * across * 4)
@@ -664,14 +544,19 @@ export function createFornixMesh(eye, { around = 256, across = 24, reach = 16 } 
 		const angle = (i / around) * Math.PI * 2
 		const cx = Math.cos(angle)
 		const cy = Math.sin(angle)
+		// Out to just past the canthi (further medially), where the lids cover it.
+		const reach = 15 + 1.5 * smoothstep(-0.3, 0.6, nasalSign * cx)
 		for (let j = 0; j < across; j++) {
-			// Denser toward the inner edge, where it meets the sclera.
-			const r = inner + (reach - inner) * (j / (across - 1)) ** 2
-			// It dips under the globe at its inner edge, and falls back past 14 mm,
-			// behind the skin, which recedes there toward the temple.
-			const dip = 0.06 * (1 - smoothstep(0, 0.3, r - inner)) + 1.5 * Math.max(0, r - 14) ** 2
+			const r = inner + (reach - inner) * (j / (across - 1)) ** 1.5
+			const x = cx * r
+			const y = cy * r
+			const z = conjunctivaZ(eye, lids, fissure, x, y)
+			// Under the globe where the conjunctiva is the globe.
+			const globe = r < eye.scleraRadius ? eye.surfaceZ(r) : -Infinity
+			const dip =
+				0.06 * (1 - smoothstep(0, 0.15, z - globe)) + 1.5 * Math.max(0, r - reach + 1.5) ** 2
 			const index = i * across + j
-			positions.set([cx * r, cy * r, supportProfile(eye, r).z - dip], index * 3)
+			positions.set([x, y, z - dip], index * 3)
 			lid.set([i / around, 0, r - inner, cy > 0 ? 1 : 0], index * 4)
 			relief.set([cx, cy, 0, 0], index * 4)
 			follow.set([cy > 0 ? 1 : 0, 0], index * 2)
@@ -694,9 +579,10 @@ export function createFornixMesh(eye, { around = 256, across = 24, reach = 16 } 
 }
 
 // The tear meniscus: a concave water fillet in the corner between the lid's
-// intermarginal strip and the eye surface, along both margins, its radius
-// tapering at the canthi (lower about 0.36 mm, upper smaller: Yokoi 1999,
-// Shen 2008). Attribute `meniscus` = (t, φ across the fillet, radius).
+// intermarginal strip and the support, along both margins, its radius
+// tapering at the canthi and where the margin leaves the globe (lower about
+// 0.36 mm, upper smaller: Yokoi 1999, Shen 2008). Attribute `meniscus` = (t, φ
+// across the fillet, radius).
 export function createMeniscusMesh(lids, eye, nasalSign = 1, { around = 320, across = 10 } = {}) {
 	const fissure = createFissure(lids, nasalSign)
 	const positions = new Float32Array(around * across * 3)
@@ -705,30 +591,31 @@ export function createMeniscusMesh(lids, eye, nasalSign = 1, { around = 320, acr
 	const follow = new Float32Array(around * across * 2)
 	for (let i = 0; i < around; i++) {
 		const t = i / around
-		const upperLid = t < 0.5
-		const radius = (upperLid ? lids.meniscusUpper : lids.meniscusLower) * cantalTaper(t)
+		const along = fissure.along(t)
+		const share = upperShare(fissure.normal(t), fissure.chord.up)
 		const [mx, my] = fissure.loop(t)
 		const [nx, ny] = fissure.normal(t)
+		const contact = 1 - smoothstep(0.05, 0.5, supportLift(eye, lids, fissure, mx, my))
+		const taper = smoothstep(0, 0.08, along) * smoothstep(0, 0.05, 1 - along) * contact
+		const radius = (lids.meniscusLower + (lids.meniscusUpper - lids.meniscusLower) * share) * taper
 		for (let j = 0; j < across; j++) {
 			const phi = (j / (across - 1)) * (Math.PI / 2)
-			// Arc center at a = −R (into the opening), b = R (off the globe).
+			// Arc center at a = −R (into the opening), b = R (off the support).
 			const a = -radius + radius * Math.sin(phi)
-			const b = 0.03 + radius - radius * Math.cos(phi)
-			const x = mx + nx * a
-			const y = my + ny * a
-			const contact = eyeSurfaceAt(eye, x, y)
-			const up = sphereNormal(eye, x, y)
-			const p = vec3.madd(contact.point, up, b)
+			const b = GAP + radius - radius * Math.cos(phi)
+			const support = supportAt(eye, lids, fissure, mx + nx * a, my + ny * a)
+			const up = thicknessDirection(support.normal)
+			const p = vec3.madd(support.point, up, b)
 			// The water surface faces the arc center.
-			const outward = [nx, ny, 0]
+			const tangent = vec3.normalize(vec3.sub([nx, ny, 0], vec3.scale(up, nx * up[0] + ny * up[1])))
 			const normal = vec3.normalize(
-				vec3.add(vec3.scale(outward, -Math.sin(phi)), vec3.scale(up, Math.cos(phi))),
+				vec3.add(vec3.scale(tangent, -Math.sin(phi)), vec3.scale(up, Math.cos(phi))),
 			)
 			const index = i * across + j
 			positions.set(p, index * 3)
 			normals.set(normal, index * 3)
 			meniscus.set([t, j / (across - 1), radius], index * 3)
-			follow.set([upperShare(t), 1], index * 2)
+			follow.set([share, 1], index * 2)
 		}
 	}
 	const indices = new Uint32Array(around * (across - 1) * 6)

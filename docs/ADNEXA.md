@@ -4,96 +4,83 @@ The eyelids, their skin and lashes, the visible tear film and the scleral vessel
 
 ## Fissure
 
-`createFissure()` ([`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js)) draws the palpebral fissure as an almond in the front plane.
+`createFissure()` ([`src/adnexa/fissure.js`](../src/adnexa/fissure.js)) draws the palpebral fissure in the front plane.
 
-- **Margins**:
-  - From the medial to the lateral canthus, the upper margin arches up to `lids.mrd1` above the pupil center, and the lower margin down to `lids.mrd2` below it.
-  - The arch amplitudes are solved by bisection, so the distances hold with any tilt or peak position.
-  - Neither margin is a perfect arch: each wanders off it by up to 0.12 mm × `lids.irregularity`, in two or three undulations seeded by `lids.seed` that vanish at the canthi. The bisection includes the wander, so MRD1 and MRD2 still hold.
-- **Corners**: `lids.fissureWidth` apart, with the lateral canthus raised by `lids.canthalTilt` and the medial one at `lids.medialHeight`. By default the canthi lie low (the medial one 3 mm below the pupil center, the lateral one 7° higher), so the upper margin arches high over the line between them and the lower one stays shallow.
-- **Shape**: the arches peak at `upperPeak` (nasal when negative) and `lowerPeak`, with the profiles `upperShape` and `lowerShape`.
+- **Canthi**: `lids.fissureWidth` apart horizontally, the medial one `lids.medialShare` of it nasal of the pupil center at `lids.medialHeight`, the lateral one raised by `lids.canthalTilt`. By default (29 mm, 0.53, −3.2 mm, 2°) the medial canthus lies 15.4 mm nasal of the pupil center and 3.2 mm below it, the lateral one 13.6 mm temporal and 1 mm higher.
+- **Margins**: each is a height above the chord between the canthi, in two cubic Hermite parts.
+  - The first leaves the medial canthus at `upperMedialAngle` / `lowerMedialAngle` and rises to the extreme at `upperPeak` / `lowerPeak` (shares of the chord from the medial canthus).
+  - The second falls from there to the lateral canthus, which it meets at `upperAngle` / `lowerAngle`.
+  - The slopes are capped so each part stays monotonic.
+  - The amplitudes are solved by bisection, so the upper margin reaches `lids.mrd1` above the pupil center and the lower one `lids.mrd2` below it.
+- **Closure**: `lids.closure` (0 to 1) brings the upper margin down onto the lower one, which hardly moves: about 9 mm of travel, as in a spontaneous blink.
 - **Side**: the nasal side follows `eye.laterality`.
-- **Along**: `fissure.along(t)` is the share of each margin's arc length from the medial (0) to the lateral canthus (1), and `fissure.lengths` the two margin lengths.
+- **Loop**: `fissure.loop(t)` runs along the upper margin from medial to lateral over t ∈ [0, 0.5), and back along the lower one.
+  - `normal(t)` points away from the opening.
+  - `along(t)` is the share of each margin's arc length from the medial (0) to the lateral canthus (1).
+  - `lengths` holds the two margin lengths and `chord` the canthi's frame.
 
-Everything built on the fissure uses it: the lid mesh, the lash roots, the tear meniscus and the fissure map stay consistent with any seed.
+Everything built on the fissure uses it: the lid mesh, the lash roots, the tear meniscus and the fissure map stay consistent.
+
+## Surfaces Around the Eye
+
+[`src/adnexa/periocular.js`](../src/adnexa/periocular.js) holds the surfaces the lids are built between. Depths are behind the corneal apex.
+
+| Surface | Shape |
+| --- | --- |
+| Support (`supportZ()`, `supportAt()`) | What the posterior margins rest on. It merges (smooth maximum over 4 mm) two surfaces: the globe, and a surface through the canthi at `lids.medialDepth` and `lids.lateralDepth`, receding above and below the chord.<br>The globe term includes the cornea, its limbal sulcus bridged by a 0.8 mm smooth maximum; past 0.88 of the sclera radius it is continued by a slope that eases off over 2 mm.<br>Toward the canthi the lids therefore pass in front of the receding globe.<br>Its normal is the sphere's over the globe and the support's elsewhere, averaged over 3 mm. |
+| Conjunctiva (`conjunctivaZ()`) | What lies behind the margins:<br>- the globe, which past 0.96 of its radius turns back into the fornix (over 1.6 mm laterally, 0.9 mm medially);<br>- the caruncle, an elliptic mound about 3.4 × 4.8 mm, centered 1.8 mm from the medial canthus, just behind the margins;<br>- the plica semilunaris, a crescent fold 0.35 mm high about 4 mm from the canthus. |
+| Face (`createFace()`) | A smoothed thin-plate spline. It passes through a ring of 32 points of the open lids' shell, so the lids flow into it. Its anatomical landmarks are:<br>- the brow (`browHeight`, `browProjection`) and the forehead;<br>- the glabella, the nasion and the nasal dorsum (`noseDistance`, `noseProjection`), and the nasal sidewall;<br>- a recess beside the medial canthus;<br>- the lateral orbital rim (`rimDepth`) and the temple;<br>- the infraorbital rim and the cheek (`cheekProjection`). |
 
 ## Lid Mesh
 
-`createLidMesh()` builds a ring of 480 × 144 quads around the fissure: `t` runs along the loop and `s` across the lid profile (`LID_PROFILE`). The loop normals it averages are memoized per fissure. `EyeApp` rebuilds the mesh, and the fissure map, only when the lids or the eye geometry change.
+`createLidMesh()` ([`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js)) builds one ring of 560 × 150 quads around the fissure: the upper lid from the medial to the lateral canthus, the lower lid back.
+
+- **Columns**:
+  - They are laid out on the open fissure, spaced by their length along the loop plus 3 mm per radian of turning, so the corners get enough columns.
+  - The canthi are rounded as the columns go round them, by a cubic Bézier tangent to both margins: the medial angle into a U around the caruncle (1 mm radius), the lateral one into an acute corner (0.5 mm).
+- **Rows**: each column is traced outward in the front plane to the edge of the patch (an ellipse about 76 × 80 mm).
+  - Near the margin a row follows the margin's normal; far out it follows a ray from the fissure's center, so rows never cross.
+  - The trace ends exactly at the patch's edge, so neighboring rows stay even.
+  - `a` is the distance traveled, in mm.
+- **Profile** (`s` across, `LID_PROFILE`):
 
 | s | Part | Shape |
 | --- | --- | --- |
-| [0, 0.07) | Intermarginal strip | The posterior margin rests on the eye surface (cornea included, which the upper lid covers) and the strip rises `lids.marginThickness` off the globe, tapering to half of it at the canthi, where the margins round the corner. Away from the canthi the thickness varies by up to ±20% × `lids.irregularity` along the lid. |
-| [0.07, 0.14) | Anterior edge | A rounded edge, where the lashes grow; its radius varies like the thickness. |
-| [0.14, 1] | Skin | The lid band, then the face around the orbit, out to 34 mm. |
+| [0, 0.07) | Intermarginal strip | The posterior margin rests on the support. The strip rises `lids.marginThickness` off it (0.8 of that on the lower lid), thinning to 0.6 of it toward the canthi. |
+| [0.07, 0.14) | Anterior edge | A quarter round of `lids.marginRadius`, where the lashes grow. |
+| [0.14, 1] | Skin | The lid's shell, turning into the face. |
 
-The surface is blocked out in volumes, as in a sculpting reference (`references/Four-view anatomical eye sculpt reference.png`): the globe, the two lid bands, the brow ridge, the cheek, the nose and the temple.
-
-### Lid Bands
-
-Each lid is a convex crescent band wrapped over the globe (`lidBand()`, `lidShell()`):
-
-| | Upper lid | Lower lid |
-| --- | --- | --- |
-| Height (from the margin, along the skin) | To the crease: `creaseHeight` in the middle | To the lid–cheek junction: `lowerHeight` |
-| Thickness off the globe | `lidThickness` | 0.7 of it |
-| Fullness (swell around 0.6 of the height: the lid over the tarsus and the fat behind the septum) | `fullness` | `bags` |
-| Groove at its edge | The crease, `creaseDepth` deep | The lid–cheek junction, shallower and wider |
-
-- **Crescents**: the heights narrow to 2 mm at the canthi, where the two bands meet; the upper one peaks a little nasally, the lower one a little temporally. Thickness, fullness and grooves blend across the canthi, so the ring has no seam.
-- **Thickness**: it starts where the rounded anterior edge ends, with the edge's thickness and flat tangent, so the margin flows into the skin without a step. It rises to the band's within 2.5 mm in the middle of the lid, over 6 mm at the canthi, where the lids wrap past the globe's outline. The canthal taper of the margin fades within 1.5 mm, so it does not run on as a groove out of the corner.
-- **Fullness** is scaled down on a band under 7 mm high, which could not hold it without folding.
-- **Shell**: near the margin the lid is the eye surface (cornea included) offset along the smooth sphere normal, so the corneal bulge does not fold it; within 3 mm it turns into a dome over the globe (the sclera sphere grown by the thickness, continued past 0.88 of its radius by its tangent).
-- **The lower lid** rests on the cheek too, where the cheek stands in front of that dome: it does not sink between the globe and the cheek. The upper one rides the globe only, so its crease slips under the brow.
-
-### Face Around the Orbit
-
-`faceDepth()` gives the face's depth behind the corneal apex as a smooth height field of broad, soft volumes (Gaussians and wide curvatures, with no step anywhere), tuned on `references/desired-output.png`:
-
-| Volume | Shape |
-| --- | --- |
-| Face | 5 mm behind the apex around the eye, curving back above, below and toward the temple (`templeDepth` further). |
-| Orbit | A soft hollow around the eye, where the face lies behind the lids: deeper under the brow than over the cheek, deepest between the eye, the brow and the nose. |
-| Brow | An arch over the eye at `browDepth` (1 mm in front of the apex by default): its head low by the nose, its peak above the lateral limbus, its tail falling faster toward the temple; its underside softer than a ridge. |
-| Cheek | A round swell below and lateral of the eye at `cheekDepth`. |
-| Nose | A ridge along the midline of the face, 31.5 mm medial of the pupil: narrow (9 mm half-width) and low at its root between the eyes, wider (18 mm) and higher (16 mm) downward; its ala on the eye's side; the glabella above the root, between the brows; a shallow recess at the medial canthus. |
-| Asymmetry | Seeded noise (`irregularity`) away from the orbit. |
-
-Past the edge of each band the skin turns from the lid into the face over 3.5 mm (upper) or 4.5 mm (lower): from the crease up the underside of the brow, from the lid–cheek junction onto the cheek. Where the face is merged with a dome over the globe (smooth maximum), neither can cut into the other.
-
-- **Canthi**:
-  - The outward directions are averaged over a window that widens away from the margin, so the skin fans evenly around the corners.
-  - The window's samples sit on grids fixed along the loop, with a smooth compact kernel, so the fan turns smoothly across the corner where the loop normal jumps. The grid steps are powers of two, blended around the window's width, so the average also changes smoothly with the width.
-  - The canthi of a 27 mm fissure lie beyond the outline of a 24 mm globe. Past 0.96 of the sclera radius, the margin's support surface leaves the sphere tangentially and its slope eases off over 1.5 mm (`supportProfile()`). The margin there stays smooth, outside the globe and about at the equator, instead of collapsing onto the outline.
-
-### Relief
-
-`skinRelief()` adds a seeded displacement (`lids.seed`) along the surface normal averaged over 2.5 mm, kept 0.3 mm clear of the globe:
-
-| Feature | Shape | Parameters |
-| --- | --- | --- |
-| Unevenness | Soft lumps of the tissue, 2–5 mm across, from 1 mm off the margin. | `irregularity` |
-| Tear trough | A groove from below the medial canthus down and out, clear of the margin. | `bags` |
-| Crow's feet | Folds fanning out of the lateral canthus from 3 to 22 mm, wandering and broken. | `folds` |
-| Lid folds | Soft folds along both lids from about 2 mm off the margin, irregularly spaced and broken, giving way to the crow's feet laterally; finer and deeper on the thin lower lid. | `folds` |
-
-The fine wrinkles that a vertex row cannot hold are shaded ([Skin Shading](#skin-shading)).
+- **Shell**:
+  - It stands off the support along the support's normal, tilted at most 35° from the front.
+  - Its thickness grows from the margin's at the edge to `lidThickness` (upper) or `lowerThickness` (lower) within 2.5 mm.
+  - Toward each canthus the thickness tapers over a third of the margin. A faster taper would part neighboring columns into creases.
+- **Into the face**: away from the margin the skin turns into the face. The turn ends 4 mm past the ring the face passes through, which lies above the fold, below the pretarsal roll, and nearer the margin toward the canthi. Lid and face meet on that ring, so there is no seam.
+- **Over it**:
+  - The upper lid's crease, `creaseDepth` deep at `creaseHeight` from the margin, lower toward the canthi. This is the pretarsal show: with the eye open, the skin above folds down over the crease, here as a fold of `creaseFold`.
+  - The lower lid's pretarsal roll (`lowerRoll`), fullest in the middle.
+  - The lateral overlap (`lateralOverlap`): along a fold out of the lateral canthus, slanting down, the upper lid's skin stands over the lower lid's. The step stays within a few millimeters of the fold.
+  - However deep the crease, the skin stays at least 0.6 mm off the globe.
+- **Closure**:
+  - As the lids close, each column's margin slides to the closing margin. The lid stretches over the globe up to 12 mm from the margin, and the fold above the crease unfolds by 4 mm.
+  - The face is built from the open lids, so it stays put.
+  - The mesh keeps its layout at any closure, so a blink can morph between two meshes ([`docs/ROADMAP.md`](ROADMAP.md)).
 
 Each vertex carries:
-- `lid` = (t, s, millimeters from the margin, upper);
-- `relief` = (the front-plane direction in which the distance from the margin grows, the depth of the grooves in mm (≤ 0: the crease, the lid–cheek junction, the folds), the share of the way along the margin from the medial canthus): the skin program orients and shades its fine detail by it;
-- `follow` = (upper share, follow weight), where the weight is 1 over the inner half of the lid band and 0 from 3 mm past its edge: the brow and the cheek stay put.
+- `lid` = (t, s, millimeters from the margin, upper share);
+- `relief` = (the front-plane direction in which the distance from the margin grows, the depth of the grooves in mm, the share of the way along the margin from the medial canthus):
+  - the depth is ≤ 0 and records the crease and the lateral fold;
+  - the skin program orients and shades its fine detail by this attribute;
+- `follow` = (upper share, follow weight): the weight is 1 over the inner half of the lid band and 0 from 3 mm past its edge, so the brow and the cheek stay put.
 
-All of the relief is in the mesh positions, so the key-light shadow pass, which draws the same mesh with the lid follow, casts the same folds.
+The upper share is 1 on the upper lid and 0 on the lower one, blended across the canthi by the column's direction. All of the relief is in the mesh positions, so the key-light shadow pass, which draws the same mesh with the lid follow, casts the same folds. `lidFace()` returns the face the lids turn into.
 
-### Fornix
+### Conjunctiva
 
-`createFornixMesh()` fills the canthi. Where the fissure reaches past the globe's outline, the opening would otherwise show the background.
+`createConjunctivaMesh()` fills the canthi. Where the lids pass in front of the receding globe, the opening shows the conjunctiva, the caruncle and the plica, not the background.
 
-- **Surface**: an annulus on the support surface, from 0.96 of the sclera radius out to 16 mm, falling back past 14 mm behind the skin, which recedes there toward the temple.
-- **Seam**: it dips 0.06 mm under the globe at its inner edge, so the sclera meets it in a clean line.
-- **Rendering**: [`src/adnexa/lids.js`](../src/adnexa/lids.js) merges it into the lid mesh. The skin program shades it as wet mucosa (`lid` s = 0, `relief` radial and without folds), and it does not follow the gaze.
-- **Visibility**: the lids cover all of it but the corners, where it stands in for the conjunctival fornix and the caruncle.
+- **Surface**: an annulus on `conjunctivaZ()`, from 0.9 of the sclera radius out to just past the canthi (16.5 mm medially, 15 mm laterally). At its outer edge it falls back behind the skin.
+- **Seam**: it dips 0.06 mm under the globe where it is the globe, so the sclera meets it in a clean line.
+- **Rendering**: [`src/adnexa/lids.js`](../src/adnexa/lids.js) merges it into the lid mesh. The skin program shades it as wet mucosa (`lid` s = 0, `relief` radial and without grooves). It does not follow the gaze.
 
 ### Skin Shading
 
@@ -121,7 +108,7 @@ All of the relief is in the mesh positions, so the key-light shadow pass, which 
 
 `generateLashes()` ([`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js)) places `lashes.upperCount` and `lashes.lowerCount` lashes along the lashed part of each margin.
 
-- **Rows and roots**: the upper lashes sit in 3 irregular rows, the lower in 2. Roots are on the rounded anterior edge.
+- **Rows and roots**: the upper lashes sit in 3 irregular rows, the lower in 2. Roots are on the rounded anterior edge, along the lashed part of each margin: from the lacrimal punctum, about a fifth of the way from the medial canthus, to the lateral canthus.
 - **Length**: `upperLength` and `lowerLength`. Lashes are shorter toward the medial canthus and in the back rows, with random variation.
 - **Direction**:
   - Each lash leaves the lid tilted away from the fissure by `upperLift` / `lowerLift`, measured from the skin normal just past the edge.
@@ -134,8 +121,8 @@ All of the relief is in the mesh positions, so the key-light shadow pass, which 
 
 [`src/adnexa/tearFilm.js`](../src/adnexa/tearFilm.js):
 
-- **Meniscus** (`createMeniscusMesh()`): a concave water fillet in the corner between the intermarginal strip and the eye surface, along both margins.
-  - Its radius is `lids.meniscusLower` (0.36 mm) and `lids.meniscusUpper`, tapering at the canthi.
+- **Meniscus** (`createMeniscusMesh()`): a concave water fillet in the corner between the intermarginal strip and the support, along both margins.
+  - Its radius is `lids.meniscusLower` (0.36 mm) and `lids.meniscusUpper`. It tapers at the canthi and where the margin leaves the globe (`supportLift()`): the water needs the globe to hold it.
 - **Bubbles**: `lids.bubbles` tiny spheres caught in the lower meniscus (an instanced mesh, up to 60).
 - **Material** (`tear-fragment.glsl`): water. A smooth mirror of the rig with water's Fresnel, over a faint transmitted tint of what lies behind. It is drawn opaque, to keep the alpha contract ([`docs/RENDERING.md`](RENDERING.md#alpha-contract)).
 

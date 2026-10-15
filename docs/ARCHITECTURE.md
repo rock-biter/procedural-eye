@@ -28,7 +28,9 @@
 | [`src/iris/irisColor.js`](../src/iris/irisColor.js) * | Spectral Kubelka–Munk model of the iris layers and its lookup table. |
 | [`src/iris/irisColorLut.js`](../src/iris/irisColorLut.js) | The lookup as a half-float `Data3DTexture`, rebuilt when the layer model changes, crossfaded during transitions. |
 | **Adnexa and sclera** ([`docs/ADNEXA.md`](ADNEXA.md)) | |
-| [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | Fissure, lid profile, skin surface, lid, fornix and meniscus meshes. |
+| [`src/adnexa/fissure.js`](../src/adnexa/fissure.js) * | The palpebral fissure: the margins between the canthi, their closure. |
+| [`src/adnexa/periocular.js`](../src/adnexa/periocular.js) * | The margins' support, the conjunctiva and caruncle, the face around the orbit (thin-plate spline). |
+| [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | The lid ring (columns, profile, shell turning into the face), the conjunctiva and meniscus meshes. |
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, lash, meniscus and bubble meshes with their materials. |

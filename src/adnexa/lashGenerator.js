@@ -6,7 +6,8 @@
 // Output: centerlines with radii, ready for tube geometry (src/adnexa/lashes.js).
 import { smoothstep, vec3 } from '../math'
 import { createRandom } from '../random'
-import { createFissure, LID_PROFILE, lidPoint } from './lidGeometry'
+import { createFissure } from './fissure'
+import { LID_PROFILE, lidPoint } from './lidGeometry'
 
 export const LASH_SEGMENTS = 14
 
@@ -49,7 +50,10 @@ function lashRow(side, settings, fissure, eye, lids, random) {
 	for (let i = 0; i < count; i++) {
 		// u: 0 at the medial end, 1 at the lateral end of the lashed margin.
 		const u = (i + 0.5 + (random() - 0.5) * 0.9) / count
-		const span = upper ? [0.06, 0.44] : [0.56, 0.92]
+		// From the lacrimal punctum, about a fifth of the way from the medial
+		// canthus (no lashes on the lacrimal part of the margin), to the lateral
+		// canthus.
+		const span = upper ? [0.1, 0.485] : [0.52, 0.9]
 		// Upper t runs medial → lateral, lower t lateral → medial.
 		const t = upper ? span[0] + (span[1] - span[0]) * u : span[1] - (span[1] - span[0]) * u
 		const row = Math.floor(random() * rows)

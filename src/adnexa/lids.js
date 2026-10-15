@@ -17,7 +17,7 @@ import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
-import { createFornixMesh, createLidMesh, LID_PROFILE } from './lidGeometry'
+import { createConjunctivaMesh, createLidMesh, LID_PROFILE } from './lidGeometry'
 
 export default class Lids {
 	// `shadowUniforms`: the key light's shadow map (src/lighting/keyShadow.js).
@@ -51,8 +51,8 @@ export default class Lids {
 
 	rebuild(params, eye) {
 		const data = createLidMesh(params.lids, eye, eye.nasalSign)
-		// The fornix fills the canthi beyond the globe's outline (same program).
-		const fornix = createFornixMesh(eye)
+		// The conjunctiva fills the canthi beyond the globe's outline (same program).
+		const fornix = createConjunctivaMesh(params.lids, eye, eye.nasalSign)
 		const join = (a, b) => {
 			const out = new a.constructor(a.length + b.length)
 			out.set(a)

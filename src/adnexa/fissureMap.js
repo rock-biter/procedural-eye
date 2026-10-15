@@ -2,7 +2,7 @@
 // inside the opening, < 0 under the lids (mm). Baked into a texture over
 // FISSURE_MAP.extent for the eye occlusion near the margins, the wet look and
 // the tear meniscus.
-import { createFissure } from './lidGeometry'
+import { createFissure } from './fissure'
 
 export const FISSURE_MAP = Object.freeze({
 	size: 256,

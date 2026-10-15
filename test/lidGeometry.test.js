@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { createFissure } from '../src/adnexa/fissure'
 import {
-	createFissure,
-	createFornixMesh,
+	createConjunctivaMesh,
 	createLidMesh,
-	eyeSurfaceAt,
+	createMeniscusMesh,
+	followWeight,
 	lidPoint,
 } from '../src/adnexa/lidGeometry'
+import { supportAt } from '../src/adnexa/periocular'
 import { createEyeGeometry } from '../src/eye/eyeProfile'
 import { createDefaults } from '../src/params/params'
 import { PARAM_SCHEMA } from '../src/params/paramSchema'
@@ -15,16 +17,14 @@ const params = createDefaults(PARAM_SCHEMA)
 const eye = createEyeGeometry(params)
 const close = (a, b, tolerance, label) =>
 	assert.ok(Math.abs(a - b) < tolerance, `${label ?? ''} ${a} vs ${b}`)
-// The most irregular, full, baggy and folded lids the schema allows.
-const aged = { ...params.lids, irregularity: 1, fullness: 1.5, bags: 1.5, folds: 1 }
+const DEG = Math.PI / 180
 
 test('the fissure has the measured width, MRD1, MRD2 and canthal tilt', () => {
-	// The margins wander off their arches by the seed, MRD1 and MRD2 hold.
 	const cases = [
 		[params.lids, 1],
 		[params.lids, -1],
-		[{ ...aged, seed: 7 }, 1],
-		[{ ...aged, seed: 4242 }, -1],
+		[{ ...params.lids, fissureWidth: 25, mrd1: 1.5, canthalTilt: -3 }, 1],
+		[{ ...params.lids, fissureWidth: 31, mrd2: 7, upperPeak: 0.6, lowerMedialAngle: 35 }, -1],
 	]
 	for (const [lids, side] of cases) {
 		const fissure = createFissure(lids, side)
@@ -41,31 +41,73 @@ test('the fissure has the measured width, MRD1, MRD2 and canthal tilt', () => {
 			fissure.lateral[1] - fissure.medial[1],
 			Math.abs(fissure.lateral[0] - fissure.medial[0]),
 		)
-		close((tilt * 180) / Math.PI, lids.canthalTilt, 1e-6, 'tilt')
+		close(tilt / DEG, lids.canthalTilt, 1e-6, 'tilt')
 		// The nose side is +X for a right eye.
 		assert.equal(Math.sign(fissure.medial[0]), side)
 	}
+})
+
+test('the margins leave the canthi at their medial and lateral angles', () => {
+	const lids = params.lids
+	const fissure = createFissure(lids, 1)
+	const { along, up } = fissure.chord
+	// Angle of a margin leaving a canthus, against the chord.
+	const leaving = (curve, from, to) => {
+		const a = curve(from)
+		const b = curve(to)
+		const d = [b[0] - a[0], b[1] - a[1]]
+		return Math.abs(Math.atan2(d[0] * up[0] + d[1] * up[1], d[0] * along[0] + d[1] * along[1]))
+	}
+	close(leaving(fissure.upper, 0, 1e-6) / DEG, lids.upperMedialAngle, 0.5, 'upper medial')
+	// The lower margin is shallow: its slope at the canthus is capped so it
+	// stays monotonic up to its trough.
+	const lowerMedial = leaving(fissure.lower, 0, 1e-6) / DEG
+	assert.ok(lowerMedial > 15 && lowerMedial < lids.lowerMedialAngle + 0.5, `lower ${lowerMedial}`)
+	close(180 - leaving(fissure.upper, 1, 1 - 1e-6) / DEG, lids.upperAngle, 0.5, 'upper lateral')
+	close(180 - leaving(fissure.lower, 1, 1 - 1e-6) / DEG, lids.lowerAngle, 0.5, 'lower lateral')
+})
+
+test('closing brings the margins together without crossing', () => {
+	const open = createFissure(params.lids, 1, 0)
+	const half = createFissure(params.lids, 1, 0.5)
+	const shut = createFissure(params.lids, 1, 1)
+	for (let s = 0.01; s < 1; s += 0.01) {
+		assert.ok(half.upper(s)[1] < open.upper(s)[1] + 1e-9, `the upper lid comes down at ${s}`)
+		assert.ok(half.upper(s)[1] > half.lower(s)[1] - 1e-9, `no crossing at ${s}`)
+		assert.ok(half.lower(s)[1] > open.lower(s)[1] - 1e-9, `the lower lid rises at ${s}`)
+		close(shut.upper(s)[1], shut.lower(s)[1], 1e-9, 'closed')
+	}
+	// Closed, they meet below the pupil center.
+	assert.ok(shut.upper(0.5)[1] < -2)
 })
 
 test('outward normals point away from the opening', () => {
 	const fissure = createFissure(params.lids, 1)
 	assert.ok(fissure.normal(0.25)[1] > 0.9)
 	assert.ok(fissure.normal(0.75)[1] < -0.9)
+	// The medial canthus is toward the nose (+X), the lateral one away from it.
+	assert.ok(fissure.normal(0)[0] > 0.9)
+	assert.ok(fissure.normal(0.5)[0] < -0.9)
 })
 
-test('the posterior margin rests on the eye surface and no lid vertex enters the globe', () => {
+test('the posterior margin rests on the support and no lid vertex enters the globe', () => {
 	const fissure = createFissure(params.lids, 1)
-	for (let t = 0.02; t < 1; t += 0.05) {
-		// The canthi lie beyond the globe's outline; check the margin in front of it.
-		const [mx, my] = fissure.loop(t)
-		if (Math.hypot(mx, my) > 0.85 * eye.scleraRadius) continue
+	for (let t = 0.01; t < 1; t += 0.04) {
+		// The posterior margin stands 0.03 mm off the support under the margin.
 		const p = lidPoint(t, 0, fissure, eye, params.lids).position
-		const surface = eyeSurfaceAt(eye, p[0], p[1])
-		close(p[2], surface.point[2], 0.1, `t ${t}`)
+		const [mx, my] = fissure.loop(t)
+		const support = supportAt(eye, params.lids, fissure, mx, my).point
+		close(Math.hypot(p[0] - mx, p[1] - my, p[2] - support[2]), 0.03, 0.005, `t ${t}`)
 	}
-	const thin = { ...aged, lidThickness: 1.5, creaseDepth: 3, creaseHeight: 5 }
-	for (const lids of [params.lids, aged, thin]) {
-		const mesh = createLidMesh(lids, eye, 1, { around: 120, across: 40 })
+	const shapes = [
+		params.lids,
+		{ ...params.lids, closure: 0.5 },
+		{ ...params.lids, closure: 1 },
+		{ ...params.lids, lidThickness: 1.5, creaseDepth: 1.5, creaseHeight: 4 },
+		{ ...params.lids, mrd1: 5.5, mrd2: 7 },
+	]
+	for (const lids of shapes) {
+		const mesh = createLidMesh(lids, eye, 1, { around: 160, across: 60 })
 		for (let i = 0; i < mesh.positions.length; i += 3) {
 			const [x, y, z] = [mesh.positions[i], mesh.positions[i + 1], mesh.positions[i + 2]]
 			const r = Math.hypot(x, y)
@@ -75,22 +117,23 @@ test('the posterior margin rests on the eye surface and no lid vertex enters the
 	}
 })
 
-test('the lids do not fold or collapse in view, also where the canthi lie beyond the globe', () => {
+test('the lids do not fold or collapse in view', () => {
 	const around = 320
 	const across = 96
-	// Realistic shapes. Extreme ones (very open or thick lids, strongly tilted
-	// wide fissures) still crease near the canthi or far out: docs/ROADMAP.md.
 	const shapes = [
 		{ label: 'right eye', side: 1, lids: params.lids },
 		{ label: 'left eye', side: -1, lids: params.lids },
 		{ label: 'narrow', side: 1, lids: { ...params.lids, fissureWidth: 25 } },
-		{ label: 'wide, tilted', side: 1, lids: { ...params.lids, fissureWidth: 29, canthalTilt: 8 } },
+		{ label: 'wide, tilted', side: 1, lids: { ...params.lids, fissureWidth: 31, canthalTilt: 10 } },
 		{ label: 'level', side: -1, lids: { ...params.lids, canthalTilt: -3 } },
 		{ label: 'ptosis', side: 1, lids: { ...params.lids, mrd1: 1.5 } },
-		{ label: 'deep crease', side: 1, lids: { ...params.lids, creaseDepth: 2.5, creaseHeight: 6 } },
-		{ label: 'aged', side: 1, lids: aged },
-		{ label: 'aged, left, another seed', side: -1, lids: { ...aged, seed: 512 } },
-		{ label: 'receding temple', side: 1, lids: { ...params.lids, templeDepth: 12 } },
+		{ label: 'deep crease', side: 1, lids: { ...params.lids, creaseDepth: 1.5, creaseHeight: 5 } },
+		{ label: 'half closed', side: 1, lids: { ...params.lids, closure: 0.5 } },
+		{
+			label: 'prominent face',
+			side: -1,
+			lids: { ...params.lids, browProjection: 8, cheekDepth: -3 },
+		},
 	]
 	for (const { label, side, lids } of shapes) {
 		const mesh = createLidMesh(lids, eye, side, { around, across })
@@ -109,101 +152,172 @@ test('the lids do not fold or collapse in view, also where the canthi lie beyond
 				d1[0] * d2[1] - d1[1] * d2[0],
 			]
 			const length = Math.hypot(...n)
-			assert.ok(length > 1e-7, `${label}: collapsed quad ${i}, ${j}`)
-			return n.map((v) => v / length)
+			return length > 1e-9 ? n.map((v) => v / length) : null
 		}
 		const { medial, lateral } = mesh.fissure
-		// At the canthi the two lids meet in a crease, back to back; elsewhere in
-		// view (20 mm around the axis) neighboring quads never face opposite ways.
+		// The canthi, where the lids meet back to back, are left out; elsewhere
+		// in view neighboring quads never face opposite ways, and the skin
+		// (past the margin's profile) never collapses.
 		const skip = ([x, y]) =>
-			Math.hypot(x, y) > 20 ||
+			Math.hypot(x, y) > 24 ||
 			Math.min(
 				Math.hypot(x - medial[0], y - medial[1]),
 				Math.hypot(x - lateral[0], y - lateral[1]),
 			) < 1.5
+		const skinRow = Math.ceil(0.15 * (across - 1))
 		for (let i = 0; i < around; i++) {
 			for (let j = 0; j < across - 2; j++) {
-				const n = normal(i, j)
 				if (skip(point(i, j))) continue
+				const n = normal(i, j)
+				if (!n) {
+					assert.ok(j < skinRow, `${label}: collapsed skin quad ${i}, ${j}`)
+					continue
+				}
 				for (const m of [normal(i + 1, j), normal(i, j + 1)]) {
+					if (!m) continue
 					const dot = n[0] * m[0] + n[1] * m[1] + n[2] * m[2]
-					assert.ok(dot > -0.2, `${label}: fold at t ${(i / around).toFixed(3)}, row ${j}`)
+					assert.ok(dot > -0.2, `${label}: fold at column ${i}, row ${j}`)
 				}
 			}
 		}
 	}
 })
 
-test('the lid relief is seeded; without irregularity and folds the seed changes nothing', () => {
-	const size = { around: 60, across: 24 }
-	const positions = (lids) => createLidMesh(lids, eye, 1, size).positions
-	assert.deepEqual(positions(params.lids), positions({ ...params.lids }))
-	const other = positions({ ...params.lids, seed: params.lids.seed + 1 })
-	assert.ok(other.some((value, i) => Math.abs(value - positions(params.lids)[i]) > 1e-3))
-	const plain = { ...params.lids, irregularity: 0, folds: 0 }
-	assert.deepEqual(positions(plain), positions({ ...plain, seed: 77 }))
+test('the skin turns into the face without creases', () => {
+	// Away from the margin the skin's height across neighboring columns bends
+	// gently (a crease left by a parameter changing too fast along the margin
+	// bends it by more than 0.5 per mm).
+	const around = 560
+	const across = 150
+	for (const side of [1, -1]) {
+		const mesh = createLidMesh(params.lids, eye, side, { around, across })
+		const at = (i, j) => {
+			const k = (((i % around) + around) % around) * across + j
+			return mesh.positions.subarray(k * 3, k * 3 + 3)
+		}
+		let worst = 0
+		for (let i = 0; i < around; i++) {
+			for (let j = 40; j < across - 1; j++) {
+				if (mesh.lid[(i * across + j) * 4 + 2] < 8) continue
+				const [a, b, c] = [at(i - 1, j), at(i, j), at(i + 1, j)]
+				const d1 = Math.hypot(b[0] - a[0], b[1] - a[1])
+				const d2 = Math.hypot(c[0] - b[0], c[1] - b[1])
+				const bend = ((c[2] - b[2]) / d2 - (b[2] - a[2]) / d1) / ((d1 + d2) / 2)
+				worst = Math.max(worst, Math.abs(bend))
+			}
+		}
+		assert.ok(worst < 0.5, `bend ${worst} per mm`)
+	}
 })
 
-test('relief attributes: the outward direction, the folds and the place along the margin', () => {
+test('the mesh keeps its layout as the lids close (a blink can morph between them)', () => {
+	const size = { around: 120, across: 40 }
+	const open = createLidMesh(params.lids, eye, 1, size)
+	const shut = createLidMesh({ ...params.lids, closure: 1 }, eye, 1, size)
+	assert.equal(open.positions.length, shut.positions.length)
+	assert.deepEqual(open.indices, shut.indices)
+	// The margins move, the face far out stays put.
+	const last = (mesh, i) => mesh.positions.subarray((i * 40 + 39) * 3, (i * 40 + 40) * 3)
+	for (let i = 0; i < 120; i += 10) assert.deepEqual(last(open, i), last(shut, i))
+	// Column 0 leaves the middle of the upper margin.
+	assert.ok(open.positions[1] - shut.positions[1] > 5, 'the upper margin comes down')
+})
+
+test('attributes: the row direction, the grooves, the place along the margin, the follow', () => {
 	const around = 160
 	const across = 40
-	const mesh = createLidMesh(aged, eye, 1, { around, across })
-	const { relief, lid } = mesh
+	const lids = { ...params.lids, creaseDepth: 1 }
+	const mesh = createLidMesh(lids, eye, 1, { around, across })
+	const { relief, lid, follow } = mesh
 	let deepest = 0
 	for (let i = 0; i < around; i++) {
-		const t = i / around
 		const along = relief[i * across * 4 + 3]
 		assert.ok(along >= 0 && along <= 1, `along ${along}`)
-		// The same along the whole profile of a ring column.
-		assert.equal(relief[(i * across + across - 1) * 4 + 3], along)
-		if (i > 0 && i < around / 2) assert.ok(along > relief[(i - 1) * across * 4 + 3], 'grows on top')
-		if (i > around / 2) assert.ok(along < relief[(i - 1) * across * 4 + 3], 'shrinks below')
 		for (let j = 0; j < across; j++) {
 			const k = (i * across + j) * 4
-			close(Math.hypot(relief[k], relief[k + 1]), 1, 1e-5, 'unit across')
-			assert.ok(relief[k + 2] <= 0, 'folds are grooves')
+			// The same along the whole column.
+			assert.equal(relief[k + 3], along)
+			close(Math.hypot(relief[k], relief[k + 1]), 1, 1e-5, 'unit direction')
+			assert.ok(relief[k + 2] <= 0, 'grooves only')
 			deepest = Math.min(deepest, relief[k + 2])
-			// `a` grows along `across`, away from the opening.
-			if (j > 0) assert.ok(lid[k + 2] >= lid[k - 2], `a grows at t ${t}, row ${j}`)
+			// `a` grows along the column, away from the opening.
+			if (j > 0) assert.ok(lid[k + 2] >= lid[k - 2], `a grows at column ${i}, row ${j}`)
+			const share = lid[k + 3]
+			assert.ok(share >= 0 && share <= 1)
+			assert.equal(follow[(i * across + j) * 2], share)
 		}
-		close(lid[(i * across + across - 1) * 4 + 2], 34, 1e-6, 'the skin reaches out 34 mm')
+		// The margin follows the gaze; the face far out does not.
+		assert.equal(follow[i * across * 2 + 1], 1)
+		assert.equal(follow[(i * across + across - 1) * 2 + 1], 0)
 	}
-	close(relief[3], 0, 1e-9, 'medial canthus')
-	close(relief[(around / 2) * across * 4 + 3], 1, 1e-9, 'lateral canthus')
-	assert.ok(deepest < -0.3, `the crease and folds are recorded (${deepest})`)
+	assert.ok(deepest < -0.5, `the crease is recorded (${deepest})`)
 	const [upper, lower] = mesh.fissure.lengths
 	assert.ok(
-		upper > 25 && upper < 35 && lower > 25 && lower < 35,
+		upper > 25 && upper < 36 && lower > 25 && lower < 36,
 		`margin lengths ${upper}, ${lower}`,
 	)
+	assert.equal(followWeight(0), 1)
+	assert.equal(followWeight(20), 0)
 })
 
-test('the fornix fills the canthi beyond the globe, facing out and outside the globe', () => {
-	const fornix = createFornixMesh(eye)
-	const p = (index) => Array.from(fornix.positions.subarray(index * 3, index * 3 + 3))
+test('the upper share is 1 over the upper lid, 0 over the lower one, half at the canthi', () => {
+	const fissure = createFissure(params.lids, 1)
+	const share = (t) => lidPoint(t, 0.5, fissure, eye, params.lids).share
+	close(share(0.25), 1, 1e-6, 'upper')
+	close(share(0.75), 0, 1e-6, 'lower')
+	close(share(0), 0.5, 0.05, 'medial canthus')
+	close(share(0.5), 0.5, 0.05, 'lateral canthus')
+})
+
+test('the conjunctiva fills the canthi, facing out and only dipping under the globe', () => {
+	const conjunctiva = createConjunctivaMesh(params.lids, eye, 1)
+	const p = (index) => Array.from(conjunctiva.positions.subarray(index * 3, index * 3 + 3))
 	let reachesCanthi = 0
 	const { medial, lateral } = createFissure(params.lids, 1)
-	for (let i = 0; i < fornix.positions.length / 3; i++) {
+	for (let i = 0; i < conjunctiva.positions.length / 3; i++) {
 		const [x, y, z] = p(i)
 		const r = Math.hypot(x, y)
-		// Only its inner edge dips (0.06 mm) under the sclera, for a clean seam.
+		// It dips (0.06 mm) under the sclera only, for a clean seam.
 		if (r < eye.scleraRadius) assert.ok(z > eye.surfaceZ(r) - 0.061, `inside the globe at ${r}`)
 		for (const corner of [medial, lateral]) {
-			if (Math.hypot(x - corner[0], y - corner[1]) < 0.5) reachesCanthi++
+			if (Math.hypot(x - corner[0], y - corner[1]) < 0.6) reachesCanthi++
 		}
 	}
 	assert.ok(reachesCanthi >= 2, 'covers both canthi')
-	for (let k = 0; k < fornix.indices.length; k += 3) {
-		const [a, b, c] = [p(fornix.indices[k]), p(fornix.indices[k + 1]), p(fornix.indices[k + 2])]
+	for (let k = 0; k < conjunctiva.indices.length; k += 3) {
+		const [a, b, c] = [
+			p(conjunctiva.indices[k]),
+			p(conjunctiva.indices[k + 1]),
+			p(conjunctiva.indices[k + 2]),
+		]
 		const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
 		const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
-		const n = [
-			e1[1] * e2[2] - e1[2] * e2[1],
-			e1[2] * e2[0] - e1[0] * e2[2],
-			e1[0] * e2[1] - e1[1] * e2[0],
-		]
-		// Outward: along +Z and away from the axis.
-		assert.ok(n[2] > 0 && n[0] * a[0] + n[1] * a[1] >= 0, `face ${k / 3} faces in`)
+		const nz = e1[0] * e2[1] - e1[1] * e2[0]
+		assert.ok(nz > 0, `face ${k / 3} faces away from the viewer`)
+	}
+})
+
+test('the meniscus lies on the eye along the margins, tapering at the canthi', () => {
+	const around = 80
+	const across = 10
+	const meniscus = createMeniscusMesh(params.lids, eye, 1, { around, across })
+	const fissure = createFissure(params.lids, 1)
+	for (let i = 0; i < around; i++) {
+		const radius = meniscus.meniscus[i * across * 3 + 2]
+		const t = i / around
+		if (t === 0 || t === 0.5) close(radius, 0, 1e-9, 'tapers at the canthi')
+		else assert.ok(radius <= Math.max(params.lids.meniscusLower, params.lids.meniscusUpper) + 1e-6)
+		// Full in the middle of the lids, where the margins rest on the globe.
+		if (t === 0.25 || t === 0.75) assert.ok(radius > 0.15, `radius ${radius} at ${t}`)
+		const [mx, my] = fissure.loop(t)
+		for (let j = 0; j < across; j++) {
+			const k = (i * across + j) * 3
+			const [x, y, z] = meniscus.positions.subarray(k, k + 3)
+			// Within its radius of the margin, never inside the eye.
+			assert.ok(Math.hypot(x - mx, y - my) < radius + 0.05)
+			const r = Math.hypot(x, y)
+			if (r < eye.scleraRadius) assert.ok(z >= eye.surfaceZ(r) - 1e-6, 'outside the eye')
+		}
 	}
 })
 

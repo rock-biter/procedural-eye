@@ -89,6 +89,6 @@ The camera aims and focuses at the entrance pupil, turned about the center of ro
 
 The lids follow the vertical gaze: the upper margin by 0.9 of the pitch and the lower by 0.35, both scaled by `animation.lidFollow`.
 
-- **Rotation**: `lid-follow.glsl` rotates lid-attached vertices about the X axis through the globe center, so they slide over the globe like a shutter.
+- **Rotation**: `lid-follow.glsl` rotates lid-attached vertices about the X axis through the globe center, so they slide over the globe like a shutter. A gaze up turns the globe by −pitch about X (its front rises); the lids turn the same way (`lidFollowAngle()` negates `uLidFollow`), so they rise with it.
 - **Weights**: each vertex is weighted by its `follow` attribute ([`docs/ADNEXA.md`](ADNEXA.md#lid-mesh)): the upper share across the canthi, and full follow near the margin fading to none up the skin.
 - **Consumers**: the skin, lashes, tear film and shadow-depth programs share the rotation. Lookups of the fissure map undo it (`lidRestPosition()`).

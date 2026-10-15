@@ -9,7 +9,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    - **Eyeball**: a surface of revolution in eye space with two index groups.
      - Group 0, the cornea and limbus cap, uses `eyeball-cap-fragment.glsl`: tear-film reflection, two-surface refraction, the iris trace and shading, the limbus and the limbal ring.
      - Group 1, the sclera beyond the cap, uses `eyeball-sclera-fragment.glsl`: the exact sphere point, then a wet, broken-up reflection over the vessel-mapped diffuse white.
-   - **Lids**: the skin program, in world space, including the fornix that fills the canthi.
+   - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi.
    - **Lashes**: tubes with the lash program.
    - **Tear meniscus and bubbles**: the water program; the bubbles are an `InstancedMesh`.
 3. **Accumulation** ([`src/render/accumulationPass.js`](../src/render/accumulationPass.js)):
