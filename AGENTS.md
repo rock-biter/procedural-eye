@@ -1,0 +1,95 @@
+# Project Guidelines
+
+## Project Overview
+
+**Procedural eye** is a browser-based three.js experience, built with Vite, that renders a hyper-realistic human eye in macro close-up: cornea, iris, pupil, sclera, eyelids with skin and lashes, and the tear film. Everything is procedural and driven by one parameter schema, so different structures, colors and shades come from parameter values and seeds.
+
+- **Optics**: the anterior cornea is a conic joined to the sclera sphere; rays refract through both corneal surfaces into the anterior chamber; mirror reflections intersect the emitters of an analytic light rig exactly.
+- **Iris**: a signed-distance field raymarched after the corneal refraction. The stroma is carved by crypts and bridged by radial vessels and collagen arcs, and colored by a spectral Kubelka–Munk model of its layers ([`docs/IRIS.md`](docs/IRIS.md)).
+- **Animation**: the eye lives (pupil light reflex with hippus, saccades, microsaccades, drift, lids following the gaze) until photo mode freezes it.
+- **Photo mode**: a physical thin-lens camera and progressive accumulation give true macro depth of field.
+
+[`README.md`](README.md) is the short human-facing introduction. This file is the entry point for coding agents and routes detailed work to the owning guide.
+
+## Read The Relevant Guide
+
+| Task | Guide |
+| --- | --- |
+| Install, commands, dependencies, source conventions, URL flags, the console API, or debugging | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
+| Bootstrap, frame loop, module ownership, parameter routing, presets, the random eye, or coordinate spaces | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| Eye geometry, corneal optics, reflections of the lids, the light rig, the key-light shadow, or the physical camera | [`docs/OPTICS.md`](docs/OPTICS.md) |
+| Materials, uniforms, GLSL, the render pipeline, accumulation, depth of field, or post-processing | [`docs/RENDERING.md`](docs/RENDERING.md) |
+| The iris model (structure, raymarching, shading, color, dilation) | [`docs/IRIS.md`](docs/IRIS.md) |
+| Eyelids, skin, lashes, tear film, or the scleral vessels | [`docs/ADNEXA.md`](docs/ADNEXA.md) |
+| Pupil dynamics, eye movements, lid follow, or photo mode | [`docs/ANIMATION.md`](docs/ANIMATION.md) |
+| Anatomical and optical data, parameter ranges, and references | [`docs/RESEARCH.md`](docs/RESEARCH.md) |
+| Checks, the capture script, visual verification, or performance measurement | [`docs/QUALITY.md`](docs/QUALITY.md) |
+| Phases, known gaps, and future work | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+
+Read the owning source file and the relevant guide before editing. When a change crosses boundaries, read each affected guide.
+
+## Documentation Sync
+
+Every task that modifies workspace files must use the [`documentation-sync` skill](.github/skills/documentation-sync/SKILL.md) after implementation and before final validation, and report which documentation changed or why none had to.
+
+## Essential Commands
+
+Use Node.js `^20.19.0` or `>=22.13.0` and pnpm `9.15.9` (pinned by `packageManager`).
+
+```bash
+pnpm install
+pnpm dev
+pnpm test
+pnpm lint
+pnpm format
+pnpm build
+pnpm capture
+```
+
+## Source Map
+
+- [`main.js`](main.js) is the bootstrap (URL flags, params, renderer, app, panel actions). [`src/app.js`](src/app.js) owns the systems and the frame loop.
+- [`src/params/`](src/params/): the parameter schema, the params helpers, the presets and the population priors of the random eye.
+- [`src/eye/`](src/eye/): the eye geometry and optics twins, the eyeball mesh and materials, and the eye rig (gaze transform).
+- [`src/iris/`](src/iris/): rest space, seeded features and the spectral color model, plus the GPU atlas bake and the color lookup texture.
+- [`src/adnexa/`](src/adnexa/): lid geometry, the lash generator and the fissure map, plus the lid, lash and tear-film meshes.
+- [`src/sclera/`](src/sclera/): the vessel generator and the polar vessel map.
+- [`src/animation/`](src/animation/): pupil dynamics, eye movements and the animator.
+- [`src/lighting/`](src/lighting/): the analytic light rig, color temperature, the rig uniforms and the key-light shadow map.
+- [`src/camera/`](src/camera/): thin-lens optics and sampling, the physical camera and the pointer controls.
+- [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field and PNG metadata.
+- [`src/debug/`](src/debug/) holds the panel and the debug view numbering; [`src/shaders/`](src/shaders/) holds every GLSL file.
+- _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
+- [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames.
+
+## Project Rules
+
+- Keep the params schema the single source of truth: every tunable value is a leaf with a range, a unit and a `kind`.
+- Treat CPU twins and GLSL as one contract, and change both sides together:
+
+  | CPU | GLSL |
+  | --- | --- |
+  | [`src/eye/eyeProfile.js`](src/eye/eyeProfile.js) | `eye-profile.glsl` |
+  | [`src/eye/cornealOptics.js`](src/eye/cornealOptics.js) | `cornea-optics.glsl` |
+  | [`src/lighting/envRig.js`](src/lighting/envRig.js) | `env-rig.glsl` |
+  | [`src/iris/irisSpace.js`](src/iris/irisSpace.js) | `iris-space.glsl` |
+  | `irisThickness()` in [`src/iris/irisFeatures.js`](src/iris/irisFeatures.js) | the copy in `iris-bake-fragment.glsl` |
+  | the lid follow weights of [`src/adnexa/lidGeometry.js`](src/adnexa/lidGeometry.js) | `lid-follow.glsl` |
+  | [`src/random.js`](src/random.js) `pcg()` | `pcgHash()` |
+- Scene materials write the apparent focus distance in alpha. Only the accumulation history keeps it; the effects receive opaque alpha (see [`docs/RENDERING.md`](docs/RENDERING.md)).
+- In shaders:
+  - use the `ZERO` loop bound (ANGLE-Metal compile times);
+  - use `highp` integer hashes (fp16);
+  - read the polar atlases with `textureLod` at the ray-footprint level.
+- Reference presets keep the living eye off, so their tuned pupil and gaze hold and the camera can circle them.
+- Do not silently resolve unrelated known gaps. Document intentional architectural changes in the same change.
+
+If documentation disagrees with the source or package metadata, the implementation is the source of truth; correct the documentation as part of the task.
+
+## Validation Baseline
+
+1. Run `pnpm lint`, `pnpm format:check`, and `pnpm test`.
+2. Run `pnpm build`.
+3. Run `pnpm capture` for the affected presets and debug views. Look at the captures, and check that it reports no console errors.
+
+A successful build does not prove that shaders compile; the capture script does. Report any check that could not be performed.
