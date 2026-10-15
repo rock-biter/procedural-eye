@@ -23,7 +23,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 
 | s | Part | Shape |
 | --- | --- | --- |
-| [0, 0.07) | Intermarginal strip | The posterior margin rests on the eye surface (cornea included, which the upper lid covers) and the strip rises `lids.marginThickness` off the globe, tapering to nothing at the canthi. Away from the canthi the thickness varies by up to ±20% × `lids.irregularity` along the lid. |
+| [0, 0.07) | Intermarginal strip | The posterior margin rests on the eye surface (cornea included, which the upper lid covers) and the strip rises `lids.marginThickness` off the globe, tapering to half of it at the canthi, where the margins round the corner. Away from the canthi the thickness varies by up to ±20% × `lids.irregularity` along the lid. |
 | [0.07, 0.14) | Anterior edge | A rounded edge, where the lashes grow; its radius varies like the thickness. |
 | [0.14, 1] | Skin | The lid band, then the face around the orbit, out to 34 mm. |
 
@@ -41,23 +41,23 @@ Each lid is a convex crescent band wrapped over the globe (`lidBand()`, `lidShel
 | Groove at its edge | The crease, `creaseDepth` deep | The lid–cheek junction, shallower and wider |
 
 - **Crescents**: the heights narrow to 2 mm at the canthi, where the two bands meet; the upper one peaks a little nasally, the lower one a little temporally. Thickness, fullness and grooves blend across the canthi, so the ring has no seam.
-- **Thickness**: it rises from the margin's within 2.5 mm in the middle of the lid, over 6 mm at the canthi, where the lids wrap past the globe's outline.
+- **Thickness**: it starts where the rounded anterior edge ends, with the edge's thickness and flat tangent, so the margin flows into the skin without a step. It rises to the band's within 2.5 mm in the middle of the lid, over 6 mm at the canthi, where the lids wrap past the globe's outline. The canthal taper of the margin fades within 1.5 mm, so it does not run on as a groove out of the corner.
+- **Fullness** is scaled down on a band under 7 mm high, which could not hold it without folding.
 - **Shell**: near the margin the lid is the eye surface (cornea included) offset along the smooth sphere normal, so the corneal bulge does not fold it; within 3 mm it turns into a dome over the globe (the sclera sphere grown by the thickness, continued past 0.88 of its radius by its tangent).
 - **The lower lid** rests on the cheek too, where the cheek stands in front of that dome: it does not sink between the globe and the cheek. The upper one rides the globe only, so its crease slips under the brow.
 
 ### Face Around the Orbit
 
-`faceDepth()` gives the face's depth behind the corneal apex as a height field, summed from volumes:
+`faceDepth()` gives the face's depth behind the corneal apex as a smooth height field of broad, soft volumes (Gaussians and wide curvatures, with no step anywhere), tuned on `references/desired-output.png`:
 
 | Volume | Shape |
 | --- | --- |
-| Orbital opening | About 38 × 34 mm around the eye, where the face falls back behind the lids: 4 mm under the brow, 0.5 mm above the cheek. The rim is 6 mm behind the apex. |
-| Brow ridge | An arch over the eye, 18.5 mm up in the middle and bending down laterally, at `browDepth` (3 mm in front of the apex by default); its underside is steeper than its top. It fades laterally toward the orbital rim and medially into the glabella. |
-| Cheek | A broad swell below and lateral of the eye at `cheekDepth`; the cheekbone keeps it forward under the lateral canthus. |
-| Nose | Its side rising medially to the bridge about 31 mm from the axis, 7 mm in front of the apex. |
-| Lateral rim and temple | 7 mm further back from 12–22 mm lateral, at the canthus and above, and `templeDepth` more toward the temple. |
-| Forehead, lower face | Receding above the brow and far below. |
-| Asymmetry | Seeded noise (`irregularity`) outside the orbital opening. |
+| Face | 5 mm behind the apex around the eye, curving back above, below and toward the temple (`templeDepth` further). |
+| Orbit | A soft hollow around the eye, where the face lies behind the lids: deeper under the brow than over the cheek, deepest between the eye, the brow and the nose. |
+| Brow | A broad roll over the eye at `browDepth` (1 mm in front of the apex by default), bending down at its ends and running medially into the glabella. |
+| Cheek | A round swell below and lateral of the eye at `cheekDepth`. |
+| Nose | Its side rising medially toward the bridge from the level of the eye down, merging upward into the glabella; its ala below; a shallow recess at the medial canthus. |
+| Asymmetry | Seeded noise (`irregularity`) away from the orbit. |
 
 Past the edge of each band the skin turns from the lid into the face over 3.5 mm (upper) or 4.5 mm (lower): from the crease up the underside of the brow, from the lid–cheek junction onto the cheek. Where the face is merged with a dome over the globe (smooth maximum), neither can cut into the other.
 

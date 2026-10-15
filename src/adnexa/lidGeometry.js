@@ -13,8 +13,9 @@
 // - the lids (lidShell()): two convex crescent bands wrapped over the globe,
 //   the upper one up to its crease, the lower one down to the lid–cheek
 //   junction, both narrowing toward the canthi where they meet;
-// - the face around the orbit (faceDepth()): the brow ridge over the upper
-//   lid, the cheek below, the nose, the lateral orbital rim and the temple;
+// - the face around the orbit (faceDepth()): soft, broad volumes, the brow
+//   over the upper lid, the cheek below, the nose, the face curving back
+//   toward the temple;
 //   past the edge of each band the skin turns from the lid into the face (from
 //   the crease up under the brow, from the lid–cheek junction onto the cheek).
 //
@@ -238,49 +239,43 @@ function sideOf(t) {
 
 // The face around the orbit: its depth behind the corneal apex (mm, negative
 // in front of it) at front-plane point (x, y), `nasalSign` +1 when the nose is
-// toward +X. A height field summed from the volumes of the region:
-// - the orbital opening, about 38 × 34 mm, centered near the pupil, where the
-//   face falls back (the lids cover it; deeper under the brow than above the
-//   cheek), within a rim 6 mm behind the apex;
-// - the brow ridge: an arch over the eye at `browDepth`, its underside steep
-//   down to the crease, fading laterally toward the orbital rim and medially
-//   into the glabella;
-// - the cheek: a broad swell below and lateral of the eye, at `cheekDepth`;
-//   the cheekbone keeps it forward under the lateral canthus;
-// - the nose: rising medially to its bridge, about 31 mm from the axis;
-// - the lateral orbital rim, far back, and the temple (`templeDepth`);
-// - the forehead receding above the brow;
+// toward +X. A smooth height field of broad, soft volumes, with no step
+// anywhere:
+// - the face, 5 mm behind the apex around the eye, curving back above,
+//   below and toward the temple (`templeDepth` further);
+// - the orbit: a soft hollow around the eye, where the face lies behind the
+//   lids, deeper under the brow than over the cheek, deepest between the
+//   eye, the brow and the nose;
+// - the brow: a broad roll over the eye at `browDepth`, bending down at its
+//   ends and running medially into the glabella;
+// - the cheek: a round swell below and lateral of the eye at `cheekDepth`;
+// - the nose: its side rising medially toward the bridge, from the level of
+//   the eye down, merging upward into the glabella, and its ala below; a
+//   shallow recess at the medial canthus;
 // - a seeded asymmetry (`irregularity`) away from the lids.
 export function faceDepth(lids, x, y, nasalSign = 1) {
 	const n = x * nasalSign
-	const RIM = 6
-	const opening = Math.hypot((n - 1) / 19, (y - 1) / 17)
-	// Deeper under the brow, shallow below, where the lower lid flows into
-	// the cheek.
-	const socket = 0.5 + 3.5 * smoothstep(-8, 8, y)
-	let depth = RIM + socket * (1 - smoothstep(0.7, 1.05, opening))
-	// The brow ridge: higher in the middle, bending down toward the lateral rim.
-	const browY = 18.5 - 0.004 * n * n - 0.006 * Math.max(0, -n) ** 2
-	const below = y < browY
-	const brow =
-		bell(y, browY, below ? 5.5 : 8) * smoothstep(-28, -6, n) * (1 - smoothstep(20, 32, n))
-	depth -= (RIM - lids.browDepth) * brow
-	// The cheek, below and lateral of the eye.
-	depth -= (RIM - lids.cheekDepth) * Math.exp(-(((n + 6) / 18) ** 2) - ((y + 15.5) / 10) ** 2)
-	// The nose: its side rising to the bridge, then falling to the other eye.
-	const noseSpan = 1 - smoothstep(18, 30, Math.abs(y + 2))
-	depth -= 13 * smoothstep(12, 31, n) * noseSpan
-	depth += 1.2 * Math.max(0, n - 31) * noseSpan
-	// The lateral orbital rim and the temple behind it, at the canthus and
-	// above: lower down the cheekbone stands forward.
-	const lateral = smoothstep(12, 22, -n) * (1 - 0.7 * smoothstep(-6, -18, y))
-	depth += (7 + lids.templeDepth * smoothstep(16, 30, -n)) * lateral
-	// The forehead and the lower face recede.
-	depth += 0.03 * Math.max(0, y - 22) ** 2 + 0.02 * Math.max(0, -y - 30) ** 2
+	const FACE = 5
+	let depth =
+		FACE + Math.max(0, -n - 4) ** 2 / 70 + (y * y) / 180 + lids.templeDepth * smoothstep(14, 34, -n)
+	// The orbit.
+	const orbit = Math.exp(-(((n - 1) / 15) ** 2) - ((y - 0.5) / 13) ** 2)
+	depth += 5.5 * orbit * (0.4 + 0.6 * smoothstep(-12, 12, y))
+	// Deepest between the eye, the brow and the nose.
+	depth += 2 * Math.exp(-(((n - 12) / 7) ** 2) - ((y - 7) / 6) ** 2)
+	// The brow and the glabella.
+	const browY = 17 - 0.005 * (n - 3) ** 2
+	depth -= (FACE - lids.browDepth) * bell(y, browY, 7) * Math.exp(-(((n - 3) / 30) ** 4))
+	// The cheek.
+	depth -= (FACE - lids.cheekDepth) * Math.exp(-(((n + 5) / 17) ** 2) - ((y + 17) / 11) ** 2)
+	// The nose with its ala, and the recess at the medial canthus.
+	depth -= 16 * smoothstep(13, 34, n) * (1 - smoothstep(4, 22, y))
+	depth -= 5 * Math.exp(-(((n - 29) / 6) ** 2) - ((y + 28) / 5.5) ** 2)
+	depth += 3 * Math.exp(-(((n - 16) / 6) ** 2) - ((y + 3) / 7) ** 2)
 	const seed = lidSeed(lids) + 30
 	const asymmetry =
 		(lids.irregularity ?? 0) *
-		smoothstep(0.9, 1.2, opening) *
+		(1 - orbit) *
 		(0.8 * noise2(x / 11, y / 11, seed) + 0.3 * noise2(x / 4.5, y / 4.5, seed + 1))
 	return depth + asymmetry
 }
@@ -413,21 +408,33 @@ function lidBand(lids, t) {
 	}
 }
 
-// The lid's thickness off the globe at `a` mm from the margin, starting from
-// `margin` (the anterior edge): it reaches the band's thickness within
-// 2.5 mm in the middle of the lid (6 mm at the canthi, where the lids wrap
-// past the globe's outline and a steep rise would fold them), swells by the band's fullness around 0.6 of its height (the convex
-// lid over the tarsus and the fat behind the septum, rising gently off the
-// margin), and dips into the groove at its
-// edge, the crease (`creaseDepth`) or the lid–cheek junction. Returns the
-// thickness and the groove (≥ 0, for the shading).
-function lidShell(lids, band, a, margin) {
-	const base = margin + (band.thickness - margin) * smoothstep(0, 6 - 3.5 * band.shape, a)
+// The lid's thickness off the globe at `a` mm from the margin, from where the
+// rounded anterior edge ends (`edge` = { a, thickness }, the thickness tapered
+// at the canthi) with the edge's flat tangent, so the skin carries on without
+// a step:
+// - it reaches the band's thickness within 2.5 mm in the middle of the lid
+//   (6 mm at the canthi, where the lids wrap past the globe's outline and a
+//   steep rise would fold them), from `margin`, the thickness the margin has
+//   away from the canthi;
+// - the canthal taper of the margin fades within 1.5 mm, so it does not run
+//   on as a groove out of the corner where the two lids meet;
+// - it swells by the band's fullness around 0.6 of its height (the convex
+//   lid over the tarsus and the fat behind the septum), less on a band
+//   under 7 mm, which could not hold it without folding;
+// - it dips into the groove at the band's edge, the crease (`creaseDepth`)
+//   or the lid–cheek junction.
+// Returns the thickness and the groove (≥ 0, for the shading).
+function lidShell(lids, band, a, edge, margin) {
+	const from = edge.a
+	const ramp = smoothstep(from, from + 6 - 3.5 * band.shape, a)
+	const taper = (edge.thickness - margin) * (1 - smoothstep(from, from + 1.5, a))
+	const base = margin + (band.thickness - margin) * ramp + taper
 	const swell =
 		band.fullness *
 		band.shape *
+		Math.min(1, band.height / 7) *
 		bell(a, 0.6 * band.height, 0.3 * band.height) *
-		smoothstep(0.5, 2.5, a)
+		smoothstep(from, from + 2, a)
 	const depth = band.upper ? lids.creaseDepth : 0.25 + 0.2 * lids.bags
 	const groove =
 		depth * band.shape * bell(a, band.height, band.upper ? 0.6 + 0.3 * lids.creaseDepth : 1.3)
@@ -504,7 +511,9 @@ export function lidPoint(t, s, fissure, eye, lids) {
 	const side = sideOf(t)
 	const away = smoothstep(0.1, 0.3, Math.min(side, 1 - side))
 	const vary = (k, cycles) => 1 + 0.2 * lids.irregularity * away * loopNoise(t, cycles, seed + k)
-	const margin = lids.marginThickness * (0.15 + 0.85 * taper) * vary(0, 5)
+	// The margin's thickness, and the same without the canthal taper.
+	const untapered = lids.marginThickness * vary(0, 5)
+	const margin = untapered * (0.5 + 0.5 * taper)
 	const edgeRadius = Math.min(0.65, margin * 0.42) * vary(1, 4)
 	const gap = 0.03
 	const { wall, edge, reach } = LID_PROFILE
@@ -525,7 +534,8 @@ export function lidPoint(t, s, fissure, eye, lids) {
 	} else {
 		const k = (s - edge) / (1 - edge)
 		a = edgeRadius + (reach - edgeRadius) * k ** 1.7
-		;({ thickness: b, groove } = lidShell(lids, band, a, margin))
+		const anterior = { a: edgeRadius, thickness: margin }
+		;({ thickness: b, groove } = lidShell(lids, band, a, anterior, untapered))
 	}
 	const far = s < edge ? 0 : (s - edge) / (1 - edge)
 	const [nx, ny] = smoothedNormal(fissure, t, far)
