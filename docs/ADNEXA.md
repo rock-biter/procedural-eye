@@ -54,9 +54,9 @@ Each lid is a convex crescent band wrapped over the globe (`lidBand()`, `lidShel
 | --- | --- |
 | Face | 5 mm behind the apex around the eye, curving back above, below and toward the temple (`templeDepth` further). |
 | Orbit | A soft hollow around the eye, where the face lies behind the lids: deeper under the brow than over the cheek, deepest between the eye, the brow and the nose. |
-| Brow | A broad roll over the eye at `browDepth` (1 mm in front of the apex by default), bending down at its ends and running medially into the glabella. |
+| Brow | An arch over the eye at `browDepth` (1 mm in front of the apex by default): its head low by the nose, its peak above the lateral limbus, its tail falling faster toward the temple; its underside softer than a ridge. |
 | Cheek | A round swell below and lateral of the eye at `cheekDepth`. |
-| Nose | Its side rising medially toward the bridge from the level of the eye down, merging upward into the glabella; its ala below; a shallow recess at the medial canthus. |
+| Nose | A ridge along the midline of the face, 31.5 mm medial of the pupil: narrow (9 mm half-width) and low at its root between the eyes, wider (18 mm) and higher (16 mm) downward; its ala on the eye's side; the glabella above the root, between the brows; a shallow recess at the medial canthus. |
 | Asymmetry | Seeded noise (`irregularity`) away from the orbit. |
 
 Past the edge of each band the skin turns from the lid into the face over 3.5 mm (upper) or 4.5 mm (lower): from the crease up the underside of the brow, from the lid–cheek junction onto the cheek. Where the face is merged with a dome over the globe (smooth maximum), neither can cut into the other.

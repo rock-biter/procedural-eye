@@ -246,12 +246,12 @@ function sideOf(t) {
 // - the orbit: a soft hollow around the eye, where the face lies behind the
 //   lids, deeper under the brow than over the cheek, deepest between the
 //   eye, the brow and the nose;
-// - the brow: a broad roll over the eye at `browDepth`, bending down at its
-//   ends and running medially into the glabella;
+// - the brow: an arch over the eye at `browDepth`, its head low by the nose,
+//   its peak above the lateral limbus, its tail falling toward the temple;
 // - the cheek: a round swell below and lateral of the eye at `cheekDepth`;
-// - the nose: its side rising medially toward the bridge, from the level of
-//   the eye down, merging upward into the glabella, and its ala below; a
-//   shallow recess at the medial canthus;
+// - the nose: a ridge along the midline, narrow and low at its root between
+//   the eyes, wider and higher downward, with its ala; the glabella above the
+//   root; a shallow recess at the medial canthus;
 // - a seeded asymmetry (`irregularity`) away from the lids.
 export function faceDepth(lids, x, y, nasalSign = 1) {
 	const n = x * nasalSign
@@ -263,15 +263,26 @@ export function faceDepth(lids, x, y, nasalSign = 1) {
 	depth += 5.5 * orbit * (0.4 + 0.6 * smoothstep(-12, 12, y))
 	// Deepest between the eye, the brow and the nose.
 	depth += 2 * Math.exp(-(((n - 12) / 7) ** 2) - ((y - 7) / 6) ** 2)
-	// The brow and the glabella.
-	const browY = 17 - 0.005 * (n - 3) ** 2
-	depth -= (FACE - lids.browDepth) * bell(y, browY, 7) * Math.exp(-(((n - 3) / 30) ** 4))
+	// The brow: an arch over the eye, its head low by the nose, its peak above
+	// the lateral limbus, its tail falling faster toward the temple.
+	const arch = n + 6
+	const browY = 17.5 - (arch > 0 ? 0.006 : 0.012) * arch * arch
+	const brow = bell(y, browY, y < browY ? 5.5 : 6) * Math.exp(-((n / 27) ** 4))
+	depth -= (FACE - lids.browDepth) * brow
 	// The cheek.
 	depth -= (FACE - lids.cheekDepth) * Math.exp(-(((n + 5) / 17) ** 2) - ((y + 17) / 11) ** 2)
-	// The nose with its ala, and the recess at the medial canthus.
-	depth -= 16 * smoothstep(13, 34, n) * (1 - smoothstep(4, 22, y))
-	depth -= 5 * Math.exp(-(((n - 29) / 6) ** 2) - ((y + 28) / 5.5) ** 2)
-	depth += 3 * Math.exp(-(((n - 16) / 6) ** 2) - ((y + 3) / 7) ** 2)
+	// The nose: a ridge along the midline of the face, 31.5 mm medial of the
+	// pupil, narrow and low at its root between the eyes, wider and higher
+	// downward, its ala on the eye's side; the glabella above the root, between
+	// the brows; a shallow recess at the medial canthus.
+	const midline = Math.abs(31.5 - n)
+	const width = 9 + 9 * smoothstep(10, -30, y)
+	const height = (5 + 11 * smoothstep(10, -35, y)) * (1 - smoothstep(12, 26, y))
+	const across = clamp01(midline / width)
+	depth -= height * (1 - across * across) ** 2
+	depth -= 4 * Math.exp(-(((midline - 11) / 4.5) ** 2) - ((y + 30) / 5) ** 2)
+	depth -= 0.6 * (FACE - lids.browDepth) * Math.exp(-((midline / 9) ** 2) - ((y - 14) / 8) ** 2)
+	depth += 1.5 * Math.exp(-(((n - 15) / 5) ** 2) - ((y + 3) / 6) ** 2)
 	const seed = lidSeed(lids) + 30
 	const asymmetry =
 		(lids.irregularity ?? 0) *
