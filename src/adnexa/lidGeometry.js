@@ -67,7 +67,7 @@ const LATERAL_FOLD = { slant: 0.35, length: 4.5, width: 1.2 }
 // show, 2–3.5 mm, Price 2009); closed, the crease is 6–7.5 mm above the margin.
 const CREASE_UNFOLD = 4
 // Points of the lids' shell the face passes through, around the fissure.
-const FACE_RING = 32
+const FACE_RING = 64
 // Over how many millimeters past the margin's edge the margin's sideways
 // shift off the support fades out (shellPoint()).
 const SHIFT_FADE = 6
@@ -122,9 +122,9 @@ function lidContext(lids, eye, fissure) {
 		// The open lids' shell: the face stays put as they close.
 		const openContext = { ...context, fissure: open }
 		const ring = []
-		for (let i = 0; i < FACE_RING; i++) {
-			const t = (i + 0.5) / FACE_RING
-			const column = { t, point: open.loop(t), direction: open.normal(t) }
+		// Laid out like the mesh's columns, so the corners' fans get points too
+		// (the face must meet the lids straight out of the canthi as well).
+		for (const column of loopColumns(open, nasalSign, FACE_RING)) {
 			const { profile, trace } = columnAt(openContext, column)
 			ring.push(shellPoint(openContext, profile, trace, profile.ring).position)
 		}
@@ -278,8 +278,13 @@ function columnProfile(context, column) {
 	// The lid's volume (its thickness, where it turns into the face) tapers
 	// over a third of the margin: quicker, neighboring columns would part.
 	const volume = smootherstep(0, 0.35, along) * smootherstep(0, 0.3, 1 - along)
+	// Thinner still at the lateral commissure, where the margins merge into the
+	// skin without a rim.
+	const thinnest = 0.6 - 0.25 * along
 	const thickness =
-		lids.marginThickness * (LOWER_MARGIN + (1 - LOWER_MARGIN) * share) * (0.6 + 0.4 * canthi)
+		lids.marginThickness *
+		(LOWER_MARGIN + (1 - LOWER_MARGIN) * share) *
+		(thinnest + (1 - thinnest) * canthi)
 	const radius = Math.min(lids.marginRadius, thickness * 0.45)
 	const lidThickness = lids.lowerThickness + (lids.lidThickness - lids.lowerThickness) * share
 	// The fold over the crease, a little lower toward the canthi, fading out
@@ -293,7 +298,7 @@ function columnProfile(context, column) {
 	const band = share * (crease + 1) + (1 - share) * 7
 	// Where the face meets the lid (lidContext()): above the fold, below the
 	// pretarsal roll, closer to the margin toward the canthi.
-	const ring = (share * (crease + 2.2) + (1 - share) * 3.5) * (0.5 + 0.5 * volume)
+	const ring = (share * (crease + 2.2) + (1 - share) * 3.5) * (0.3 + 0.7 * volume)
 	// How far the closing margin has slid from the open one.
 	const [ox, oy] = open.loop(t)
 	const [cx, cy] = fissure.loop(t)
@@ -432,7 +437,10 @@ function skinPoint(context, profile, trace, a) {
 	const { lids, open, face } = context
 	const shell = shellPoint(context, profile, trace, a)
 	const [x, y, z] = shell.position
-	const toFace = smootherstep(1.5, profile.ring + 2, a)
+	// Toward the canthi it starts right past the margin's edge: around the
+	// corners the margin must not stand as a rim with a moat behind it.
+	const start = profile.radius + (1.5 - profile.radius) * profile.volume
+	const toFace = smootherstep(start, profile.ring + 2, a)
 	const position = [x, y, z + (face(x, y) - z) * toFace]
 	const upper = profile.share * profile.creaseFade
 	const creaseGroove = -lids.creaseDepth * bell(a - profile.crease, 0.9) * upper

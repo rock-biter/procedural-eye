@@ -219,7 +219,7 @@ export const PARAM_SCHEMA = {
 		creaseDepth: num(1.1, 0, 1.5, 0.05, 'mm', 'rebuild', 'upper crease depth'),
 		creaseFold: num(0.9, 0, 1.5, 0.05, 'mm', 'rebuild', 'skin fold over the crease'),
 		lowerRoll: num(0.2, 0, 1, 0.05, 'mm', 'rebuild', 'lower pretarsal roll'),
-		lateralOverlap: num(0.35, 0, 1.2, 0.01, 'mm', 'rebuild', 'lateral overlap'),
+		lateralOverlap: num(0.2, 0, 1.2, 0.01, 'mm', 'rebuild', 'lateral overlap'),
 		// Depths behind the corneal apex and the face around the orbit
 		// (src/adnexa/periocular.js).
 		medialDepth: num(4.5, 1, 8, 0.1, 'mm', 'rebuild', 'medial canthus behind apex'),

@@ -29,7 +29,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 | --- | --- |
 | Support (`supportZ()`, `supportAt()`) | What the posterior margins rest on. It merges (smooth maximum over 4 mm) two surfaces: the globe, and a surface through the canthi at `lids.medialDepth` and `lids.lateralDepth`, receding above and below the chord.<br>The globe term includes the cornea, its limbal sulcus bridged by a 0.8 mm smooth maximum; past 0.88 of the sclera radius it is continued by a slope that eases off over 2 mm.<br>Toward the canthi the lids therefore pass in front of the receding globe.<br>Its normal is the sphere's over the globe and the support's elsewhere, averaged over 3 mm. |
 | Conjunctiva (`conjunctivaZ()`) | What lies behind the margins:<br>- the globe, which past 0.96 of its radius turns back into the fornix (over 1.6 mm laterally, 0.9 mm medially);<br>- the caruncle, an elliptic mound about 2.3 × 3.4 mm, centered 1.3 mm from the medial canthus, just behind the margins;<br>- the plica semilunaris, a crescent fold 0.3 mm high about 2.9 mm from the canthus. |
-| Face (`createFace()`) | A thin-plate spline. It follows closely a ring of 32 points of the open lids' shell, so the lids flow into it, and passes loosely through its anatomical landmarks, so it stays smooth. The landmarks are:<br>- the brow (`browHeight`, `browProjection`) and the forehead;<br>- the glabella, the nasion and the nasal dorsum (`noseDistance`, `noseProjection`), and the nasal sidewall;<br>- a recess beside the medial canthus;<br>- the lateral orbital rim (`rimDepth`) and the temple;<br>- the infraorbital rim and the cheek (`cheekProjection`). |
+| Face (`createFace()`) | A thin-plate spline. It follows closely a ring of 64 points of the open lids' shell, laid out like the mesh's columns so the canthi's fans get points too, so the lids flow into it, and passes loosely through its anatomical landmarks, so it stays smooth. The landmarks are:<br>- the brow (`browHeight`, `browProjection`) and the forehead;<br>- the glabella, the nasion and the nasal dorsum (`noseDistance`, `noseProjection`), and the nasal sidewall;<br>- a recess beside the medial canthus;<br>- the lateral orbital rim (`rimDepth`) and the temple;<br>- the infraorbital rim and the cheek (`cheekProjection`). |
 
 ## Lid Mesh
 
@@ -46,7 +46,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 
 | s | Part | Shape |
 | --- | --- | --- |
-| [0, 0.07) | Intermarginal strip | The posterior margin rests on the support. The strip rises `lids.marginThickness` off it (0.8 of that on the lower lid), thinning to 0.6 of it toward the canthi. |
+| [0, 0.07) | Intermarginal strip | The posterior margin rests on the support. The strip rises `lids.marginThickness` off it (0.8 of that on the lower lid), thinning toward the canthi to 0.6 of it medially and 0.35 laterally, where the margins merge into the skin without a rim. |
 | [0.07, 0.14) | Anterior edge | A quarter round of `lids.marginRadius`, where the lashes grow. |
 | [0.14, 1] | Skin | The lid's shell, turning into the face. |
 
@@ -55,7 +55,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
   - Past the margin's edge that sideways shift fades out over 6 mm, and the thickness is taken upright, blended in over 3 mm. Shifting every row along its own normal would pull rows back where the support bends from the globe to the canthi, and crease the skin there.
   - Its thickness grows from the margin's at the edge to `lidThickness` within 2.5 mm on the upper lid, and to `lowerThickness` over 4.5 mm on the lower one, which so slopes down from its margin instead of standing in a shelf over the globe.
   - Toward each canthus the thickness tapers over a third of the margin. A faster taper would part neighboring columns into creases. Every taper along the margin is a smootherstep or a sine: a plain smoothstep's curvature jumps at its ends, which the shading shows as a line down the lid.
-- **Into the face**: away from the margin the skin turns into the face. The turn ends 2 mm past the ring the face follows. The ring lies before the globe curves away under the lid: about 2 mm above the fold, 3.5 mm below the lower margin, and nearer the margin toward the canthi. Lid and face meet on that ring, so there is no seam, and the lids do not fall back with the globe into a bag.
+- **Into the face**: away from the margin the skin turns into the face. The turn ends 2 mm past the ring the face follows, and toward the canthi it starts right past the margin's edge, so the margin does not stand as a rim with a moat behind it around the corners. The ring lies before the globe curves away under the lid: about 2 mm above the fold, 3.5 mm below the lower margin, and nearer the margin toward the canthi (down to 0.3 of that at the corners). Lid and face meet on that ring, so there is no seam, and the lids do not fall back with the globe into a bag.
 - **Over it**:
   - The upper lid's crease, `creaseDepth` deep at `creaseHeight` from the margin, a little lower toward the canthi and fading out before them (it does not run into the corners). This is the pretarsal show: with the eye open, the skin above folds down over the crease, here as a fold of `creaseFold`.
   - The lower lid's pretarsal roll (`lowerRoll`), broad and fullest in the middle.
