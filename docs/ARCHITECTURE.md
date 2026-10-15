@@ -88,7 +88,8 @@
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.
 4. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
-5. **Render one sample** (`renderSample()`)
+5. **Adaptive resolution**: before a fresh frame is drawn, the interval since the last frame feeds the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation. The resize comes before drawing: a canvas resized after it is cleared, and the browser would show a black frame.
+6. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field.
    - Later frames take `accumulationSample(n)`: a subpixel jitter, a point on the lens and a point on the key light.
    - The steps, in order:
@@ -98,7 +99,6 @@
      4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window.
      5. The eyeball, lid and lash uniforms are refreshed from the params.
      6. The post-processing updates the lens of the depth of field and its fade, then the composer renders.
-6. **Adaptive resolution**: fresh frames feed the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation.
 
 ## Parameter Routing
 

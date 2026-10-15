@@ -406,13 +406,15 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (this.converged) return
 
+		// Only interactive frames adapt the resolution: a resize restarts the
+		// accumulation. It comes before the frame is drawn: a canvas resized
+		// after drawing is cleared, and the browser would show it black.
+		if (this.samples === 0 && delta > 0) this.setup.adaptPixelRatio(delta)
 		const stats = this.setup.frameStats
 		stats.beginFrame(time)
 		const fresh = this.samples === 0
 		this.renderSample(fresh ? null : accumulationSample(this.samples))
 		stats.endFrame()
-		// Only interactive frames adapt the resolution: a resize restarts the accumulation.
-		if (fresh && delta > 0) this.setup.adaptPixelRatio(delta)
 	}
 
 	measureFrame(time) {
