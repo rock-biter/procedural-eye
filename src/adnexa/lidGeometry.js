@@ -80,25 +80,25 @@ const MIN_THICKNESS = 0.6
 const bell = (value, width) => Math.exp(-((value / width) ** 2))
 const angleOf = (v) => Math.atan2(v[1], v[0])
 
-// The lid's thickness grows off the support along its normal, tilted at most
-// MAX_TILT from the front (the lids stay in front of the globe).
+// The lid's thickness grows off the support along its normal, its tilt from
+// the front eased toward MAX_TILT (the lids stay in front of the globe). The
+// easing is smooth: a hard limit would leave a line on the skin where the
+// support's tilt crosses it.
 const MAX_TILT = (35 * Math.PI) / 180
 function thicknessDirection(normal) {
-	let [x, y, z] = normal
-	const tilt = Math.hypot(x, y)
-	const limit = Math.tan(MAX_TILT) * z
-	if (tilt > limit) {
-		x *= limit / tilt
-		y *= limit / tilt
-	}
-	return vec3.normalize([x, y, z])
+	const [x, y, z] = normal
+	const sideways = Math.hypot(x, y)
+	if (sideways < 1e-9) return [0, 0, 1]
+	const tilt = MAX_TILT * Math.tanh(Math.atan2(sideways, z) / MAX_TILT)
+	const scale = Math.sin(tilt) / sideways
+	return [x * scale, y * scale, Math.cos(tilt)]
 }
 
 // Upper-lid share of a direction leaving the margin: 1 on the upper lid, 0 on
 // the lower one, blended across the canthi (by the direction against the
 // chord's normal, so the fan of the lateral corner blends too).
 export function upperShare(direction, up) {
-	return smoothstep(-0.6, 0.6, direction[0] * up[0] + direction[1] * up[1])
+	return smootherstep(-0.6, 0.6, direction[0] * up[0] + direction[1] * up[1])
 }
 
 // How much a lid vertex follows the gaze (lid-follow.glsl): fully over most of
@@ -272,7 +272,9 @@ function columnProfile(context, column) {
 	const share = upperShare(column.direction, open.chord.up)
 	// The lids thin toward the canthi, where they meet: medially along the
 	// lacrimal part of the margin, from the punctum on.
-	const canthi = smoothstep(0, 0.2, along) * smoothstep(0, 0.06, 1 - along)
+	// (Smootherstep tapers: a plain smoothstep's curvature jumps at its ends,
+	// which shading shows as a line down the lid.)
+	const canthi = smootherstep(0, 0.3, along) * smootherstep(0, 0.12, 1 - along)
 	// The lid's volume (its thickness, where it turns into the face) tapers
 	// over a third of the margin: quicker, neighboring columns would part.
 	const volume = smootherstep(0, 0.35, along) * smootherstep(0, 0.3, 1 - along)
@@ -280,12 +282,14 @@ function columnProfile(context, column) {
 		lids.marginThickness * (LOWER_MARGIN + (1 - LOWER_MARGIN) * share) * (0.6 + 0.4 * canthi)
 	const radius = Math.min(lids.marginRadius, thickness * 0.45)
 	const lidThickness = lids.lowerThickness + (lids.lidThickness - lids.lowerThickness) * share
-	// The fold over the crease, lower toward the canthi; it unfolds as the lid
+	// The fold over the crease, a little lower toward the canthi, fading out
+	// before them (it does not run into the corners); it unfolds as the lid
 	// closes.
 	const s = t < 0.5 ? t * 2 : 2 - t * 2
 	const crease =
 		(lids.creaseHeight + CREASE_UNFOLD * fissure.closure) *
-		(0.35 + 0.65 * Math.sin(Math.PI * s) ** 0.7)
+		(0.6 + 0.4 * Math.sin(Math.PI * s) ** 0.6)
+	const creaseFade = Math.sin(Math.PI * along) ** 1.5
 	const band = share * (crease + 1) + (1 - share) * 7
 	// Where the face meets the lid (lidContext()): above the fold, below the
 	// pretarsal roll, closer to the margin toward the canthi.
@@ -303,6 +307,7 @@ function columnProfile(context, column) {
 		radius,
 		lidThickness: thickness + (lidThickness - thickness) * volume,
 		crease,
+		creaseFade,
 		band,
 		ring,
 		slide: [cx - ox, cy - oy],
@@ -322,7 +327,7 @@ function traceColumn(context, column, maxReach = 70) {
 		const rx = x - center[0]
 		const ry = y - center[1]
 		const r = Math.hypot(rx, ry) || 1
-		const w = smoothstep(RADIAL.start, RADIAL.end, a)
+		const w = smootherstep(RADIAL.start, RADIAL.end, a)
 		const dx = column.direction[0] * (1 - w) + (rx / r) * w
 		const dy = column.direction[1] * (1 - w) + (ry / r) * w
 		const length = Math.hypot(dx, dy) || 1
@@ -383,8 +388,8 @@ function lateralFold(lids, fissure, x, y) {
 	const up = [chord.up[0] * c + chord.along[0] * s, chord.up[1] * c + chord.along[1] * s]
 	const u = (x - lateral[0]) * along[0] + (y - lateral[1]) * along[1]
 	const v = (x - lateral[0]) * up[0] + (y - lateral[1]) * up[1]
-	const window = smoothstep(-1, 0.5, u) * (1 - smoothstep(0.4, 1, u / LATERAL_FOLD.length))
-	const step = 2 * smoothstep(-LATERAL_FOLD.width, LATERAL_FOLD.width, v) - 1
+	const window = smootherstep(-1, 0.5, u) * (1 - smootherstep(0.4, 1, u / LATERAL_FOLD.length))
+	const step = 2 * smootherstep(-LATERAL_FOLD.width, LATERAL_FOLD.width, v) - 1
 	const overlap = lids.lateralOverlap * window
 	// The step stays within a few millimeters of the fold.
 	const near = bell(v, 4 * LATERAL_FOLD.width)
@@ -396,7 +401,10 @@ function lateralFold(lids, fissure, x, y) {
 function shellPoint(context, profile, trace, a) {
 	const { lids, eye, fissure } = context
 	const { point: q, direction } = alongTrace(trace, a, profile)
-	const rise = smootherstep(profile.radius, 2.5 + 2 * (1 - profile.volume), a)
+	// The upper lid thickens within 2.5 mm; the lower one over 4.5, so it slopes
+	// down from its margin instead of standing in a shelf over the globe.
+	const reach = 2.5 + 2 * (1 - profile.share) + 2 * (1 - profile.volume)
+	const rise = smootherstep(profile.radius, reach, a)
 	const b = profile.thickness + (profile.lidThickness - profile.thickness) * rise
 	// The margin stands off the support along its normal; away from it that
 	// sideways shift fades out over SHIFT_FADE mm and the thickness is taken
@@ -426,14 +434,14 @@ function skinPoint(context, profile, trace, a) {
 	const [x, y, z] = shell.position
 	const toFace = smootherstep(1.5, profile.ring + 2, a)
 	const position = [x, y, z + (face(x, y) - z) * toFace]
-	const upper = profile.share * profile.canthi
+	const upper = profile.share * profile.creaseFade
 	const creaseGroove = -lids.creaseDepth * bell(a - profile.crease, 0.9) * upper
 	let relief = creaseGroove + lids.creaseFold * bell(a - profile.crease - 2.4, 2) * upper
 	// The pretarsal roll, fullest in the middle of the lower lid.
 	relief +=
-		lids.lowerRoll * bell(a - 2.2, 1.1) * (1 - profile.share) * Math.sin(Math.PI * profile.along)
+		lids.lowerRoll * bell(a - 2.5, 1.6) * (1 - profile.share) * Math.sin(Math.PI * profile.along)
 	const fold = lateralFold(lids, open, shell.q[0], shell.q[1])
-	relief += fold.offset * smoothstep(profile.radius, profile.radius + 0.6, a)
+	relief += fold.offset * smootherstep(profile.radius, profile.radius + 0.6, a)
 	// However deep the crease, the skin stays clear of the globe.
 	const skin = vec3.madd(position, shell.normal, relief)
 	const r = Math.hypot(skin[0], skin[1])

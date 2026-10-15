@@ -51,14 +51,14 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 | [0.14, 1] | Skin | The lid's shell, turning into the face. |
 
 - **Shell**:
-  - The margin stands off the support along the support's normal at the margin, tilted at most 35° from the front.
+  - The margin stands off the support along the support's normal at the margin, its tilt from the front eased toward 35° (smoothly: a hard limit leaves a line on the skin where the support's tilt crosses it).
   - Past the margin's edge that sideways shift fades out over 6 mm, and the thickness is taken upright, blended in over 3 mm. Shifting every row along its own normal would pull rows back where the support bends from the globe to the canthi, and crease the skin there.
-  - Its thickness grows from the margin's at the edge to `lidThickness` (upper) or `lowerThickness` (lower) within 2.5 mm.
-  - Toward each canthus the thickness tapers over a third of the margin. A faster taper would part neighboring columns into creases.
+  - Its thickness grows from the margin's at the edge to `lidThickness` within 2.5 mm on the upper lid, and to `lowerThickness` over 4.5 mm on the lower one, which so slopes down from its margin instead of standing in a shelf over the globe.
+  - Toward each canthus the thickness tapers over a third of the margin. A faster taper would part neighboring columns into creases. Every taper along the margin is a smootherstep or a sine: a plain smoothstep's curvature jumps at its ends, which the shading shows as a line down the lid.
 - **Into the face**: away from the margin the skin turns into the face. The turn ends 2 mm past the ring the face follows. The ring lies before the globe curves away under the lid: about 2 mm above the fold, 3.5 mm below the lower margin, and nearer the margin toward the canthi. Lid and face meet on that ring, so there is no seam, and the lids do not fall back with the globe into a bag.
 - **Over it**:
-  - The upper lid's crease, `creaseDepth` deep at `creaseHeight` from the margin, lower toward the canthi. This is the pretarsal show: with the eye open, the skin above folds down over the crease, here as a fold of `creaseFold`.
-  - The lower lid's pretarsal roll (`lowerRoll`), fullest in the middle.
+  - The upper lid's crease, `creaseDepth` deep at `creaseHeight` from the margin, a little lower toward the canthi and fading out before them (it does not run into the corners). This is the pretarsal show: with the eye open, the skin above folds down over the crease, here as a fold of `creaseFold`.
+  - The lower lid's pretarsal roll (`lowerRoll`), broad and fullest in the middle.
   - The lateral overlap (`lateralOverlap`): along a fold out of the lateral canthus, slanting down, the upper lid's skin stands over the lower lid's. The step stays within a few millimeters of the fold.
   - However deep the crease, the skin stays at least 0.6 mm off the globe.
 - **Closure**:
