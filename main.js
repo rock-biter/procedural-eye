@@ -2,6 +2,7 @@ import './style.css'
 import EyeApp from './src/app'
 import { PARAM_SCHEMA } from './src/params/paramSchema'
 import {
+	allValues,
 	applyOverrides,
 	cloneParams,
 	createDefaults,
@@ -75,9 +76,23 @@ async function savePng() {
 		c.charCodeAt(0),
 	)
 	const tagged = insertPngText(bytes, 'eye-state', window.__EYE__.getState())
+	download(new Blob([tagged], { type: 'image/png' }), `eye-${Date.now()}.png`)
+}
+
+// Downloads the values the panel is heading for (not a transition's in-between
+// ones) as defaults.json, the file that replaces src/params/defaults.json. The
+// debug view is left out, so the app never starts in one.
+function exportDefaults() {
+	const values = allValues(PARAM_SCHEMA, app.targetParams)
+	delete values.debug
+	const json = `${JSON.stringify(values, null, 2)}\n`
+	download(new Blob([json], { type: 'application/json' }), 'defaults.json')
+}
+
+function download(blob, filename) {
 	const link = document.createElement('a')
-	link.href = URL.createObjectURL(new Blob([tagged], { type: 'image/png' }))
-	link.download = `eye-${Date.now()}.png`
+	link.href = URL.createObjectURL(blob)
+	link.download = filename
 	link.click()
 	setTimeout(() => URL.revokeObjectURL(link.href), 1000)
 }
@@ -106,6 +121,7 @@ if (urlParams.get('gui') !== '0') {
 		actions: [
 			{ title: 'Photo (freeze / live) — Space', run: () => window.__EYE__.toggleFrozen() },
 			{ title: 'Save PNG', run: () => savePng() },
+			{ title: 'Export defaults JSON', run: () => exportDefaults() },
 			{
 				title: 'Copy state URL',
 				run: () => {

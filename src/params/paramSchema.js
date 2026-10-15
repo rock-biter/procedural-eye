@@ -1,6 +1,9 @@
-// The single source of truth for every tunable value: groups of leaves, each
-// `{ default, min, max, step, unit, kind, label, options }`. `kind` routes a
-// change (src/app.js):
+// The single source of truth for what is tunable: groups of leaves, each
+// `{ default, min, max, step, unit, kind, label, options }`. The default
+// values come from src/params/defaults.json, exported by the panel's
+// **Export defaults JSON**; the `default` written here is the fallback for a
+// leaf the file does not name (a new one) and the value the tests use.
+// `kind` routes a change (src/app.js):
 // - 'uniform': read every frame, nothing else to do;
 // - 'bake': re-bakes the iris atlases, the iris color table and the vessel maps;
 // - 'rebuild': regenerates geometry (and the derived eye geometry, then bakes);
@@ -11,6 +14,9 @@
 // Transitions (src/params/paramTransition.js) glide numbers and colors; a
 // `discrete` number (a seed, a count) changes in one step, and a toggle that
 // `fades` its sibling leaf fades it from or to zero instead of switching.
+
+import PROJECT_DEFAULTS from './defaults.json' with { type: 'json' }
+import { withDefaults } from './params'
 
 const num = (value, min, max, step, unit, kind = 'uniform', label) => ({
 	default: value,
@@ -47,7 +53,9 @@ export const DEBUG_VIEWS = [
 	'iris-atlas',
 ]
 
-export const PARAM_SCHEMA = {
+// The schema with the fallback defaults. The tests use it, so they do not
+// depend on the tuning in defaults.json.
+export const BASE_PARAM_SCHEMA = {
 	eye: {
 		laterality: choice('right', ['right', 'left'], 'rebuild'),
 		age: num(30, 5, 90, 1, 'years', 'uniform', 'age (pupil size)'),
@@ -387,3 +395,10 @@ export const PARAM_SCHEMA = {
 		view: choice('beauty', DEBUG_VIEWS, 'define'),
 	},
 }
+
+// The schema with the defaults of defaults.json. The panel does not export the
+// `debug` group, so the debug view starts at its fallback.
+const project = withDefaults(BASE_PARAM_SCHEMA, PROJECT_DEFAULTS)
+if (project.unknown.length > 0)
+	console.warn(`defaults.json names unknown parameters: ${project.unknown.join(', ')}`)
+export const PARAM_SCHEMA = project.schema

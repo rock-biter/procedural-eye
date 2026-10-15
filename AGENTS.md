@@ -49,7 +49,7 @@ pnpm capture
 ## Source Map
 
 - [`main.js`](main.js) is the bootstrap (URL flags, params, renderer, app, panel actions). [`src/app.js`](src/app.js) owns the systems and the frame loop.
-- [`src/params/`](src/params/): the parameter schema, the params helpers, the presets and the population priors of the random eye.
+- [`src/params/`](src/params/): the parameter schema, its default values (`defaults.json`), the params helpers, the presets and the population priors of the random eye.
 - [`src/eye/`](src/eye/): the eye geometry and optics twins, the eyeball mesh and materials, and the eye rig (gaze transform).
 - [`src/iris/`](src/iris/): rest space, seeded features and the spectral color model, plus the GPU atlas bake and the color lookup texture.
 - [`src/adnexa/`](src/adnexa/): the fissure, the surfaces around the eye (support, conjunctiva, face), lid geometry, the lash generator and the fissure map, plus the lid, lash and tear-film meshes.
@@ -64,7 +64,7 @@ pnpm capture
 
 ## Project Rules
 
-- Keep the params schema the single source of truth: every tunable value is a leaf with a range, a unit and a `kind`.
+- Keep the params schema the single source of truth for what is tunable: every tunable value is a leaf with a range, a unit and a `kind`. Its default values come from [`src/params/defaults.json`](src/params/defaults.json), exported by the panel; the `default` in the schema is only the fallback for a leaf the file does not name, and the value the tests use (`BASE_PARAM_SCHEMA`).
 - Treat CPU twins and GLSL as one contract, and change both sides together:
 
   | CPU | GLSL |

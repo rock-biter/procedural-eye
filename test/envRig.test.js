@@ -13,7 +13,7 @@ import {
 } from '../src/lighting/envRig'
 import { vec3 } from '../src/math'
 import { applyOverrides, createDefaults } from '../src/params/params'
-import { PARAM_SCHEMA } from '../src/params/paramSchema'
+import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
 
 const close = (a, b, tolerance, label) =>
 	assert.ok(Math.abs(a - b) < tolerance, `${label ?? ''} ${a} vs ${b}`)
@@ -33,7 +33,7 @@ test('black-body colors have unit luminance and the right hue order', () => {
 test('panels sit on their spherical direction and face the eye with orthonormal axes', () => {
 	assert.deepEqual(sphericalDirection(0, 0), [0, 0, 1])
 	close(sphericalDirection(90, 0)[0], 1, 1e-12)
-	const params = createDefaults(PARAM_SCHEMA)
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	const list = buildEmitters(params.lighting, camera)
 	const key = list[0]
 	close(vec3.length(key.center), params.lighting.key.distance, 1e-9)
@@ -48,8 +48,8 @@ test('panels sit on their spherical direction and face the eye with orthonormal 
 })
 
 test('the camera-mounted silhouettes and lights follow the camera', () => {
-	const params = createDefaults(PARAM_SCHEMA)
-	applyOverrides(PARAM_SCHEMA, params, {
+	const params = createDefaults(BASE_PARAM_SCHEMA)
+	applyOverrides(BASE_PARAM_SCHEMA, params, {
 		lighting: { ring: { enabled: true }, leds: { enabled: true } },
 	})
 	const list = buildEmitters(params.lighting, camera)
@@ -61,7 +61,7 @@ test('the camera-mounted silhouettes and lights follow the camera', () => {
 })
 
 test('packing writes six vec4s per emitter and transforms into another space', () => {
-	const params = createDefaults(PARAM_SCHEMA)
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	const list = buildEmitters(params.lighting, camera)
 	const { data, count } = packEmitters(list)
 	assert.equal(count, list.length)
@@ -79,7 +79,7 @@ test('packing writes six vec4s per emitter and transforms into another space', (
 })
 
 test('the pupil weighs each light by its angle from the line of sight', () => {
-	const params = createDefaults(PARAM_SCHEMA)
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	const list = buildEmitters(params.lighting, camera)
 	const key = sphericalDirection(params.lighting.key.azimuth, params.lighting.key.elevation)
 	const away = sphericalDirection(-params.lighting.key.azimuth, -params.lighting.key.elevation)

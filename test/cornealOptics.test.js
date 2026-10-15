@@ -13,9 +13,9 @@ import {
 import { createEyeGeometry } from '../src/eye/eyeProfile'
 import { vec3 } from '../src/math'
 import { createDefaults } from '../src/params/params'
-import { PARAM_SCHEMA } from '../src/params/paramSchema'
+import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
 
-const geometry = createEyeGeometry(createDefaults(PARAM_SCHEMA))
+const geometry = createEyeGeometry(createDefaults(BASE_PARAM_SCHEMA))
 const close = (a, b, tolerance, label) =>
 	assert.ok(Math.abs(a - b) < tolerance, `${label ?? ''} ${a} vs ${b}`)
 

@@ -1,6 +1,6 @@
 # Research
 
-The anatomical, optical and computer-graphics references behind the procedural eye, with the numbers the code uses as defaults and parameter ranges. Values marked *(calc)* are derived from the cited inputs; *(unverified)* could not be confirmed against the primary source.
+The anatomical, optical and computer-graphics references behind the procedural eye, with the numbers the code uses as fallback defaults (the `default` of each leaf in `paramSchema.js`) and parameter ranges; `src/params/defaults.json`, the defaults the app runs with, may be tuned away from them. Values marked *(calc)* are derived from the cited inputs; *(unverified)* could not be confirmed against the primary source.
 
 ## Geometry and optics
 

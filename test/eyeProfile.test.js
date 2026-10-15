@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { conicSag, createEyeGeometry } from '../src/eye/eyeProfile'
 import { createDefaults } from '../src/params/params'
-import { PARAM_SCHEMA } from '../src/params/paramSchema'
+import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
 
-const geometry = createEyeGeometry(createDefaults(PARAM_SCHEMA))
+const geometry = createEyeGeometry(createDefaults(BASE_PARAM_SCHEMA))
 const sag = (r) => geometry.apexZ - geometry.surfaceZ(r)
 
 test('conic sag matches the closed form of a sphere when Q = 0', () => {

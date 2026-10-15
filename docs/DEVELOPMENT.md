@@ -43,6 +43,8 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
   - Systems that own three.js objects are ES modules with default-export classes.
   - Pure modules (geometry, optics, sampling, params, priors, generators, color model, animation) import no three.js objects or browser state, and are tested in Node.
 - **Parameters**: every tunable value is a leaf of `PARAM_SCHEMA` ([`src/params/paramSchema.js`](../src/params/paramSchema.js)) with a range, unit and `kind`. Code reads values from the params object, never from duplicated constants.
+  - The default values live in [`src/params/defaults.json`](../src/params/defaults.json) ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#parameters-presets-and-the-random-eye)). To change them, tune the eye in the panel, press **Export defaults JSON**, and replace the file with the download.
+  - A new leaf needs only its fallback `default` in the schema; the next export writes it into the file.
 - **Uniforms and defines**
   - Uniforms use a `u` prefix.
   - Constants that the CPU also needs reach GLSL as material defines, for example `MAX_EMITTERS`, `EMITTER_VEC4S`, `IRIS_ATLAS_HEIGHT`, `IRIS_LUT_*` and `DEBUG_VIEW`.
@@ -65,7 +67,7 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 
 | Flag | Effect |
 | --- | --- |
-| `?preset=<name>` | Starts from a preset of `src/params/presets.js` (`default` otherwise). |
+| `?preset=<name>` | Starts from a preset of `src/params/presets.js` (`default`, the values of `src/params/defaults.json`, otherwise). |
 | `?state=<string>` | Applies the non-default values encoded by **Copy state URL** or **Save PNG** (base64url JSON), on top of the preset. |
 | `?photo=<n>` | Sets `quality.photoSamples` to `n` and starts in photo mode (frozen clock); the accumulation stops after `n` samples. |
 | `?view=<name>` | Sets `debug.view`; see [`docs/RENDERING.md`](RENDERING.md#debug-views) for the list. |
@@ -82,7 +84,7 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 
 **Random eye** is a button outside the panel, always in view: bottom right, or bottom center on phones and tablets. It blurs itself after a click, so Space still toggles photo mode.
 
-The panel starts collapsed. It has the actions **Photo (freeze / live)**, **Save PNG** and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
+The panel starts collapsed. When its open folders outgrow the viewport it scrolls, and it stops above the Random eye button (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
 
 ## Console API
 

@@ -122,12 +122,13 @@ export function diffParams(schema, a, b) {
 	return changed
 }
 
-// The deep partial object of the values that differ from the defaults.
-export function nonDefaultValues(schema, params) {
+// The deep partial object of the values for which keep(leaf, value) holds, in
+// schema order, numbers rounded.
+function pickValues(schema, params, keep) {
 	const partial = {}
 	forEachLeaf(schema, (leaf, path) => {
 		const value = getValue(params, path)
-		if (value !== leaf.default) {
+		if (keep(leaf, value)) {
 			const keys = path.split('.')
 			let node = partial
 			for (const key of keys.slice(0, -1)) node = node[key] ??= {}
@@ -135,6 +136,30 @@ export function nonDefaultValues(schema, params) {
 		}
 	})
 	return partial
+}
+
+// The deep partial object of the values that differ from the defaults.
+export function nonDefaultValues(schema, params) {
+	return pickValues(schema, params, (leaf, value) => value !== leaf.default)
+}
+
+// Every value, as a deep object in schema order: the format of
+// src/params/defaults.json.
+export function allValues(schema, params) {
+	return pickValues(schema, params, () => true)
+}
+
+// A copy of the schema whose leaf defaults come from `values`, a deep partial
+// object sanitized like any override; the leaves it does not name keep their
+// default. Also returns the unknown paths.
+export function withDefaults(schema, values) {
+	const params = createDefaults(schema)
+	const unknown = applyOverrides(schema, params, values)
+	const copy = structuredClone(schema)
+	forEachLeaf(copy, (leaf, path) => {
+		leaf.default = getValue(params, path)
+	})
+	return { schema: copy, unknown }
 }
 
 function roundForState(value) {

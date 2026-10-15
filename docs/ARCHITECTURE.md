@@ -10,8 +10,9 @@
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
-| [`src/params/paramSchema.js`](../src/params/paramSchema.js) * | `PARAM_SCHEMA`: every tunable value with default, range, unit and `kind`; `DEBUG_VIEWS`. |
-| [`src/params/params.js`](../src/params/params.js) * | Create, sanitize, get/set by path, diff, overrides, state encoding. |
+| [`src/params/paramSchema.js`](../src/params/paramSchema.js) * | `PARAM_SCHEMA`: every tunable value with default, range, unit and `kind`, the defaults taken from `defaults.json`; `BASE_PARAM_SCHEMA`, the same with the fallback defaults; `DEBUG_VIEWS`. |
+| [`src/params/defaults.json`](../src/params/defaults.json) | The default values, as exported by the panel's **Export defaults JSON**. |
+| [`src/params/params.js`](../src/params/params.js) * | Create, sanitize, get/set by path, diff, overrides, state encoding, all values (the export) and schema defaults from values. |
 | [`src/params/paramTransition.js`](../src/params/paramTransition.js) * | Transitions: numbers and colors glide to a target, the rest switches, lights fade. |
 | [`src/params/presets.js`](../src/params/presets.js) * | Named partial overrides, one per reference photograph. |
 | [`src/params/populationPriors.js`](../src/params/populationPriors.js) * | The random eye: features sampled from measured frequencies by ancestry, mapped onto parameters. |
@@ -133,6 +134,11 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `lids`, `lashes`, `skin`, `sclera`;
   - `lighting`, `camera`, `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
+- **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.
+  - `paramSchema.js` writes `BASE_PARAM_SCHEMA` with a `default` per leaf, then `withDefaults()` replaces each default the file names (sanitized like any override) to make `PARAM_SCHEMA`. A leaf the file does not name, such as a new one, keeps the default written in the schema; a name the file has but the schema lacks is reported with a console warning.
+  - Everything that starts from the defaults follows the file: the start-up params, the `default` preset, the presets laid over it, the groups the random eye resets, and the `?state=` strings, which store only the values that differ from it. A state string or a PNG saved before the file changed decodes against the new defaults.
+  - **Export defaults JSON** in the panel downloads `defaults.json`: every value of the panel's target params (where a running transition is heading), rounded like the state, in schema order, without the `debug` group, so the app never starts in a debug view. Replacing `src/params/defaults.json` with it makes the current eye the default.
+  - The tests use `BASE_PARAM_SCHEMA`, so retuning the file does not change them; `params.test.js` checks that the file names only existing leaves with valid values.
   - `discrete: true` marks a seed or a count, which a transition switches instead of gliding.
   - `fades: 'intensity'` marks a light's `enabled` toggle, which a transition fades through the sibling leaf.
 - **Seeds**: they are separate per subsystem (`irisStructure.seed`, `lashes.seed`, `lids.seed` for the lid shape, folds and skin patterns, `sclera.vessels.seed`), so a new crypt pattern keeps the same lashes.

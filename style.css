@@ -11,8 +11,15 @@ canvas {
 	touch-action: none;
 }
 
+/* The panel scrolls when its open folders outgrow the viewport, and stops
+   above the Random eye button (8px top + 84px kept for the button). */
 .tp-dfwv {
 	width: 320px !important;
+	max-height: calc(100vh - 92px);
+	max-height: calc(100dvh - 92px - env(safe-area-inset-bottom));
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
 }
 
 .random-eye {

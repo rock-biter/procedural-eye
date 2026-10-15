@@ -1,4 +1,5 @@
-// Named starting points: deep partial overrides of the schema defaults. The
+// Named starting points: deep partial overrides of the defaults
+// (src/params/defaults.json over the schema's fallbacks). The
 // URL picks one with ?preset=<name>; ?state= then applies on top. Each
 // reference preset is tuned on a photograph of references/ (`references`).
 
@@ -10,7 +11,7 @@ const macro = { camera: { ...frontal, distance: 150, fNumber: 11 } }
 const living = { animation: { enabled: false } }
 
 export const PRESETS = {
-	default: { label: 'Default (hazel)', params: {} },
+	default: { label: 'Default (defaults.json)', params: {} },
 	'amber-lattice': {
 		label: 'Amber lattice (01)',
 		references: ['eye-01.jpg'],

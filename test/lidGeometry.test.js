@@ -11,9 +11,9 @@ import {
 import { supportAt } from '../src/adnexa/periocular'
 import { createEyeGeometry } from '../src/eye/eyeProfile'
 import { createDefaults } from '../src/params/params'
-import { PARAM_SCHEMA } from '../src/params/paramSchema'
+import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
 
-const params = createDefaults(PARAM_SCHEMA)
+const params = createDefaults(BASE_PARAM_SCHEMA)
 const eye = createEyeGeometry(params)
 // The eye of each side: its nose side matches the fissure's.
 const eyes = {

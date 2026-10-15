@@ -130,8 +130,8 @@ test("Listing's law: no torsion, the quaternion turns +Z onto the gaze", () => {
 test('the animator looks at the camera along the visual axis and lids follow the pitch', async () => {
 	const { default: Animator } = await import('../src/animation/animator')
 	const { createDefaults } = await import('../src/params/params')
-	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
-	const params = createDefaults(PARAM_SCHEMA)
+	const { BASE_PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	params.animation.gaze = 'camera'
 	params.animation.microMovements = 0
 	const animator = new Animator(3)
@@ -153,8 +153,8 @@ test('the animator looks at the camera along the visual axis and lids follow the
 test('a still eye takes its pupil and gaze from the parameters, not the camera', async () => {
 	const { default: Animator } = await import('../src/animation/animator')
 	const { createDefaults } = await import('../src/params/params')
-	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
-	const params = createDefaults(PARAM_SCHEMA)
+	const { BASE_PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	params.animation.enabled = false
 	params.animation.yaw = 6
 	params.animation.pitch = -4
@@ -177,8 +177,8 @@ test('a still eye takes its pupil and gaze from the parameters, not the camera',
 test('a living eye starts at rest on its target: a frozen start is the steady state', async () => {
 	const { default: Animator } = await import('../src/animation/animator')
 	const { createDefaults } = await import('../src/params/params')
-	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
-	const params = createDefaults(PARAM_SCHEMA)
+	const { BASE_PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	params.animation.gaze = 'camera'
 	const animator = new Animator(5)
 	const state = animator.step(0, params, {
@@ -208,8 +208,8 @@ test('a living eye starts at rest on its target: a frozen start is the steady st
 test('looking around: starts straight ahead, then looks within the range, framed still', async () => {
 	const { default: Animator } = await import('../src/animation/animator')
 	const { createDefaults } = await import('../src/params/params')
-	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
-	const params = createDefaults(PARAM_SCHEMA)
+	const { BASE_PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	assert.equal(params.animation.gaze, 'wander', 'the default')
 	params.animation.microMovements = 0
 	const animator = new Animator(7)
@@ -242,9 +242,9 @@ test('looking around: starts straight ahead, then looks within the range, framed
 test('each look brings its own pupil size, eased in', async () => {
 	const { default: Animator } = await import('../src/animation/animator')
 	const { createDefaults } = await import('../src/params/params')
-	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const { BASE_PARAM_SCHEMA } = await import('../src/params/paramSchema')
 	const run = (response) => {
-		const params = createDefaults(PARAM_SCHEMA)
+		const params = createDefaults(BASE_PARAM_SCHEMA)
 		params.animation.microMovements = 0
 		params.animation.hippus = 0
 		params.animation.pupilResponse = response
@@ -273,8 +273,8 @@ test('each look brings its own pupil size, eased in', async () => {
 test('the light along the line of sight sets the pupil', async () => {
 	const { default: Animator } = await import('../src/animation/animator')
 	const { createDefaults } = await import('../src/params/params')
-	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
-	const params = createDefaults(PARAM_SCHEMA)
+	const { BASE_PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(BASE_PARAM_SCHEMA)
 	params.animation.gaze = 'fixed'
 	params.animation.microMovements = 0
 	params.animation.hippus = 0
