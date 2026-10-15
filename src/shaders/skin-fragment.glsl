@@ -20,6 +20,8 @@ uniform vec2 uMarginLength; // upper and lower margin lengths (mm)
 uniform float uPixelAngle; // radians per pixel
 uniform vec2 uDefocus; // camera aperture diameter, focus distance (mm)
 uniform float uOcclusion; // strength of the baked ambient occlusion
+uniform sampler2D uSkinPattern; // baked pigment patterns (skin-pattern-fragment.glsl)
+uniform vec4 uSkinPatternBox; // its box in the front plane: min x, min y, 1 / width, 1 / height (mm)
 
 varying vec3 vWorldPos;
 varying vec3 vRestPos;
@@ -63,6 +65,8 @@ void main() {
 	float along = vRelief.w;
 	vec2 p = vRestPos.xy;
 	uint seed = uint(uSkin3.w + 0.5) * 7919u + 101u;
+	// Melanin and blood mottling, veins, oily patches (skin-pattern-fragment.glsl).
+	vec4 pattern = texture(uSkinPattern, (p - uSkinPatternBox.xy) * uSkinPatternBox.zw);
 	float onMargin = 1.0 - smoothstep(uSkin2.z, uSkin2.w, s);
 	float onSkin = 1.0 - onMargin;
 	// The canthi, where the margin features fade out.
@@ -174,13 +178,13 @@ void main() {
 	vec3 n = normalize(geometric - gradient - marginGradient * onMargin);
 
 	// Albedo: melanin, blood and the venous tint over the skin color.
-	float melanin = 0.3 * fbm(p / 6.0, seed + 51u) + 0.35 * fbm(p / 1.3, seed + 53u);
-	float blood = 0.3 * fbm(p / 3.0, seed + 57u) + 0.3 * valueNoise(p / 0.7, seed + 59u);
+	float melanin = (pattern.r - 0.5) * 1.3;
+	float blood = (pattern.g - 0.5) * 1.2;
 	float venous = 0.0;
 	float cavity = saturate(-fold / 0.5);
 	melanin += 1.1 * freckles(p, uSkin3.x, seed + 61u);
 	melanin += uSkin3.z * (0.9 * cavity + 0.5 * underEye + 0.4 * canthi);
-	float veins = veinNetwork(p, seed + 67u);
+	float veins = pattern.b;
 	venous += uSkin3.y * (0.8 * upperLid + 1.0 * underEye + 1.6 * veins * saturate(upperLid + underEye + 0.15));
 	// Capillaries: pinker thin skin toward the lash line and in the canthi.
 	blood += uSkin.x * (1.5 * exp(-a / 1.6) + 0.6 * canthi);
@@ -210,7 +214,7 @@ void main() {
 	// Baked over the geometry: deep in the canthi, under the margins, in the crease.
 	occlusion *= mix(1.0, vAo, uOcclusion);
 	// Wet toward the margin, oily patches on the lids, matte further out.
-	float sebum = smoothstep(-0.3, 0.6, valueNoise(p / 2.5, seed + 83u)) * (1.0 - smoothstep(6.0, 16.0, a));
+	float sebum = pattern.a * (1.0 - smoothstep(6.0, 16.0, a));
 	float wet = mix(uSkin.z * exp(-a / 2.5), 1.0 - 0.25 * smoothstep(0.6, 1.2, u), onMargin);
 	float roughness = mix(uSkin.y * (1.0 - 0.25 * sebum), mix(0.06, 0.13, smoothstep(0.4, 1.0, u)), wet);
 	vec3 wrap = uSkin2.y * vec3(0.55, 0.28, 0.18);

@@ -204,7 +204,7 @@ export default class EyeApp {
 		const lidKey = JSON.stringify([this.params.lids, this.eye])
 		if (lidKey !== this.lidKey) {
 			this.lidKey = lidKey
-			this.lids.rebuild(this.params, this.eye)
+			this.lids.rebuild(this.params, this.eye, this.setup.renderer)
 			const distances = bakeFissureMap(this.params.lids, this.eye.nasalSign)
 			const data = this.fissureMap.image.data
 			for (let i = 0; i < distances.length; i++) data[i] = DataUtils.toHalfFloat(distances[i])
@@ -406,13 +406,15 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (this.converged) return
 
+		// Only interactive frames adapt the resolution: a resize restarts the
+		// accumulation. It comes before the frame is drawn: a canvas resized
+		// after drawing is cleared, and the browser would show it black.
+		if (this.samples === 0 && delta > 0) this.setup.adaptPixelRatio(delta)
 		const stats = this.setup.frameStats
 		stats.beginFrame(time)
 		const fresh = this.samples === 0
 		this.renderSample(fresh ? null : accumulationSample(this.samples))
 		stats.endFrame()
-		// Only interactive frames adapt the resolution: a resize restarts the accumulation.
-		if (fresh && delta > 0) this.setup.adaptPixelRatio(delta)
 	}
 
 	measureFrame(time) {
@@ -462,6 +464,7 @@ export default class EyeApp {
 			this.eyeRig.eyeToWorld,
 			this.reflectedRadiance(this.params.skin.color, 0.35),
 			this.reflectedRadiance(this.params.lashes.color, 0.5),
+			this.lightRig.luminance * 0.05,
 		)
 		this.lids.update(this.params, pixelAngle)
 		this.lashes.update(this.params)

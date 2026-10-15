@@ -28,8 +28,9 @@ void main() {
 	float rLimbus = limbusRadius(p.xy);
 	float opacity = smoothstep(uGlobe.y - uLimbus.x, uGlobe.y + uLimbus.y, rLimbus);
 	// The clear cornea is a near-perfect mirror; the conjunctiva over the
-	// limbus already has the irregular surface of the sclera.
-	vec3 mirror = normalize(mix(n, scleraNormal(p, n), opacity));
+	// limbus already has the irregular surface of the sclera. The sclera's
+	// relief and diffuse light are only computed where the limbus shows them.
+	vec3 mirror = opacity > 0.0 ? normalize(mix(n, scleraNormal(p, n), opacity)) : n;
 	float cosi = -dot(dir, mirror);
 	float fresnel = fresnelDielectric(cosi, uIor.x);
 	vec3 mirrorDir = reflect(dir, mirror);
@@ -42,6 +43,7 @@ void main() {
 		if (traceCornea(p, n, dir, inner, innerDir)) {
 			// Pixel footprint: the cone from the camera, narrowed by the refraction.
 			float coneOrigin = length(inner - uCameraEye) * uPixelAngle;
+			gIrisSight = vec2(length(p - uCameraEye), length(inner - p));
 			ChamberResult chamber = traceChamber(inner, innerDir, coneOrigin, uPixelAngle / uIor.z);
 			inside = chamber.radiance;
 			insideDistance = length(inner - p) + chamber.distance;
@@ -50,7 +52,7 @@ void main() {
 		float ring = smoothstep(uGlobe.y - uLimbus.x - uLimbus.z, uGlobe.y - 0.25 * uLimbus.x, rLimbus);
 		inside *= (1.0 - fresnel) * (1.0 - uLimbus.w * ring);
 	}
-	vec3 diffuse = scleraDiffuse(p, n) * (1.0 - fresnel);
+	vec3 diffuse = opacity > 0.0 ? scleraDiffuse(p, n) * (1.0 - fresnel) : vec3(0.0);
 	vec3 refracted = mix(inside, diffuse, opacity);
 	vec3 reflected = reflection * fresnel;
 	vec3 color = refracted + reflected;
@@ -58,8 +60,7 @@ void main() {
 	// Apparent depth: the iris through the cornea (paraxial single surface),
 	// the reflection as the virtual image of a convex mirror (R / 2).
 	float cameraDistance = length(p - uCameraEye);
-	float s = max(insideDistance, 1e-3);
-	float refractedDepth = 1.0 / (uIor.z / s - (uIor.z - 1.0) / uCornea.x);
+	float refractedDepth = apparentDepth(insideDistance);
 	float reflectedDepth = 0.5 * uCornea.x;
 	float weight = luma(reflected) / (luma(reflected) + luma(refracted * (1.0 - opacity)) + 1e-6);
 	float focusDistance = cameraDistance + mix(mix(refractedDepth, 0.0, opacity), reflectedDepth, weight);

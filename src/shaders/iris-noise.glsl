@@ -4,9 +4,10 @@
 
 #include ./common.glsl
 
+// i modulo period, in [0, period). Float division: GPUs have no integer
+// divider, and the operands stay far below 2^24.
 int wrapIndex(int i, int period) {
-	int m = i % period;
-	return m < 0 ? m + period : m;
+	return i - period * int(floor(float(i) / float(period)));
 }
 
 vec2 latticeGradient(int x, int y, uint seed) {

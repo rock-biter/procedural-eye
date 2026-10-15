@@ -33,7 +33,7 @@ export default class PhysicalCamera {
 		const center = eye.apexZ - ROTATION_CENTER_DEPTH
 		this.rotation.fromArray(gazeQuaternion(framing.yaw, framing.pitch))
 		this.framed.set(0, 0, eye.apexZ - focusDepth - center).applyQuaternion(this.rotation)
-		this.target.set(c.targetX, c.targetY, center).add(this.framed)
+		this.target.set(c.targetX, c.targetY, center + c.targetZ).add(this.framed)
 		const [x, y, z] = sphericalDirection(c.azimuth, c.elevation)
 		camera.position.set(x, y, z).multiplyScalar(c.distance).add(this.target)
 		camera.up.set(0, 1, 0)

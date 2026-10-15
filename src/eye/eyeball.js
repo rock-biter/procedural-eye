@@ -2,6 +2,7 @@
 // groups) sharing one set of uniforms: the optics of the cornea and limbus,
 // and the light sclera program.
 import { Color, Matrix4, Mesh, ShaderMaterial, Uniform, Vector2, Vector3, Vector4 } from 'three'
+import { apertureRadius } from '../camera/cameraOptics'
 import { debugViewDefine } from '../debug/debugViews'
 import { IRIS_ATLAS_SIZE } from '../iris/irisAtlas'
 import { IRIS_COLOR_LUT } from '../iris/irisColor'
@@ -39,6 +40,8 @@ export default class Eyeball {
 			uIrisSteps: new Uniform(64),
 			uIrisShadowSteps: new Uniform(10),
 			uIrisAoSteps: new Uniform(5),
+			uIrisMicroBlur: new Uniform(1e6),
+			uDefocus: new Uniform(new Vector2(0, 1)),
 			uFiberRadial: new Uniform(new Vector4()),
 			uFiberArc: new Uniform(new Vector4()),
 			uFiberMisc: new Uniform(new Vector4()),
@@ -78,6 +81,9 @@ export default class Eyeball {
 		this.scleraMaterial.name = 'EyeballSclera'
 		this.mesh = new Mesh(undefined, [this.capMaterial, this.scleraMaterial])
 		this.mesh.name = 'Eyeball'
+		// Drawn after the lids and lashes: the depth test then skips the costly
+		// optics wherever they cover the eye.
+		this.mesh.renderOrder = 1
 	}
 
 	// New profile (any 'rebuild' parameter): new tessellation.
@@ -99,7 +105,8 @@ export default class Eyeball {
 	// rest space, the camera position in eye space and its pixel angle.
 	// `interactive`: a fresh frame while something changes (cheaper shading).
 	// `lidRadiance`, `lashRadiance`: linear colors of the skin and the lashes as
-	// seen in the reflections.
+	// seen in the reflections; `whiteRadiance`: a white diffuse surface lit by
+	// the rig (the scale of the iris glow).
 	update(
 		params,
 		pupilDiameter,
@@ -111,6 +118,7 @@ export default class Eyeball {
 		eyeToWorld,
 		lidRadiance,
 		lashRadiance,
+		whiteRadiance,
 	) {
 		const u = this.uniforms
 		const packed = eye.pack()
@@ -154,8 +162,18 @@ export default class Eyeball {
 			? quality.interactiveShadowSteps
 			: quality.irisShadowSteps
 		u.uIrisAoSteps.value = interactive ? quality.interactiveAoSteps : quality.irisAoSteps
+		// Interactive frames leave out the micro striations that the depth of
+		// field's gather blurs over two of their widths.
+		u.uIrisMicroBlur.value = interactive ? 2 : 1e6
+		const lens = params.camera
+		u.uDefocus.value.set(2 * apertureRadius(lens.focalLength, lens.fNumber), lens.distance)
 		const color = params.irisColor
-		u.uIrisColorMisc.value.set(color.fiberAbl, color.saturation, IRIS_COLOR_LUT.maxStroma, 0)
+		u.uIrisColorMisc.value.set(
+			color.fiberAbl,
+			color.saturation,
+			IRIS_COLOR_LUT.maxStroma,
+			color.glow * whiteRadiance,
+		)
 		u.uIrisTint.value.set(color.tint)
 		const structure = params.irisStructure
 		const f = structure.fibers

@@ -3,7 +3,9 @@
 // SHADOW_LAYER: lids and lashes) into a float depth map. For accumulation
 // samples the camera moves to a point on the emitter's area, so the averaged
 // hard shadows form the real penumbra; interactive frames estimate it
-// (percentage-closer soft shadows, key-shadow.glsl).
+// (percentage-closer soft shadows, key-shadow.glsl) on a map of half the
+// resolution: their filters are wider than its texels, and its taps stay in
+// the texture cache.
 import {
 	Color,
 	DoubleSide,
@@ -23,20 +25,28 @@ import fragmentShader from '../shaders/shadow-depth-fragment.glsl'
 import vertexShader from '../shaders/shadow-depth-vertex.glsl'
 
 export const SHADOW_LAYER = 1
+// Map sizes of accumulation samples and of interactive frames.
 const SIZE = 2048
+const INTERACTIVE_SIZE = 1024
 // Half extent of the shadowed region around the eye (mm): the whole skin
 // patch (the lookup fades out toward the border).
 const EXTENT = 40
 
+function createShadowTarget(size) {
+	const target = new WebGLRenderTarget(size, size, {
+		type: FloatType,
+		format: RedFormat,
+		minFilter: NearestFilter,
+		magFilter: NearestFilter,
+	})
+	target.texture.name = 'KeyShadowMap'
+	return target
+}
+
 export default class KeyShadow {
 	constructor() {
-		this.target = new WebGLRenderTarget(SIZE, SIZE, {
-			type: FloatType,
-			format: RedFormat,
-			minFilter: NearestFilter,
-			magFilter: NearestFilter,
-		})
-		this.target.texture.name = 'KeyShadowMap'
+		this.target = createShadowTarget(SIZE)
+		this.interactiveTarget = createShadowTarget(INTERACTIVE_SIZE)
 		this.camera = new OrthographicCamera(-EXTENT, EXTENT, EXTENT, -EXTENT, 1, 400)
 		this.camera.layers.set(SHADOW_LAYER)
 		this.matrix = new Matrix4()
@@ -88,12 +98,14 @@ export default class KeyShadow {
 		this.camera.updateMatrixWorld()
 		this.matrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse)
 
+		const map = sample ? this.target : this.interactiveTarget
+		this.uniforms.uKeyShadowMap.value = map.texture
 		const previousTarget = renderer.getRenderTarget()
 		const previousOverride = scene.overrideMaterial
 		const previousBackground = scene.background
 		scene.overrideMaterial = this.material
 		scene.background = null
-		renderer.setRenderTarget(this.target)
+		renderer.setRenderTarget(map)
 		const clearColor = renderer.getClearColor(this.clearColor)
 		const clearAlpha = renderer.getClearAlpha()
 		renderer.setClearColor(0xffffff, 1)
@@ -114,6 +126,7 @@ export default class KeyShadow {
 
 	dispose() {
 		this.target.dispose()
+		this.interactiveTarget.dispose()
 		this.material.dispose()
 	}
 }

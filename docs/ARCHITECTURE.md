@@ -6,7 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the Random eye button and the collapsed panel with its actions. Builds the target params of presets and random eyes. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the dock (Zoom out, Zoom in, Random eye) and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes and zooms; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
@@ -36,6 +36,7 @@
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, lash, meniscus and bubble meshes with their materials. |
+| [`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js) | The skin's pigment patterns baked on the GPU over the lid mesh at rest. |
 | [`src/sclera/vesselGenerator.js`](../src/sclera/vesselGenerator.js) * | Seeded episcleral and conjunctival vessel network. |
 | [`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) | The network rasterized into the polar vessel map, when its parameters or the globe change. |
 | **Animation** ([`docs/ANIMATION.md`](ANIMATION.md)) | |
@@ -54,7 +55,7 @@
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
 | [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: render pass, accumulation, depth of field, effects. |
 | [`src/render/accumulationPass.js`](../src/render/accumulationPass.js) | Progressive mean of still frames in a float history. |
-| [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution gather). |
+| [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare and gather), composited over the accumulated mean. |
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
@@ -71,7 +72,7 @@
      - the eye geometry (`createEyeGeometry()`);
      - the entrance-pupil depth the camera aims at;
      - the rig transform and the eyeball mesh;
-     - the lid mesh and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
+     - the lid mesh, its skin patterns (baked on the GPU) and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
      - the lashes and the tear film.
 
      A rebuild always bakes too.
@@ -87,7 +88,8 @@
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.
 4. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
-5. **Render one sample** (`renderSample()`)
+5. **Adaptive resolution**: before a fresh frame is drawn, the interval since the last frame feeds the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation. The resize comes before drawing: a canvas resized after it is cleared, and the browser would show a black frame.
+6. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field.
    - Later frames take `accumulationSample(n)`: a subpixel jitter, a point on the lens and a point on the key light.
    - The steps, in order:
@@ -97,14 +99,13 @@
      4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window.
      5. The eyeball, lid and lash uniforms are refreshed from the params.
      6. The post-processing updates the lens of the depth of field and its fade, then the composer renders.
-6. **Adaptive resolution**: fresh frames feed the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation.
 
 ## Parameter Routing
 
 The panel, the camera controls and `window.__EYE__.setParams()` all edit the one params object.
 - **Changes**: `EyeApp.onParamChange(path)` looks up the schema leaf, records its `kind` as dirty and restarts the accumulation. Values of kind `uniform` need nothing else, because every frame reads the params.
 - **Listeners**: those added to `app.listeners` hear every change. The panel refreshes after camera moves, and at the start and end of transitions. Tweakpane reports its own refreshes as changes; the panel ignores them, because they are not edits.
-- **Bulk changes**: loading a preset and **Random eye** glide to their values ([Transitions](#transitions)). `setParams()` ends a running transition, then replaces the values at once and marks everything for rebuild.
+- **Bulk changes**: loading a preset, **Random eye** and the zoom buttons glide to their values ([Transitions](#transitions)); a zoom changes only `camera.distance`, over `zoom.duration`. `setParams()` ends a running transition, then replaces the values at once and marks everything for rebuild.
 
 ## Transitions
 
@@ -118,7 +119,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 
 - **Color lookup**: building it takes about 35 ms, too much for every frame. At the start, `IrisColorLut.beginBlend()` builds the target table once; every frame then mixes the old and the new table with the transition's progress (`setBlend()`). The pigment atlas re-bakes every frame (under a millisecond).
 - **Pose**: when the transition changes where the pose comes from, the pose blends too ([`docs/ANIMATION.md`](ANIMATION.md#modes)).
-- **Duration**: the panel's **transition (s)** (2 s by default; 0 switches at once). Captures and `?preset=` at start-up do not glide.
+- **Duration**: the panel's **transition (s)** (1 s by default; 0 switches at once); a zoom takes `zoom.duration`. Captures and `?preset=` at start-up do not glide.
 - **Interruptions**:
   - Orbiting the camera cancels the camera's glides; the rest goes on.
   - A panel edit of a `uniform` leaf cancels that leaf's glide.
@@ -132,7 +133,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `globe`, `cornea`, `chamber`, `limbus`;
   - `iris`, `irisStructure`, `irisColor`;
   - `lids`, `lashes`, `skin`, `sclera`;
-  - `lighting`, `camera`, `post`, `quality`, `debug`.
+  - `lighting`, `camera`, `zoom` (the dock's zoom distances and duration), `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
 - **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.
   - `paramSchema.js` writes `BASE_PARAM_SCHEMA` with a `default` per leaf, then `withDefaults()` replaces each default the file names (sanitized like any override) to make `PARAM_SCHEMA`. A leaf the file does not name, such as a new one, keeps the default written in the schema; a name the file has but the schema lacks is reported with a console warning.
@@ -153,7 +154,8 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - A Gaussian copula carries the measured correlations between them.
   - Within its color class, a shade (`SHADES`: pale or deep blue, green, grey, hazel, light brown, amber, brown, chestnut, black) sets ranges for the whole layer model of the color and its `saturation` (`SHADE_COLORS`), not only the melanin; the shades and their shares are approximations ([`docs/RESEARCH.md`](RESEARCH.md#color)).
   - Larsson's peripupillary ring is added to 91% of green, hazel and light brown eyes.
-  - The result maps onto the age, the pupil, the iris structure and color, the sclera, the lash seed and the skin color.
+  - A tenth of the eyes, of any ancestry (`MAKO_SHARE`), take the fantasy **mako** shade instead: the glowing green-blue of the mako eyes of Final Fantasy VII, a deep blue stroma tinted between green and cyan at full saturation with `irisColor.glow`, without a ring or pigment spots. It is drawn last, so the other eyes of a seed do not change.
+  - The result maps onto the age, the pupil, the iris structure and color, the sclera and the skin color. The lashes stay as they are.
   - `main.js` resets those groups to their defaults before applying it, and glides to the result.
 - **State**: `encodeState()` writes the non-default values as base64url JSON. **Copy state URL** puts it in `?state=`; **Save PNG** stores it in a `tEXt` chunk named `eye-state` ([`src/render/pngMetadata.js`](../src/render/pngMetadata.js)).
 

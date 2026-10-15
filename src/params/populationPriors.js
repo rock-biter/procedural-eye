@@ -6,7 +6,9 @@
 // override of the params. Color classes outside Europe are approximate
 // (mostly brown). Within a class, a shade (deep blue, green, amber, …) sets
 // the whole layer model of the color, not only its melanin; the shades and
-// their shares are approximations, not measurements; docs/RESEARCH.md.
+// their shares are approximations, not measurements; docs/RESEARCH.md. A
+// share of the eyes (MAKO_SHARE) take the fantasy mako shade instead.
+import { hexToLinearRgb, linearRgbToHex } from '../lighting/colorTemperature'
 import { createRandom, gaussian, pickWeighted } from '../random'
 
 export const ANCESTRIES = ['european', 'east-asian', 'south-asian']
@@ -234,7 +236,30 @@ export const SHADE_COLORS = Object.freeze({
 			fiberAbl: [0.85, 1],
 		},
 	},
+	// Fantasy: the glowing green-blue of the mako eyes of Final Fantasy VII. A
+	// clear, deep blue stroma with a trace of pheomelanin, tinted between green
+	// and cyan (`tint`, mixed in linear sRGB), at full saturation, with a light
+	// of its own; no ring and no pigment spots (randomEye()).
+	mako: {
+		ring: 0,
+		tint: ['#1affb8', '#33ffe0'],
+		color: {
+			ablMelanin: [0.04, 0.07],
+			eumelanin: [0, 0.03],
+			stromaMelanin: [0, 0.005],
+			stromaScattering: [1.5, 2.5],
+			rayleighShare: [0.95, 1],
+			blood: [0.0001, 0.0005],
+			ablScattering: [0.2, 0.4],
+			saturation: [2.8, 3],
+			fiberAbl: [0.55, 0.7],
+			glow: [0.5, 0.8],
+		},
+	},
 })
+
+// The share of random eyes of any ancestry that take the mako shade.
+export const MAKO_SHARE = 0.1
 
 // Standard normal CDF (Abramowitz–Stegun 7.1.26 erf).
 export function normalCdf(z) {
@@ -278,13 +303,23 @@ export function sampleFeatures(ancestry, random) {
 
 const between = (random, a, b) => a + (b - a) * random()
 
+// The irisColor values of `shade`.
+export function shadeColor(shade, random) {
+	const { color: ranges, tint } = SHADE_COLORS[shade]
+	const color = {}
+	for (const [leaf, [min, max]] of Object.entries(ranges)) color[leaf] = between(random, min, max)
+	if (tint) {
+		const [a, b] = tint.map(hexToLinearRgb)
+		const k = random()
+		color.tint = linearRgbToHex(a.map((value, i) => value + (b[i] - value) * k))
+	}
+	return color
+}
+
 // A shade of color class `colorClass` and its irisColor values.
 export function sampleIrisColor(colorClass, random) {
 	const shade = pickWeighted(SHADES[colorClass], random())
-	const color = {}
-	for (const [leaf, [min, max]] of Object.entries(SHADE_COLORS[shade].color))
-		color[leaf] = between(random, min, max)
-	return { shade, color }
+	return { shade, color: shadeColor(shade, random) }
 }
 
 export function randomEye(ancestry = 'european', seed = Math.floor(Math.random() * 1e9)) {
@@ -296,7 +331,7 @@ export function randomEye(ancestry = 'european', seed = Math.floor(Math.random()
 	const furrowCount = [0, 1 + Math.floor(random() * 2), 2 + Math.floor(random() * 3)][f.furrowGrade]
 	const age = Math.round(between(random, 18, 72))
 	const skin = { european: '#d39b7c', 'east-asian': '#c9966f', 'south-asian': '#9c6a4a' }[ancestry]
-	return {
+	const eye = {
 		features: { ...f, shade },
 		params: {
 			eye: { age },
@@ -339,8 +374,16 @@ export function randomEye(ancestry = 'european', seed = Math.floor(Math.random()
 				vessels: { seed: 1 + Math.floor(random() * 9998) },
 				yellowing: Math.min(1, (age - 18) / 70),
 			},
-			lashes: { seed: 1 + Math.floor(random() * 9998) },
 			skin: { color: skin },
 		},
 	}
+	// Drawn last, so every other eye of a seed stays as it was.
+	if (random() < MAKO_SHARE) {
+		Object.assign(eye.params.irisColor, shadeColor('mako', random))
+		// Even: pigment spots would turn bright green under the tint.
+		eye.params.irisColor.heterochromia.amount = 0
+		eye.params.irisColor.freckles.count = 0
+		eye.features.shade = 'mako'
+	}
+	return eye
 }

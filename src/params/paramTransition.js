@@ -10,7 +10,7 @@ import { hexToLinearRgb, linearRgbToHex } from '../lighting/colorTemperature'
 import { lerp, smootherstep } from '../math'
 import { forEachLeaf, getValue, leafType } from './params'
 
-export const TRANSITION = Object.freeze({ duration: 2 })
+export const TRANSITION = Object.freeze({ duration: 1 })
 
 // 'glide' or 'switch': how a leaf reaches a new value in a transition.
 export function transitionMode(leaf) {
