@@ -2,8 +2,11 @@
 // URL picks one with ?preset=<name>; ?state= then applies on top. Each
 // reference preset is tuned on a photograph of references/ (`references`).
 
+// The frontal 100 mm framing the reference presets were tuned with (the
+// default camera sits off to the side with a longer lens).
+const frontal = { focalLength: 100, azimuth: 0, elevation: 0 }
 // Close iris macro framing: about 2:1 on the iris, shallow focus.
-const macro = { camera: { distance: 150, fNumber: 11 } }
+const macro = { camera: { ...frontal, distance: 150, fNumber: 11 } }
 const living = { animation: { enabled: false } }
 
 export const PRESETS = {
@@ -55,7 +58,7 @@ export const PRESETS = {
 		references: ['eye-02.jpg'],
 		params: {
 			...living,
-			camera: { distance: 170, fNumber: 2.8, exposure: 0.3, whiteBalance: 6200 },
+			camera: { ...frontal, distance: 170, fNumber: 2.8, exposure: 0.3, whiteBalance: 6200 },
 			iris: { pupilDiameter: 3.0 },
 			irisColor: {
 				ablMelanin: 0.07,
@@ -117,7 +120,7 @@ export const PRESETS = {
 		references: ['eye-04.jpg'],
 		params: {
 			...living,
-			camera: { distance: 158, fNumber: 9, exposure: 0.6, whiteBalance: 5600 },
+			camera: { ...frontal, distance: 158, fNumber: 9, exposure: 0.6, whiteBalance: 5600 },
 			iris: { pupilDiameter: 3.6 },
 			irisColor: {
 				ablMelanin: 0.3,
@@ -149,7 +152,14 @@ export const PRESETS = {
 		references: ['eye-05.jpg', 'eye-07.avif'],
 		params: {
 			...living,
-			camera: { distance: 175, fNumber: 5.6, azimuth: -12, exposure: 0.2, whiteBalance: 6000 },
+			camera: {
+				...frontal,
+				distance: 175,
+				fNumber: 5.6,
+				azimuth: -12,
+				exposure: 0.2,
+				whiteBalance: 6000,
+			},
 			iris: { pupilDiameter: 3.2 },
 			irisColor: {
 				ablMelanin: 0.05,
@@ -186,7 +196,7 @@ export const PRESETS = {
 		references: ['eye-08.avif'],
 		params: {
 			...living,
-			camera: { distance: 190, fNumber: 8, exposure: 0.4 },
+			camera: { ...frontal, distance: 190, fNumber: 8, exposure: 0.4 },
 			iris: { pupilDiameter: 3.3 },
 			irisColor: {
 				ablMelanin: 0.25,
@@ -234,7 +244,7 @@ export const PRESETS = {
 	},
 	'refraction-checker': {
 		label: 'Refraction checker (debug)',
-		params: { ...living, debug: { view: 'refraction-checker' } },
+		params: { ...living, camera: frontal, debug: { view: 'refraction-checker' } },
 	},
 	outdoor: {
 		label: 'Outdoor sky',

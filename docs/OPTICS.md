@@ -5,7 +5,7 @@
 - Units are millimeters, and the globe (sclera sphere) is centered at the origin.
 - +Z is the optical axis, out of the corneal apex. +Y is superior.
 - +X is nasal for a right eye and temporal for a left one (`eye.laterality`; `nasalSign` is +1 for a right eye).
-- The default camera looks down −Z, so +X is the right of the picture.
+- A camera at azimuth 0 looks down −Z, so +X is the right of the picture.
 
 The eye turns about a center of rotation 13.5 mm behind the apex ([`src/eye/eyeRig.js`](../src/eye/eyeRig.js)). The animator aims the **visual axis**, which lies `eye.kappa` degrees nasal of the optical axis, so the corneal reflex of a light at the camera sits slightly nasal of the pupil center.
 
@@ -68,7 +68,7 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 [`src/lighting/envRig.js`](../src/lighting/envRig.js) builds the emitters in world space around the eye. Colors come from black-body temperatures (unit luminance) or sRGB colors times an intensity, in arbitrary linear units (exposure is applied in post).
 
 - **Placement**
-  - The studio key and fill panels and the window are placed by azimuth (0 faces the default camera, positive toward +X), elevation and distance, and face the eye.
+  - The studio key and fill panels and the window are placed by azimuth (0 is straight in front of the eye, positive toward +X), elevation and distance, and face the eye.
   - The ring light, the LED ring, the camera lens, the camera body and the photographer are mounted on the camera and follow it.
 - **Types**: rect, disk, octagon, window (panes, mullions, sky gradient, skyline), ring, LEDs, lens (dark, with a bright barrel rim), blocker.
 
@@ -98,10 +98,10 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 
 [`src/camera/cameraOptics.js`](../src/camera/cameraOptics.js) and [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js):
 
-- **Placement**: the camera orbits a target at `camera.distance`, which is also the focus distance. The target is on the apparent pupil plane: the entrance-pupil depth behind the apex, plus `camera.targetX` and `camera.targetY`.
+- **Placement**: the camera orbits a target at `camera.distance`, which is also the focus distance. The target is the entrance pupil (its depth behind the apex) turned about the center of rotation along the eye's settled line of sight ([`docs/ANIMATION.md`](ANIMATION.md#framing)), plus `camera.targetX` and `camera.targetY`. The iris therefore stays framed and in focus when the eye turns.
 - **Field of view**: that of a thin lens focused there, fov = 2·atan(h / 2s_i) with s_i = f·s / (s − f).
   - The field narrows as the focus gets closer (focus breathing).
-  - At the default 185 mm with a 100 mm lens, the magnification is about 1.2:1.
+  - At the default 185 mm with the default 110 mm lens, the magnification is about 1.5:1. The reference presets use 100 mm, about 1.2:1.
 - **Accumulation samples**:
   - They move the camera across the aperture (radius f / 2N, concentric-disk samples) and shear the projection so the focus plane stays fixed, plus a subpixel jitter.
   - The mean of the samples is the physically correct depth of field, reflections and refraction included.

@@ -128,4 +128,35 @@ test('a still eye takes its pupil and gaze from the parameters, not the camera',
 	close(first.yaw, 6 + params.eye.kappa, 1e-9, 'left eye: nasal is −X')
 	assert.ok(first.lidFollow[0] < 0 && first.lidFollow[1] < 0, 'lids follow the downward gaze')
 	assert.deepEqual(animator.step(0.5, params, { ...context, nasalSign: -1 }), first, 'no movement')
+	assert.deepEqual(first.framing, { yaw: 6, pitch: -4 })
+})
+
+test('a living eye starts at rest on its target: a frozen start is the steady state', async () => {
+	const { default: Animator } = await import('../src/animation/animator')
+	const { createDefaults } = await import('../src/params/params')
+	const { PARAM_SCHEMA } = await import('../src/params/paramSchema')
+	const params = createDefaults(PARAM_SCHEMA)
+	const animator = new Animator(5)
+	const state = animator.step(0, params, {
+		sceneLuminance: 5,
+		pointer: { x: 0, y: 0 },
+		camera: { yaw: -26, pitch: -7.8 },
+		nasalSign: 1,
+	})
+	close(state.yaw, -26 - params.eye.kappa, 1e-9)
+	close(state.pitch, -7.8, 1e-9)
+	// The camera frames the settled line of sight: here the camera itself.
+	assert.deepEqual(state.framing, { yaw: -26, pitch: -7.8 })
+	params.animation.gaze = 'cursor'
+	const roaming = animator.step(1 / 60, params, {
+		sceneLuminance: 5,
+		pointer: { x: 0.5, y: 0.5 },
+		camera: { yaw: -26, pitch: -7.8 },
+		nasalSign: 1,
+	})
+	assert.deepEqual(
+		roaming.framing,
+		{ yaw: 0, pitch: 0 },
+		'a roaming eye moves within a still frame',
+	)
 })

@@ -79,6 +79,7 @@
    - A living eye steps the animator and restarts the accumulation.
    - In photo mode it keeps its instant.
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
+   - The pose also gives the line of sight the camera frames.
 3. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
 4. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field.
@@ -112,6 +113,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 - **Presets** ([`src/params/presets.js`](../src/params/presets.js)): deep partial overrides of the defaults.
   - Each reference preset names its photographs (`references`, shown by the capture contact sheet).
   - Reference presets keep the living eye off, so their pupil and gaze are the tuned ones.
+  - They also pin the frontal 100 mm framing they were tuned with (`frontal`). The default camera looks from 26° to the side and 7.8° below, with a 110 mm lens.
   - `refraction-checker` is a debug preset; `outdoor` swaps the studio for the sky.
 - **Random eye** ([`src/params/populationPriors.js`](../src/params/populationPriors.js)): `randomEye(ancestry)`, with ancestry `european`, `east-asian` or `south-asian`.
   - It samples color class, crypt grade, furrow grade, pigment spots and Wölfflin nodules from Edwards et al. 2016.
@@ -123,7 +125,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 
 ## Coordinate Spaces
 
-- **World**: millimeters, with the globe center at the origin in primary gaze; +Y is up and the default camera looks down −Z.
+- **World**: millimeters, with the globe center at the origin in primary gaze; +Y is up and a camera at azimuth 0 looks down −Z.
   - The lids, lashes and tear film live in world space; they do not turn with the gaze.
   - Lid-attached vertices rotate about the X axis through the globe center to follow the vertical gaze (`lid-follow.glsl`).
 - **Eye space** ([`docs/OPTICS.md`](OPTICS.md#eye-space)) moves with the gaze.

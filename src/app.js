@@ -50,6 +50,8 @@ export default class EyeApp {
 		this.pointer = { x: 0, y: 0 }
 		this.pupilDiameter = params.iris.pupilDiameter
 		this.gaze = new Quaternion()
+		// The line of sight the camera frames (src/animation/animator.js).
+		this.framing = { yaw: 0, pitch: 0 }
 		this.animationStarted = false
 		window.addEventListener('pointermove', (event) => {
 			this.pointer.x = (event.clientX / window.innerWidth) * 2 - 1
@@ -249,8 +251,14 @@ export default class EyeApp {
 		}
 	}
 
-	// One animation step: pupil, gaze, lids.
+	// One animation step: pupil, gaze, lids, framing.
 	animate(delta) {
+		const { animation, camera: lens } = this.params
+		// A first look into the camera starts where it settles: the eye looking
+		// along the orbit, the camera framing its pupil.
+		if (!this.animationStarted && animation.enabled && animation.gaze === 'camera') {
+			this.framing = { yaw: lens.azimuth, pitch: lens.elevation }
+		}
 		// The camera of this frame (renderSample places it again with its sample).
 		this.physicalCamera.update(
 			this.params,
@@ -258,6 +266,7 @@ export default class EyeApp {
 			this.focusDepth,
 			this.setup.getDrawingBufferSize(),
 			null,
+			this.framing,
 		)
 		const camera = this.physicalCamera.camera.position
 		const result = this.animator.step(Math.min(delta, 0.1), this.params, {
@@ -270,6 +279,7 @@ export default class EyeApp {
 			nasalSign: this.eye.nasalSign,
 		})
 		this.pupilDiameter = result.pupilDiameter
+		this.framing = result.framing
 		this.gaze.fromArray(gazeQuaternion(result.yaw, result.pitch))
 		this.eyeRig.setGaze(this.gaze)
 		this.keyShadow.uniforms.uLidFollow.value.fromArray(result.lidFollow)
@@ -328,7 +338,7 @@ export default class EyeApp {
 
 	renderSample(sample) {
 		const size = this.setup.getDrawingBufferSize()
-		this.physicalCamera.update(this.params, this.eye, this.focusDepth, size, sample)
+		this.physicalCamera.update(this.params, this.eye, this.focusDepth, size, sample, this.framing)
 		this.eyeRig.updateMatrices()
 		this.lightRig.update(this.params.lighting, this.physicalCamera.camera, this.eyeRig.worldToEye)
 		// The key light casts the lid and lash shadows (studio panels and windows only).

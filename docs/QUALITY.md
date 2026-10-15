@@ -22,7 +22,7 @@ CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs lint, format
 | `irisColor.test.js` | Kubelka–Munk limits; white maps to white; reflectance in [0, 1]; little melanin is blue, eumelanin brown and dark, pheomelanin yellower; thinner stroma is darker; lookup layout. |
 | `lidGeometry.test.js` | Fissure width, MRD1, MRD2 and tilt; outward normals; the margin rests on the eye and no lid vertex enters the globe; no collapsed quads and no folds in view (outside the canthal crease) for realistic lid shapes, both eyes; lash counts, lengths, roots and directions; fissure distance signs. |
 | `vessels.test.js` | The vessel network is seeded, stays on the visible sclera, has both layers, deep vessels wider. |
-| `animation.test.js` | Watson–Yellott trends; latency, faster constriction than dilation, settling; frame-rate independence; saccade main sequence; the animator's visual axis and lid follow; the still pose. |
+| `animation.test.js` | Watson–Yellott trends; latency, faster constriction than dilation, settling; frame-rate independence; saccade main sequence; the animator's visual axis and lid follow; the still pose; a living start at rest on its target; the framed line of sight per gaze mode. |
 | `params.test.js` | Defaults valid; clamping and choices; overrides and unknown paths; state round trip; presets name only existing parameters; random eyes valid with the measured marginals (±2% over 10k); PNG text chunks round-trip with a valid CRC. |
 
 ## Captures

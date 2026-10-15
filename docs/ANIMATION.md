@@ -58,6 +58,20 @@ The iris follows any diameter through its rest space ([`docs/IRIS.md`](IRIS.md#r
 - **Drift**: an Ornstein–Uhlenbeck walk around the fixation point (σ 0.25 °/√s, return rate 2.5 /s).
 - **Visual axis**: the target is aimed by the visual axis; the optical axis turns `eye.kappa` temporal of it.
 - **Orientation**: `gazeQuaternion()` gives the shortest-arc rotation from primary position (Listing's law, no torsion). `EyeRig` applies it about the center of rotation.
+- **Start**: the first living step starts at rest on its target, so a frozen start is the steady state for the gaze as well as for the pupil.
+
+## Framing
+
+The camera aims and focuses at the entrance pupil, turned about the center of rotation along the eye's *settled* line of sight (`framing` in the step result). The micro-movements are left out, so they move the eye within a still frame.
+
+| Pose | Framed line of sight |
+| --- | --- |
+| Still eye, or `fixed` gaze | `animation.yaw`, `animation.pitch` |
+| `camera` gaze | The camera, so the eye looking into the lens stays centered and sharp as the camera orbits. The first frame starts at the settled point (the eye looking along the orbit). |
+| `cursor`, `wander` | Straight ahead, so the eye roams within a still frame |
+
+- **Photo mode**: the framing stays with the frozen eye, so the camera can circle it.
+- **Offset**: the framed point ignores κ, so a straight-ahead eye frames exactly as before; an eye turned to the camera sits about 0.9 mm off center.
 
 ## Lid Follow
 

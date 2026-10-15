@@ -40,6 +40,14 @@ export class GazeModel {
 		this.target = { yaw, pitch }
 	}
 
+	// Puts the eye at rest on (yaw, pitch), the steady state, without a saccade.
+	settle(yaw, pitch) {
+		this.target = { yaw, pitch }
+		this.yaw = yaw
+		this.pitch = pitch
+		this.saccade = null
+	}
+
 	startSaccade(yaw, pitch) {
 		const amplitude = Math.hypot(yaw - this.yaw, pitch - this.pitch)
 		this.saccade = {
