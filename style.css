@@ -63,7 +63,7 @@ canvas {
 	border-radius: 999px;
 	background:
 		radial-gradient(70% 55% at 50% 0%, rgba(255, 255, 255, 0.01), transparent),
-		radial-gradient(60% 40% at 50% 100%, rgba(255, 255, 255, 0.03), transparent), var(--glass-tint);
+		radial-gradient(60% 40% at 50% 100%, rgba(255, 255, 255, 0.08), transparent), var(--glass-tint);
 	box-shadow:
 		inset 2.5px -2.5px 2px -2.5px rgba(255, 255, 255, 0.7),
 		inset -2.5px 2.5px 2px -1.5px rgba(255, 255, 255, 0.9),

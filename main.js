@@ -163,8 +163,8 @@ if (urlParams.get('gui') !== '0') {
 	dock.append(
 		dockButton('zoom', 'Zoom out', sign(false), () => zoom('out')),
 		dockButton('zoom', 'Zoom in', sign(true), () => zoom('in')),
-		dockButton('random-eye', 'Random eye', 'Random eye', () =>
-			console.log('Random eye', panelState.ancestry, loadRandomEye()),
+		dockButton('random-eye', 'Random-eyes', 'Random-eyes', () =>
+			console.log('Random-eyes', panelState.ancestry, loadRandomEye()),
 		),
 	)
 	document.body.appendChild(dock)
