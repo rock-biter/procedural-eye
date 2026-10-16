@@ -315,9 +315,10 @@
     "whiteBalance": 5600
   },
   "zoom": {
+    "in": 160,
     "out": 480,
     "mobileOut": 720,
-    "start": 0.5,
+    "start": 0.35,
     "duration": 1.2
   },
   "post": {

@@ -90,8 +90,8 @@ The buttons are liquid glass, clear (a 2px blur) and defined by their edges. `st
 
 - **Zoom out** and **Zoom in** (− and +) glide `camera.distance` over `zoom.duration`:
   - Zoom out to `zoom.out`, which frames the whole figure; portrait screens (phones held upright), much narrower, to `zoom.mobileOut`.
-  - Zoom in to `camera.distance`, on every screen.
-  - Landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (half the framing by default), unless the URL sets `?preset=` or `?state=`; portrait screens start zoomed in.
+  - Zoom in to `zoom.in` (160 mm by default); portrait screens to the start-up `camera.distance`, where they start.
+  - Landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (0.35 by default, about 272 mm), unless the URL sets `?preset=` or `?state=`; portrait screens start zoomed in.
   - The wheel stays between the zoom-in and zoom-out distances of the screen.
 - Portrait screens start, and load presets, with `camera.targetZ` 0.
 - **Random eye**.
