@@ -63,6 +63,9 @@ function svgElement(name, attributes) {
 	return element
 }
 
+// The filters made so far, so every call gives its elements new ids.
+let filters = 0
+
 // Gives each element a glass filter of its own size, rebuilt when it resizes,
 // through the --glass-refraction custom property.
 export function liquidGlass(elements, glass = GLASS) {
@@ -115,7 +118,7 @@ export function liquidGlass(elements, glass = GLASS) {
 		element.style.setProperty('--glass-refraction', `url(#${id})`)
 	}
 
-	const ids = new Map([...elements].map((element, index) => [element, `glass-${index}`]))
+	const ids = new Map([...elements].map((element) => [element, `glass-${filters++}`]))
 	const observer = new ResizeObserver((entries) => {
 		for (const { target } of entries) update(target, ids.get(target))
 	})

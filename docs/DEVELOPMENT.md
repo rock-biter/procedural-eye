@@ -36,7 +36,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
   - The terrain project uses lil-gui; Tweakpane is used here for its folders, color pickers and FPS graph.
   - The panel is generated from the schema, so the library stays replaceable.
 - **`alea`** seeds the CPU generators.
-- **JetBrains Mono** (Google Fonts, SIL OFL 1.1) sets the credit line and the frame rate. Its latin subset of weight 400 is a file of the repository, [`fonts/`](../fonts/) with its `OFL.txt`, which Vite bundles from `style.css`; the page loads no font from a CDN.
+- **JetBrains Mono** (Google Fonts, SIL OFL 1.1) sets the title, the credit line and the frame rate. Its latin subset of weight 400 is a file of the repository, [`fonts/`](../fonts/) with its `OFL.txt`, which Vite bundles from `style.css`; the page loads no font from a CDN.
 - Plain JavaScript, no TypeScript step.
 
 ## Site Assets
@@ -81,7 +81,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 | `?state=<string>` | Applies the non-default values encoded by **Copy state URL** or **Save PNG** (base64url JSON), on top of the preset. |
 | `?photo=<n>` | Sets `quality.photoSamples` to `n` and starts in photo mode (frozen clock); the accumulation stops after `n` samples. |
 | `?view=<name>` | Sets `debug.view`; see [`docs/RENDERING.md`](RENDERING.md#debug-views) for the list. |
-| `?gui=0` | Hides the dock, the credit line, the frame rate and the panel (captures). |
+| `?gui=0` | Hides the dock, the skin tones, the title and the credit line, the frame rate and the panel (captures). |
 | `?dpr=<ratio>` | Pins the pixel ratio (0.5–2) and turns the adaptive resolution off. |
 | `?debug=1` | Exposes the app object as `window.__EYE_APP__` for console debugging. |
 | `#debug` | Shows the panel (it is not even loaded otherwise). It follows the hash: adding or removing `#debug` on an open page shows or hides it. |
@@ -96,7 +96,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 
 **The dock** holds three buttons outside the panel, always in view: bottom right, or bottom center on phones and tablets (`style.css`). Each blurs itself after a click, so Space still toggles photo mode.
 
-The buttons are liquid glass, clear (a 2px blur) and defined by their edges. `style.css` draws a glossy dome of light on the upper half and a faint glow above the bottom edge, soft specular rims at the top-right and bottom-left edges, a faint dark line inside the edge, and the hover and press. On Chromium, [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) also bends the scene near each rim: it gives every button an SVG filter of its own size as `backdrop-filter` (through `--glass-refraction`), rebuilt when the button resizes. The filter carries the blur too, because Chromium drops the CSS filter functions that follow an SVG one. It is detected through `navigator.userAgentData`, which exists only in secure contexts, so over plain HTTP on the LAN (`pnpm dev --host`) Chromium also keeps the CSS glass.
+The buttons are liquid glass (the `glass` class, shared with the skin tones), clear (a 2px blur) and defined by their edges. `style.css` draws a glossy dome of light on the upper half and a faint glow above the bottom edge, soft specular rims at the top-right and bottom-left edges, a faint dark line inside the edge, and the hover and press. On Chromium, [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) also bends the scene near each rim: it gives every button an SVG filter of its own size, with a unique id, as `backdrop-filter` (through `--glass-refraction`), rebuilt when the button resizes. The filter carries the blur too, because Chromium drops the CSS filter functions that follow an SVG one. It is detected through `navigator.userAgentData`, which exists only in secure contexts, so over plain HTTP on the LAN (`pnpm dev --host`) Chromium also keeps the CSS glass.
 
 - **Zoom out** and **Zoom in** (− and +) glide `camera.distance` over `zoom.duration`:
   - Zoom out to `zoom.out`, which frames the whole figure; portrait screens (phones held upright), much narrower, to `zoom.mobileOut`.
@@ -106,11 +106,13 @@ The buttons are liquid glass, clear (a 2px blur) and defined by their edges. `st
 - Portrait screens start, and load presets, with `camera.targetZ` 0.
 - **Random eye**.
 
-**The credit line**, small text at the top left in JetBrains Mono (`style.css`), links **rockbiter** to the author's X account; only the link takes the pointer, so drags across the text still orbit the camera, and it blurs itself after a click. On narrow screens it wraps, aligned left, before the frame rate.
+**The skin tones**, bottom left on every screen: a column of five small round glass buttons (32 px, the lowest level with the dock's middle), each with a bead of its color inside. A click glides `skin.color` to that tone ([`src/params/skinTones.js`](../src/params/skinTones.js): fair, light, medium, brown, deep) over the panel's **transition (s)**; nothing else of the skin changes, and the other params keep heading where they were. The button of the color the params are heading for is pressed (`aria-pressed`: its bead grows and is ringed), also after the panel or a preset changes the color; a color of no tone presses none. Their glass bends less than the dock's (`SMALL_GLASS` in `main.js`: a 10 px bevel, a 7 px offset).
+
+**The title and the credit line**, top left in JetBrains Mono (`style.css`): **Random-eyes** at 16 px, over the credit line at 12 px. The credit links **rockbiter** to the author's X account; only the link takes the pointer, so drags across the text still orbit the camera, and it blurs itself after a click. On narrow screens it wraps, aligned left, before the frame rate.
 
 **The frame rate**, top right in the credit line's style, counts the frames the page shows per second, over half a second, with a `requestAnimationFrame` loop of its own in `main.js`. A converged photo draws nothing, so it then shows the display's refresh rate.
 
-The panel shows only while the URL ends in `#debug`, and starts collapsed, below the frame rate (and, on phones, below the credit line, which wraps there). When its open folders outgrow the viewport it scrolls, and it stops above the dock (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
+The panel shows only while the URL ends in `#debug`, and starts collapsed, below the frame rate (and, on phones, below the title and the credit line, which wraps there). When its open folders outgrow the viewport it scrolls, and it stops above the dock (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
 
 ## Console API
 
@@ -135,6 +137,7 @@ The panel shows only while the URL ends in `#debug`, and starts collapsed, below
 | `getPresetNames()`, `getPresetInfo(name)` | Preset names, labels and reference photographs. |
 | `loadPreset(name, duration)`, `randomEye(ancestry, seed, duration)` | Glide to a preset or to a random eye, as the panel does; `randomEye` returns the sampled features and the color shade. |
 | `zoom('in' \| 'out')` | Glide the camera as the dock's zoom buttons do. |
+| `skinTone(name, duration)` | Glide `skin.color` to a tone of `src/params/skinTones.js`, as the skin buttons do; `false` for an unknown name. |
 
 ## Debugging Notes
 

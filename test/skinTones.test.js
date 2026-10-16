@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { hexToLinearRgb } from '../src/lighting/colorTemperature'
+import { getLeaf, sanitizeValue } from '../src/params/params'
+import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
+import { SKIN_TONES } from '../src/params/skinTones'
+
+test('the skin tones are skin colors, named once, from fair to deep', () => {
+	const leaf = getLeaf(BASE_PARAM_SCHEMA, 'skin.color')
+	const luminance = (hex) => {
+		const [r, g, b] = hexToLinearRgb(hex)
+		return 0.2126 * r + 0.7152 * g + 0.0722 * b
+	}
+	assert.equal(new Set(SKIN_TONES.map((tone) => tone.name)).size, SKIN_TONES.length)
+	for (const [i, tone] of SKIN_TONES.entries()) {
+		assert.equal(sanitizeValue(leaf, tone.color), tone.color, tone.name)
+		if (i > 0) assert.ok(luminance(tone.color) < luminance(SKIN_TONES[i - 1].color), tone.name)
+	}
+})

@@ -13,8 +13,9 @@ import {
 import { TRANSITION } from './src/params/paramTransition'
 import { ANCESTRIES, randomEye } from './src/params/populationPriors'
 import { PRESETS } from './src/params/presets'
+import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
-import { liquidGlass } from './src/ui/liquidGlass'
+import { GLASS, liquidGlass } from './src/ui/liquidGlass'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
 // #debug), creates the params, the renderer and the app, the dock unless
@@ -94,6 +95,19 @@ function zoom(direction) {
 	app.transitionTo(target, settings.duration)
 }
 
+// Glides `skin.color` to the tone `name` (src/params/skinTones.js), as the
+// skin buttons do. The rest keeps the values a running transition is heading
+// for.
+function skinTone(name, duration = panelState.transition) {
+	const tone = SKIN_TONES.find((candidate) => candidate.name === name)
+	if (!tone) return false
+	if (app.targetParams.skin.color === tone.color) return true
+	const target = cloneParams(app.targetParams)
+	setValue(PARAM_SCHEMA, target, 'skin.color', tone.color)
+	app.transitionTo(target, duration)
+	return true
+}
+
 window.__EYE__ = {
 	...app.createApi(),
 	getPresetNames: () => Object.keys(PRESETS),
@@ -104,6 +118,7 @@ window.__EYE__ = {
 	loadPreset,
 	randomEye: loadRandomEye,
 	zoom,
+	skinTone,
 }
 
 // Downloads the current (accumulated) image with its state in a tEXt chunk.
@@ -135,17 +150,20 @@ function download(blob, filename) {
 	setTimeout(() => URL.revokeObjectURL(link.href), 1000)
 }
 
+// The glass of the skin buttons: a bevel and a bend scaled to their size.
+const SMALL_GLASS = { ...GLASS, bezel: 10, maxOffset: 7 }
+
 // A plus (zoom in) or a minus (zoom out).
 function sign(plus) {
 	return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12${plus ? 'M12 6v12' : ''}"/></svg>`
 }
 
-// A button of the dock; it blurs itself after a click, because Space toggles
-// photo mode only when the page has the focus.
-function dockButton(className, label, content, run) {
+// A glass button (the dock, the skin tones); it blurs itself after a click,
+// because Space toggles photo mode only when the page has the focus.
+function glassButton(className, label, content, run) {
 	const button = document.createElement('button')
 	button.type = 'button'
-	button.className = className
+	button.className = `glass ${className}`
 	button.setAttribute('aria-label', label)
 	button.title = label
 	button.innerHTML = content
@@ -162,23 +180,51 @@ if (urlParams.get('gui') !== '0') {
 	const dock = document.createElement('div')
 	dock.className = 'dock'
 	dock.append(
-		dockButton('zoom', 'Zoom out', sign(false), () => zoom('out')),
-		dockButton('zoom', 'Zoom in', sign(true), () => zoom('in')),
-		dockButton('random-eye', 'Random-eyes', 'Random-eyes', () =>
+		glassButton('zoom', 'Zoom out', sign(false), () => zoom('out')),
+		glassButton('zoom', 'Zoom in', sign(true), () => zoom('in')),
+		glassButton('random-eye', 'Random-eyes', 'Random-eyes', () =>
 			console.log('Random-eyes', panelState.ancestry, loadRandomEye()),
 		),
 	)
 	document.body.appendChild(dock)
 	liquidGlass(dock.children)
 
-	// The credit line, top left; its link blurs itself after a click, as the
-	// dock's buttons do.
-	const credit = document.createElement('div')
-	credit.className = 'credit'
-	credit.innerHTML =
-		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
-	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
-	document.body.appendChild(credit)
+	// The skin tones, bottom left: a column of small glass buttons, each with
+	// a bead of its color. The one of the color the params are heading for is
+	// pressed, also after the panel or a preset changes it.
+	const skinTones = document.createElement('div')
+	skinTones.className = 'skin-tones'
+	skinTones.setAttribute('role', 'group')
+	skinTones.setAttribute('aria-label', 'Skin tone')
+	const toneButtons = SKIN_TONES.map((tone) => {
+		const button = glassButton('skin', `${tone.label} skin`, '<span></span>', () =>
+			skinTone(tone.name),
+		)
+		button.style.setProperty('--tone', tone.color)
+		return button
+	})
+	const pressTone = () => {
+		const color = app.targetParams.skin.color
+		toneButtons.forEach((button, i) =>
+			button.setAttribute('aria-pressed', String(SKIN_TONES[i].color === color)),
+		)
+	}
+	skinTones.append(...toneButtons)
+	document.body.appendChild(skinTones)
+	liquidGlass(toneButtons, SMALL_GLASS)
+	pressTone()
+	app.listeners.add((path) => {
+		if (path === '*' || path === 'skin.color') pressTone()
+	})
+
+	// The title and the credit line, top left; the credit's link blurs itself
+	// after a click, as the glass buttons do.
+	const masthead = document.createElement('header')
+	masthead.className = 'masthead'
+	masthead.innerHTML =
+		'<h1>Random-eyes</h1><p class="credit">powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5</p>'
+	masthead.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
+	document.body.appendChild(masthead)
 
 	// The frame rate, top right, styled as the credit line: the frames the page
 	// shows per second, counted over half a second. A gap longer than a second
