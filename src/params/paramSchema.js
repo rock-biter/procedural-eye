@@ -381,11 +381,13 @@ export const BASE_PARAM_SCHEMA = {
 	// the camera distance Zoom out glides to, farther on portrait (mobile)
 	// screens, which are much narrower, and how long a zoom takes. Zoom in
 	// glides to camera.distance. Landscape (desktop) screens start `start` of
-	// the way from there to their zoom out (0.5: half the framing).
+	// the way from there to their zoom out (0.5: half the framing), portrait
+	// ones `mobileStart` of the way (just out of the zoom in).
 	zoom: {
 		out: num(480, 60, 1000, 0.5, 'mm', 'uniform', 'zoom out distance'),
 		mobileOut: num(720, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom out distance'),
 		start: num(0.5, 0, 1, 0.01, '', 'uniform', 'desktop start (zoom in → out)'),
+		mobileStart: num(0.06, 0, 1, 0.01, '', 'uniform', 'mobile start (zoom in → out)'),
 		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),
 	},
 	post: {

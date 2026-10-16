@@ -19,7 +19,7 @@ pnpm capture    # renders presets headlessly next to the reference photos
 **Controls**
 
 - Drag to orbit, shift- or right-drag to pan, scroll to change the distance between the zoom-in and zoom-out framings (the focus stays on the pupil plane).
-- **Zoom out** / **Zoom in** (the magnifiers at the bottom): glide out to the whole figure and back.
+- **Zoom out** / **Zoom in** (the − and + at the bottom): glide out to the whole figure and back.
 - **Space** toggles photo mode: the eye freezes and the image converges.
 
 **Random eye** (the button at the bottom): an eye drawn from measured population data for the chosen ancestry.

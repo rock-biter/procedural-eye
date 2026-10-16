@@ -1,3 +1,13 @@
+/* JetBrains Mono from Google Fonts (SIL OFL 1.1, fonts/OFL.txt), served with
+   the app rather than from a CDN: the latin subset of weight 400. */
+@font-face {
+	font-family: 'JetBrains Mono';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('./fonts/jetbrains-mono-latin-400.woff2') format('woff2');
+}
+
 html,
 body {
 	margin: 0;
@@ -33,34 +43,52 @@ canvas {
 	gap: 10px;
 }
 
+/* Liquid glass: clear glass over the eye, defined by soft edges. Specular
+   rims light the top-right and bottom-left edges, each with a faint crescent
+   inside it, and a faint dark line inside the edge gives the glass its
+   thickness. On Chromium an SVG filter replaces the backdrop filter, and the
+   bevel also refracts the scene (--glass-refraction, src/ui/liquidGlass.js).
+   Pressed, the glass swells. */
 .dock button {
 	min-height: 44px;
-	border: 1px solid rgba(255, 255, 255, 0.18);
+	border: none;
 	border-radius: 999px;
-	background: rgba(28, 28, 32, 0.62);
-	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-	color: #f2f2f2;
+	background: rgba(255, 255, 255, 0.05);
+	box-shadow:
+		inset 1.5px -1.5px 2px -1px rgba(255, 255, 255, 0.4),
+		inset -1.5px 1.5px 2px -1px rgba(255, 255, 255, 0.4),
+		inset 5px -5px 4px -5px rgba(255, 255, 255, 0.15),
+		inset -5px 5px 4px -5px rgba(255, 255, 255, 0.15),
+		inset 0 0 3px rgba(0, 0, 0, 0.25),
+		0 4px 12px rgba(0, 0, 0, 0.12);
+	color: #fff;
 	font:
 		600 14px/1 system-ui,
 		-apple-system,
 		sans-serif;
 	letter-spacing: 0.02em;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 	white-space: nowrap;
 	cursor: pointer;
-	-webkit-backdrop-filter: blur(10px);
-	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: var(--glass-refraction, blur(2px));
+	backdrop-filter: var(--glass-refraction, blur(2px));
 	-webkit-tap-highlight-color: transparent;
 	transition:
-		background 0.15s,
-		transform 0.15s;
+		background 0.2s,
+		transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .dock button:hover {
-	background: rgba(48, 48, 54, 0.75);
+	background: rgba(255, 255, 255, 0.09);
 }
 
 .dock button:active {
-	transform: scale(0.97);
+	transform: scale(1.06);
+	background: rgba(255, 255, 255, 0.13);
+}
+
+.zoom svg {
+	filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
 .dock button:focus-visible {
@@ -72,7 +100,7 @@ canvas {
 	padding: 0 22px;
 }
 
-/* Round icon buttons: a magnifier with a plus or a minus. */
+/* Round icon buttons: a plus or a minus. */
 .zoom {
 	display: grid;
 	place-items: center;
@@ -87,6 +115,37 @@ canvas {
 	stroke: currentColor;
 	stroke-width: 2;
 	stroke-linecap: round;
+}
+
+/* The credit line, at the top, clear of the notch, in JetBrains Mono. Only its
+   link takes the pointer, so drags across the text still orbit the camera. */
+.credit {
+	position: fixed;
+	top: calc(12px + env(safe-area-inset-top));
+	left: 24px;
+	z-index: 10;
+	width: max-content;
+	max-width: calc(100vw - 32px);
+	/* transform: translateX(-50%); */
+	color: #ffe4c3;
+	font:
+		400 12px/1.4 'JetBrains Mono',
+		ui-monospace,
+		monospace;
+	letter-spacing: 0.02em;
+	text-align: center;
+	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+	pointer-events: none;
+	user-select: none;
+	opacity: 0.8;
+	text-wrap: balance;
+}
+
+.credit a {
+	color: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	pointer-events: auto;
 }
 
 /* Phones and tablets: bottom center, clear of the home indicator. */

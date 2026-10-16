@@ -58,7 +58,7 @@ pnpm capture
 - [`src/lighting/`](src/lighting/): the analytic light rig, color temperature, the rig uniforms and the key-light shadow map.
 - [`src/camera/`](src/camera/): thin-lens optics and sampling, the physical camera and the pointer controls.
 - [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field and PNG metadata.
-- [`src/debug/`](src/debug/) holds the panel and the debug view numbering; [`src/shaders/`](src/shaders/) holds every GLSL file.
+- [`src/debug/`](src/debug/) holds the panel and the debug view numbering; [`src/ui/`](src/ui/) the dock's glass refraction; [`src/shaders/`](src/shaders/) holds every GLSL file.
 - _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
 - [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames.
 

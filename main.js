@@ -14,6 +14,7 @@ import { TRANSITION } from './src/params/paramTransition'
 import { ANCESTRIES, randomEye } from './src/params/populationPriors'
 import { PRESETS } from './src/params/presets'
 import RenderSetup from './src/renderSetup'
+import { liquidGlass } from './src/ui/liquidGlass'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
 // #debug), creates the params, the renderer and the app, the dock unless
@@ -36,15 +37,17 @@ if (urlParams.has('view')) setValue(PARAM_SCHEMA, params, 'debug.view', urlParam
 
 // The zoom-in and zoom-out distances of the screen's shape, which also bound
 // the wheel: zoom in is camera.distance; portrait screens are narrow, so their
-// zoom out is farther. Landscape screens start zoom.start of the way out
-// (unless the URL sets the scene); portrait ones zoomed in.
+// zoom out is farther. Unless the URL sets the scene, landscape screens start
+// zoom.start of the way out, portrait ones zoom.mobileStart (just out of the
+// zoom in).
 const startDistance = params.camera.distance
 function zoomDistances(settings) {
 	return [startDistance, portrait() ? settings.mobileOut : settings.out]
 }
-if (!portrait() && !urlParams.has('state') && !urlParams.has('preset')) {
+if (!urlParams.has('state') && !urlParams.has('preset')) {
 	const [near, far] = zoomDistances(params.zoom)
-	setValue(PARAM_SCHEMA, params, 'camera.distance', near + (far - near) * params.zoom.start)
+	const start = portrait() ? params.zoom.mobileStart : params.zoom.start
+	setValue(PARAM_SCHEMA, params, 'camera.distance', near + (far - near) * start)
 }
 
 const setup = new RenderSetup({ params, urlParams })
@@ -133,9 +136,9 @@ function download(blob, filename) {
 	setTimeout(() => URL.revokeObjectURL(link.href), 1000)
 }
 
-// A magnifier with a plus (zoom in) or a minus (zoom out).
-function magnifier(plus) {
-	return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 20.5 20.5M7.5 10.5h6${plus ? 'M10.5 7.5v6' : ''}"/></svg>`
+// A plus (zoom in) or a minus (zoom out).
+function sign(plus) {
+	return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12${plus ? 'M12 6v12' : ''}"/></svg>`
 }
 
 // A button of the dock; it blurs itself after a click, because Space toggles
@@ -160,13 +163,23 @@ if (urlParams.get('gui') !== '0') {
 	const dock = document.createElement('div')
 	dock.className = 'dock'
 	dock.append(
-		dockButton('zoom', 'Zoom out', magnifier(false), () => zoom('out')),
-		dockButton('zoom', 'Zoom in', magnifier(true), () => zoom('in')),
+		dockButton('zoom', 'Zoom out', sign(false), () => zoom('out')),
+		dockButton('zoom', 'Zoom in', sign(true), () => zoom('in')),
 		dockButton('random-eye', 'Random eye', 'Random eye', () =>
 			console.log('Random eye', panelState.ancestry, loadRandomEye()),
 		),
 	)
 	document.body.appendChild(dock)
+	liquidGlass(dock.children)
+
+	// The credit line, top center; its link blurs itself after a click, as the
+	// dock's buttons do.
+	const credit = document.createElement('div')
+	credit.className = 'credit'
+	credit.innerHTML =
+		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
+	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
+	document.body.appendChild(credit)
 
 	// The panel shows while the URL ends in #debug: built the first time, then
 	// hidden and shown again as the hash changes.
