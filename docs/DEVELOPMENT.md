@@ -19,6 +19,7 @@ pnpm format:check
 pnpm build          # production bundle in dist/
 pnpm preview
 pnpm capture        # headless captures, contact sheet, optional bench (docs/QUALITY.md)
+pnpm brand          # renders the favicon, the touch icons and the Open Graph image into public/
 ```
 
 `pnpm test` loads `test/support/register.mjs`, whose hooks let Node import modules written for Vite:
@@ -37,6 +38,14 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 - **`alea`** seeds the CPU generators.
 - **JetBrains Mono** (Google Fonts, SIL OFL 1.1) sets the credit line and the frame rate. Its latin subset of weight 400 is a file of the repository, [`fonts/`](../fonts/) with its `OFL.txt`, which Vite bundles from `style.css`; the page loads no font from a CDN.
 - Plain JavaScript, no TypeScript step.
+
+## Site Assets
+
+- **Head** ([`index.html`](../index.html)): the title and description of **Random-eyes**, the icons, the Open Graph and Twitter cards.
+- **Images** ([`public/`](../public/), copied as they are into `dist/`): `favicon.ico` (16, 32 and 48 px), `icon-192.png` and `apple-touch-icon.png` (180 px, square, opaque), all the default eye's iris seen from the front, and `og-image.jpg` (1200×630), the opening desktop scene. [`scripts/brand.mjs`](../scripts/brand.mjs) (`pnpm brand [--samples 128]`) renders them with the app in headless Chrome, converged in photo mode: rerun it when the default eye or the opening framing changes.
+  - The iris: a still eye from the front, without the lids, lashes and tear meniscus, cut to a circle around the limbus as the camera projects it.
+  - The scene: `?gui=0` at 1200×630, rendered at twice the size and scaled down.
+- **`VITE_SITE_URL`** ([`.env`](../.env), empty by default): the site's origin, such as `https://example.com`. Social cards need absolute image URLs; Vite writes it in front of `/og-image.jpg` at build time. Set it on the host or in `.env.production.local`.
 
 ## Code Conventions
 
@@ -79,7 +88,8 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 
 ## Controls
 
-- Drag orbits the camera (`camera.azimuth`, `camera.elevation`).
+- Drag orbits the camera (`camera.azimuth`, `camera.elevation`). Let go while moving and the orbit coasts: its speed over the last tenth of a second decays with the time constant `controls.inertia` (0.2 s, so it coasts speed × 0.2 s), and stops at the limits of the two angles. A drag held still before letting go does not coast; a new press, a preset, a zoom or `setParams()` stops it.
+- The mouse turns the view a little toward itself, as a short drag from the center would: up to `controls.parallax` (1.5°) of azimuth and elevation at the window's edges, followed with the time constant `controls.parallaxLag` (0.4 s). It is a turn of the orbit outside the params (`CameraControls.parallax`, added by `PhysicalCamera.orbitOffset`), so it is not in the state URL. It follows only a living eye; in photo mode and on a still eye it settles back to none, so the image that accumulates is the one the params describe. Touch does not move it, and a mouse leaving the window lets it settle back.
 - Shift-drag or right-drag pans the target (`camera.targetX`, `camera.targetY`).
 - The wheel changes `camera.distance`, which is also the focus distance, between the dock's zoom-in and zoom-out distances (`CameraControls.distanceLimits`); from outside them it only moves back toward them.
 - **Space** toggles photo mode when the page, not a panel control, has the focus.

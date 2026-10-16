@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Procedural eye** is a browser-based three.js experience, built with Vite, that renders a hyper-realistic human eye in macro close-up: cornea, iris, pupil, sclera, eyelids with skin and lashes, and the tear film. Everything is procedural and driven by one parameter schema, so different structures, colors and shades come from parameter values and seeds.
+**Random-eyes** (the procedural eye) is a browser-based three.js experience, built with Vite, that renders a hyper-realistic human eye in macro close-up: cornea, iris, pupil, sclera, eyelids with skin and lashes, and the tear film. Everything is procedural and driven by one parameter schema, so different structures, colors and shades come from parameter values and seeds.
 
 - **Optics**: the anterior cornea is a conic joined to the sclera sphere; rays refract through both corneal surfaces into the anterior chamber; mirror reflections intersect the emitters of an analytic light rig exactly.
 - **Iris**: a signed-distance field raymarched after the corneal refraction. The stroma is carved by crypts and bridged by radial vessels and collagen arcs, and colored by a spectral Kubelka–Munk model of its layers ([`docs/IRIS.md`](docs/IRIS.md)).
@@ -44,6 +44,7 @@ pnpm lint
 pnpm format
 pnpm build
 pnpm capture
+pnpm brand
 ```
 
 ## Source Map
@@ -60,7 +61,7 @@ pnpm capture
 - [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field and PNG metadata.
 - [`src/debug/`](src/debug/) holds the panel and the debug view numbering; [`src/ui/`](src/ui/) the dock's glass refraction; [`src/shaders/`](src/shaders/) holds every GLSL file.
 - _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
-- [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames.
+- [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/).
 
 ## Project Rules
 

@@ -7,7 +7,7 @@
 - +X is nasal for a right eye and temporal for a left one (`eye.laterality`; `nasalSign` is +1 for a right eye).
 - A camera at azimuth 0 looks down −Z, so +X is the right of the picture.
 
-The eye turns about a center of rotation 13.5 mm behind the apex ([`src/eye/eyeRig.js`](../src/eye/eyeRig.js)). The animator aims the **visual axis**, which lies `eye.kappa` degrees nasal of the optical axis, so the corneal reflex of a light at the camera sits slightly nasal of the pupil center.
+The eye turns about the globe's center ([`src/eye/eyeRig.js`](../src/eye/eyeRig.js)), not about the measured center of rotation, 13.5 mm behind the apex (0.4 mm behind the globe's center by default). The conjunctiva, the margins' support and the tear meniscus are built on the globe at rest and stay with the face, so the globe has to turn in place under them: turning about a point behind its center would shift the sphere, by about half a millimeter in depth at the fornix for 20° of gaze, and the conjunctiva and sclera would cut through each other in the canthi ([`docs/ADNEXA.md`](ADNEXA.md#conjunctiva)). The animator aims the **visual axis**, which lies `eye.kappa` degrees nasal of the optical axis, so the corneal reflex of a light at the camera sits slightly nasal of the pupil center.
 
 ## Eye Geometry
 
@@ -100,7 +100,7 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 
 [`src/camera/cameraOptics.js`](../src/camera/cameraOptics.js) and [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js):
 
-- **Placement**: the camera orbits a target at `camera.distance`, which is also the focus distance. The target is the entrance pupil (its depth behind the apex) turned about the center of rotation along the eye's settled line of sight ([`docs/ANIMATION.md`](ANIMATION.md#framing)), plus `camera.targetX`, `camera.targetY` and `camera.targetZ` (world axes, mm; +Z out of the face). The iris therefore stays framed and in focus when the eye turns. The offsets carry the camera and its focus with the target, so `targetZ` moves the plane in focus forward or back.
+- **Placement**: the camera orbits a target at `camera.distance`, which is also the focus distance. The target is the entrance pupil (its depth behind the apex) turned about the globe's center along the eye's settled line of sight ([`docs/ANIMATION.md`](ANIMATION.md#framing)), plus `camera.targetX`, `camera.targetY` and `camera.targetZ` (world axes, mm; +Z out of the face). The iris therefore stays framed and in focus when the eye turns. The offsets carry the camera and its focus with the target, so `targetZ` moves the plane in focus forward or back.
 - **Field of view**: that of a thin lens focused there, fov = 2·atan(h / 2s_i) with s_i = f·s / (s − f).
   - The field narrows as the focus gets closer (focus breathing).
   - At the default 185 mm with the default 110 mm lens, the magnification is about 1.5:1. The reference presets use 100 mm, about 1.2:1.

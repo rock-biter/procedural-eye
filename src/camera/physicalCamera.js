@@ -6,7 +6,6 @@
 // samples gives the true depth of field, reflections and refraction included.
 import { MathUtils, PerspectiveCamera, Quaternion, Vector3 } from 'three'
 import { gazeQuaternion } from '../animation/gaze'
-import { ROTATION_CENTER_DEPTH } from '../eye/eyeRig'
 import { sphericalDirection } from '../lighting/envRig'
 import { apertureRadius, projectionShear, verticalFov } from './cameraOptics'
 
@@ -19,22 +18,27 @@ export default class PhysicalCamera {
 		this.right = new Vector3()
 		this.up = new Vector3()
 		this.focusDistance = 200
+		// { azimuth, elevation } in degrees, added to params.camera's.
+		this.orbitOffset = { azimuth: 0, elevation: 0 }
 	}
 
 	// `focusDepth`: depth of the apparent iris behind the corneal apex (the
 	// entrance pupil); `sample`: an accumulationSample() or null; `size`: the
 	// drawing-buffer size in pixels; `framing`: the eye's settled line of sight
 	// (yaw, pitch in degrees, src/animation/animator.js). The camera aims and
-	// focuses on the entrance pupil turned that way about the center of
-	// rotation, so the iris stays framed and sharp when the eye turns.
+	// focuses on the entrance pupil turned that way about the globe's center
+	// (the world origin, src/eye/eyeRig.js), so the iris stays framed and sharp
+	// when the eye turns.
 	update(params, eye, focusDepth, size, sample = null, framing = { yaw: 0, pitch: 0 }) {
 		const c = params.camera
 		const camera = this.camera
-		const center = eye.apexZ - ROTATION_CENTER_DEPTH
 		this.rotation.fromArray(gazeQuaternion(framing.yaw, framing.pitch))
-		this.framed.set(0, 0, eye.apexZ - focusDepth - center).applyQuaternion(this.rotation)
-		this.target.set(c.targetX, c.targetY, center + c.targetZ).add(this.framed)
-		const [x, y, z] = sphericalDirection(c.azimuth, c.elevation)
+		this.framed.set(0, 0, eye.apexZ - focusDepth).applyQuaternion(this.rotation)
+		this.target.set(c.targetX, c.targetY, c.targetZ).add(this.framed)
+		const [x, y, z] = sphericalDirection(
+			c.azimuth + this.orbitOffset.azimuth,
+			c.elevation + this.orbitOffset.elevation,
+		)
 		camera.position.set(x, y, z).multiplyScalar(c.distance).add(this.target)
 		camera.up.set(0, 1, 0)
 		camera.lookAt(this.target)

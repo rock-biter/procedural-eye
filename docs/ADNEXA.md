@@ -90,7 +90,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 `createConjunctivaMesh()` fills the canthi. Where the lids pass in front of the receding globe, the opening shows the conjunctiva, the caruncle and the plica, not the background.
 
 - **Surface**: an annulus on `conjunctivaZ()`, from 0.9 of the sclera radius out to just past the canthi (16.5 mm medially, 15 mm laterally). At its outer edge it falls back behind the skin.
-- **Seam**: it dips 0.06 mm under the globe where it is the globe, so the sclera meets it in a clean line.
+- **Seam**: it dips 0.06 mm under the globe where it is the globe, so the sclera meets it in a clean line. Past the fornix's start it leaves the globe only tangentially, so the seam holds only because the globe turns in place, about its own center ([`docs/OPTICS.md`](OPTICS.md#eye-space)): a globe shifted by a tenth of a millimeter would cut through it in facets.
 - **Rendering**: [`src/adnexa/lids.js`](../src/adnexa/lids.js) merges it into the lid mesh. The skin program shades it as wet mucosa (`lid` s = 0, `relief` radial and without grooves). It does not follow the gaze.
 
 ### Skin Shading
@@ -112,7 +112,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 - **Lighting**:
   - per-channel wrap diffuse (`skin.translucency`) with subsurface-tinted shadows;
   - GGX specular from each emitter's representative point (`skin.roughness`, lower in oily patches on the lids);
-  - a mirror reflection of the rig where it is wet (`skin.wetness`, toward the margin);
+  - a mirror reflection of the rig where it is wet: the margin, fading out within half a millimeter onto the skin (`skin.wetness`). Further out the moisture follows the relief and reflects as the GGX lobe; a mirror there showed the emitters as pale blots in the canthi's folds, where the skin turns grazing;
   - ambient and specular occlusion in the folds and grooves, and the baked occlusion (`ao`, scaled by `skin.occlusion`);
   - the key-light shadow.
 

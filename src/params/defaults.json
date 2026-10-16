@@ -321,6 +321,11 @@
     "start": 0.35,
     "duration": 1.2
   },
+  "controls": {
+    "parallax": 1.5,
+    "parallaxLag": 0.4,
+    "inertia": 0.2
+  },
   "post": {
     "toneMapping": "agx",
     "grain": 0.035,

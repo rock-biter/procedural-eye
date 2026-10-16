@@ -21,7 +21,7 @@
 | [`src/eye/cornealOptics.js`](../src/eye/cornealOptics.js) * | Snell, Fresnel, ray–surface intersections, two-surface corneal trace, entrance pupil. |
 | [`src/eye/eyeballGeometry.js`](../src/eye/eyeballGeometry.js) | The eyeball mesh with its cap and sclera groups, coarse on purpose (the shaders refine the surface). |
 | [`src/eye/eyeball.js`](../src/eye/eyeball.js) | The eyeball mesh, its two `ShaderMaterial`s and their shared uniforms (optics, iris, sclera, lid reflections). |
-| [`src/eye/eyeRig.js`](../src/eye/eyeRig.js) | Pivot (center of rotation, gaze) and eye-space group; world↔eye matrices. |
+| [`src/eye/eyeRig.js`](../src/eye/eyeRig.js) | Pivot (the globe's center, gaze) and eye-space group; world↔eye matrices. |
 | **Iris** ([`docs/IRIS.md`](IRIS.md)) | |
 | [`src/iris/irisSpace.js`](../src/iris/irisSpace.js) * | Rest space and its deformation with the pupil. |
 | [`src/iris/irisFeatures.js`](../src/iris/irisFeatures.js) * | Thickness profile, collarette curve, furrows, freckles (seeded). |
@@ -51,7 +51,8 @@
 | [`src/camera/cameraOptics.js`](../src/camera/cameraOptics.js) * | Thin-lens formulas, blur circle, lens-shift projection shear. |
 | [`src/camera/lensSampling.js`](../src/camera/lensSampling.js) * | Halton and concentric-disk samples (pixel, lens, light). |
 | [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js) | The macro `PerspectiveCamera`, placed and sheared per sample. |
-| [`src/camera/cameraControls.js`](../src/camera/cameraControls.js) | Pointer orbit, pan and distance, written into `params.camera`. |
+| [`src/camera/orbitMotion.js`](../src/camera/orbitMotion.js) * | The orbit's release speed and coasting, the lagged follow of the mouse parallax. |
+| [`src/camera/cameraControls.js`](../src/camera/cameraControls.js) | Pointer orbit (with inertia), pan and distance, written into `params.camera`; the mouse parallax, a turn of the orbit outside the params. |
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
 | [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, effects. |
 | [`src/render/scenePass.js`](../src/render/scenePass.js) | The scene into the composer's buffer; living frames split into a full-resolution sharp share and a half-resolution blurred one. |
@@ -73,7 +74,7 @@
    - `rebuild`:
      - the eye geometry (`createEyeGeometry()`);
      - the entrance-pupil depth the camera aims at;
-     - the rig transform and the eyeball mesh;
+     - the eyeball mesh;
      - the lid mesh, its skin patterns (baked on the GPU) and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
      - the lashes and the tear film.
 
@@ -84,14 +85,15 @@
      - the color lookup (spectral model in JS, about 35 ms), only when the layer model changed, and not while it crossfades;
      - the scleral vessel map, only when its parameters or the globe changed.
    - `define`: the debug view define of the eyeball, lid and lash materials. The tone-mapping mode is set by the post-processing every frame; `postprocessing` recompiles it.
-3. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
+3. **Controls**: `CameraControls.update()` steps a coasting orbit (which restarts the accumulation as a drag does) and the mouse parallax, which restarts it while it moves ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
+4. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
    - A living eye steps the animator and restarts the accumulation.
    - In photo mode it keeps its instant.
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.
-4. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
-5. **Adaptive resolution**: before a fresh frame is drawn, the interval since the last frame feeds the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation. The resize comes before drawing: a canvas resized after it is cleared, and the browser would show a black frame.
-6. **Render one sample** (`renderSample()`)
+5. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
+6. **Adaptive resolution**: before a fresh frame is drawn, the interval since the last frame feeds the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation. The resize comes before drawing: a canvas resized after it is cleared, and the browser would show a black frame.
+7. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field. When the next frame restarts the image anyway (a living eye, a running transition), it is shown without being kept in the accumulation ([`docs/RENDERING.md`](RENDERING.md#pipeline)); `capture()` then renders and keeps one first.
    - Later frames take `accumulationSample(n)`: a subpixel jitter, a point on the lens and a point on the key light.
    - The steps, in order:
@@ -123,7 +125,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 - **Pose**: when the transition changes where the pose comes from, the pose blends too ([`docs/ANIMATION.md`](ANIMATION.md#modes)).
 - **Duration**: the panel's **transition (s)** (1 s by default; 0 switches at once); a zoom takes `zoom.duration`. Captures and `?preset=` at start-up do not glide.
 - **Interruptions**:
-  - Orbiting the camera cancels the camera's glides; the rest goes on.
+  - Orbiting the camera cancels the camera's glides; the rest goes on. A transition stops a coasting orbit, which would cancel its camera glides.
   - A panel edit of a `uniform` leaf cancels that leaf's glide.
   - A panel edit of any other kind ends the transition on its target (the edited leaf keeps the edit), because the color lookup cannot crossfade under a rebuild.
   - A new preset or random eye starts from the current in-between values. A random eye keeps the target values of the groups it does not resample (`targetParams`).
@@ -135,7 +137,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `globe`, `cornea`, `chamber`, `limbus`;
   - `iris`, `irisStructure`, `irisColor`;
   - `lids`, `lashes`, `skin`, `sclera`;
-  - `lighting`, `camera`, `zoom` (the dock's zoom distances and duration), `post`, `quality`, `debug`.
+  - `lighting`, `camera`, `zoom` (the dock's zoom distances and duration), `controls` (the mouse parallax and the orbit's inertia), `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
 - **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.
   - `paramSchema.js` writes `BASE_PARAM_SCHEMA` with a `default` per leaf, then `withDefaults()` replaces each default the file names (sanitized like any override) to make `PARAM_SCHEMA`. A leaf the file does not name, such as a new one, keeps the default written in the schema; a name the file has but the schema lacks is reported with a console warning.
@@ -167,7 +169,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - The lids, lashes and tear film live in world space; they do not turn with the gaze.
   - Lid-attached vertices rotate about the X axis through the globe center to follow the vertical gaze (`lid-follow.glsl`).
 - **Eye space** ([`docs/OPTICS.md`](OPTICS.md#eye-space)) moves with the gaze.
-  - `EyeRig.pivot` sits at the center of rotation, 13.5 mm behind the corneal apex; `EyeRig.eyeSpace` carries the eyeball.
+  - `EyeRig.pivot` sits at the globe's center, the world origin, which the eye turns about ([`docs/OPTICS.md`](OPTICS.md#eye-space)); `EyeRig.eyeSpace` carries the eyeball.
   - The eyeball shaders work entirely in eye space. The light rig is packed into both spaces every frame.
 - **Iris space** is eye space shifted to the decentered pupil center. Its features live in **rest space** ([`docs/IRIS.md`](IRIS.md)).
 - **Polar maps**:

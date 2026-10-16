@@ -222,8 +222,13 @@ void main() {
 	// Light scattered under the skin softens the red edge of the shadows.
 	vec3 shadow = mix(vec3(lit), vec3(sqrt(lit), lit, lit * lit), uSkin2.y);
 	vec3 color = litSurface(vWorldPos, n, v, albedo * occlusion, wrap, roughness, 0.028, occlusion, shadow);
+	// The tear film makes the margin a mirror. On the skin the moisture follows
+	// the relief, so it reflects roughly (litSurface() above), and the mirror
+	// image fades out within half a millimeter: further out, where the folds of
+	// the canthi turn the skin grazing, it showed the emitters as pale blots.
+	float mirror = mix(wet * exp(-a / 0.5), wet, onMargin);
 	float fresnel = schlick(dot(n, v), 0.02);
-	color += wet * occlusion * fresnel * envRadiance(vWorldPos, reflect(-v, n)) * 0.6;
+	color += mirror * occlusion * fresnel * envRadiance(vWorldPos, reflect(-v, n)) * 0.6;
 
 #if DEBUG_VIEW == DEBUG_NORMALS
 	color = n * 0.5 + 0.5;

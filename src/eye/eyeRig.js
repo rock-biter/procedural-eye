@@ -1,11 +1,11 @@
-// The eye's transform hierarchy: `pivot` sits at the center of rotation (about
-// 13.5 mm behind the corneal apex) and carries the gaze rotation; `eyeSpace`,
-// its child, puts the globe center at the world origin in primary gaze. Eye
-// meshes are built in eye space and parented to `eyeSpace`.
+// The eye's transform hierarchy: `pivot` sits at the globe's center (the world
+// origin) and carries the gaze rotation; `eyeSpace`, its child, holds the eye
+// meshes, built in eye space. The eye turns about the center of its sclera
+// sphere, not about the measured center of rotation a little further back
+// (13.5 mm behind the apex): the conjunctiva, the margins' support and the
+// tear meniscus are built on the globe at rest and do not move, so the globe
+// must turn in place under them (docs/OPTICS.md).
 import { Group, Matrix4, Quaternion, Vector3 } from 'three'
-
-// Distance of the center of rotation behind the corneal apex.
-export const ROTATION_CENTER_DEPTH = 13.5
 
 export default class EyeRig {
 	constructor() {
@@ -17,13 +17,6 @@ export default class EyeRig {
 		this.worldToEye = new Matrix4()
 		this.eyeToWorld = new Matrix4()
 		this.rotation = new Quaternion()
-	}
-
-	// New profile: the center of rotation follows the apex.
-	setGeometry(eye) {
-		const center = eye.apexZ - ROTATION_CENTER_DEPTH
-		this.pivot.position.set(0, 0, center)
-		this.eyeSpace.position.set(0, 0, -center)
 	}
 
 	setGaze(quaternion) {

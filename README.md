@@ -1,6 +1,6 @@
-# Procedural eye
+# Random-eyes
 
-A hyper-realistic, fully procedural human eye in three.js, seen as in macro photography.
+An exploratory demo of a digital eye configurator: a hyper-realistic, fully procedural human eye in three.js, seen as in macro photography.
 
 - **Cornea, limbus and sclera** are analytic surfaces. Light refracts through both corneal surfaces onto the iris.
 - **The iris** is raymarched as a 3D field of crypts, vessels and collagen arcs, and colored by a spectral model of its pigments.
@@ -18,7 +18,7 @@ pnpm capture    # renders presets headlessly next to the reference photos
 
 **Controls**
 
-- Drag to orbit, shift- or right-drag to pan, scroll to change the distance between the zoom-in and zoom-out framings (the focus stays on the pupil plane).
+- Drag to orbit (it coasts a little when you let go; the view also turns slightly toward the mouse), shift- or right-drag to pan, scroll to change the distance between the zoom-in and zoom-out framings (the focus stays on the pupil plane).
 - **Zoom out** / **Zoom in** (the − and + at the bottom): glide out to the whole figure and back.
 - **Space** toggles photo mode: the eye freezes and the image converges.
 

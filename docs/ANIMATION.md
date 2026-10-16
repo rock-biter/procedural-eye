@@ -68,12 +68,12 @@ The iris follows any diameter through its rest space ([`docs/IRIS.md`](IRIS.md#r
   - **Microsaccades**: a Poisson process at 1.5 Hz × the scale during fixation. Amplitudes are log-normal around 0.35° × the scale, capped at 1°. Each also corrects half of the line of sight's error, and is slowed like the saccades.
   - **Drift**: smooth. Its velocity is an Ornstein–Uhlenbeck process (RMS 0.5 °/s × the scale, correlation time 0.2 s), and the offset returns at 2.5 /s toward the saccadic position. At full scale that is about 0.11° RMS, without frame-to-frame jitter.
 - **Visual axis**: the target is aimed by the visual axis; the optical axis turns `eye.kappa` temporal of it.
-- **Orientation**: `gazeQuaternion()` gives the shortest-arc rotation from primary position (Listing's law, no torsion). `EyeRig` applies it about the center of rotation.
+- **Orientation**: `gazeQuaternion()` gives the shortest-arc rotation from primary position (Listing's law, no torsion). `EyeRig` applies it about the globe's center ([`docs/OPTICS.md`](OPTICS.md#eye-space)).
 - **Start**: the first living step starts at rest on its target, so a frozen start is the steady state for the gaze as well as for the pupil.
 
 ## Framing
 
-The camera aims and focuses at the entrance pupil, turned about the center of rotation along the eye's *settled* line of sight (`framing` in the step result). The micro-movements are left out, so they move the eye within a still frame.
+The camera aims and focuses at the entrance pupil, turned about the globe's center along the eye's *settled* line of sight (`framing` in the step result). The micro-movements are left out, so they move the eye within a still frame.
 
 | Pose | Framed line of sight |
 | --- | --- |

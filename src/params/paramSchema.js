@@ -390,6 +390,16 @@ export const BASE_PARAM_SCHEMA = {
 		start: num(0.35, 0, 1, 0.01, '', 'uniform', 'desktop start (zoom in → out)'),
 		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),
 	},
+	// The pointer controls (src/camera/cameraControls.js): how far the mouse
+	// turns the view toward itself at the window's edge, how slowly the view
+	// follows it (a time constant; 0 follows at once), and the time constant an
+	// orbit's speed decays with after a drag (it coasts speed × inertia; 0
+	// stops at once).
+	controls: {
+		parallax: num(1.5, 0, 6, 0.1, 'deg', 'uniform', 'mouse parallax'),
+		parallaxLag: num(0.4, 0, 2, 0.01, 's', 'uniform', 'parallax lag'),
+		inertia: num(0.2, 0, 1, 0.01, 's', 'uniform', 'orbit inertia'),
+	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),
 		grain: num(0.035, 0, 0.3, 0.001),

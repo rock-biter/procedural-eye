@@ -130,6 +130,7 @@ export default class EyeApp {
 			this.transition?.cancel('camera')
 			this.notifyChange('camera')
 		})
+		this.physicalCamera.orbitOffset = this.controls.parallax
 		this.cameraEye = new Vector3()
 		this.backdropColor = new Color()
 		// Continuous interactive frames for measure(): { remaining, resolve }.
@@ -206,7 +207,6 @@ export default class EyeApp {
 		this.irisSpace = this.createIrisSpace()
 		// The camera aims at the apparent pupil plane (entrance pupil).
 		this.focusDepth = entrancePupil(this.eye).depth
-		this.eyeRig.setGeometry(this.eye)
 		this.eyeball.rebuild(this.eye)
 		// The lid mesh and the fissure map take about half a second: they are
 		// rebuilt only when the lids or the eye change, not for a new lash seed.
@@ -267,6 +267,7 @@ export default class EyeApp {
 		const mode = (p) =>
 			p.animation.enabled ? `${p.animation.gaze}:${p.animation.pupilReflex}` : 'still'
 		const modeChanges = mode(this.params) !== mode(target)
+		this.controls.stop()
 		this.transition = new ParamTransition(PARAM_SCHEMA, this.params, target, duration)
 		for (const path of this.transition.switched) this.markDirty(path)
 		this.irisColorLut.beginBlend(target.irisColor)
@@ -412,6 +413,9 @@ export default class EyeApp {
 			this.measureFrame(time)
 			return
 		}
+		// A coasting orbit restarts the image as a drag does; the parallax too.
+		const living = this.params.animation.enabled && !this.frozen
+		if (this.controls.update(Math.min(delta / 1000, 0.1), living)) this.invalidate()
 		this.pose(delta / 1000)
 		if (this.converged) return
 
@@ -547,6 +551,7 @@ export default class EyeApp {
 			isTransitioning: () => this.transition !== null,
 			setParams: (overrides) => {
 				this.finishTransition()
+				this.controls.stop()
 				const unknown = applyOverrides(PARAM_SCHEMA, this.params, overrides)
 				this.dirty.add('rebuild').add('define')
 				this.notifyChange('*')
