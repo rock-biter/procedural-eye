@@ -14,10 +14,11 @@
    see the end), and the interface stays --frame-gap inside the frame, at
    --ui-inset from the edges. */
 :root {
-	--ui-color: #ffe4c3;
+	--ui-color: #ffffff77;
 	--frame-inset: 24px;
 	--frame-gap: 16px;
 	--ui-inset: calc(var(--frame-inset) + var(--frame-gap));
+	text-transform: uppercase;
 }
 
 html,
@@ -259,6 +260,7 @@ canvas {
 
 .random-eye {
 	padding: 0 22px;
+	text-transform: uppercase;
 }
 
 /* Round icon buttons: a plus or a minus. */
