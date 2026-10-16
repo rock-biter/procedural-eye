@@ -27,8 +27,9 @@ export const HUD = Object.freeze({
 	// the other, and a drag snaps it to either end within `snap` px of it
 	// (overlapping the button a little).
 	zoom: Object.freeze({ center: 5 * DEGREE, span: 30 * DEGREE, minArc: 160, snap: 28 }),
-	// Random eye below the zoom: at `angle`, or `spacing` px past zoom out.
-	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
+	// Random eye below the zoom: at `angle`, or `spacing` px past zoom out; a
+	// dashed circle around it, `halo` times the button across.
+	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60, halo: 5 }),
 	// The second circle that follows the zoom: `in` px outside the circle
 	// zoomed in (negative: inside it), `out` px zoomed out, turned `turn` over
 	// the whole zoom against the knob.

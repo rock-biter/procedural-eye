@@ -72,6 +72,14 @@ function group(label) {
 }
 
 // Centers `element` and its cut in the circle's line at `angle` on a circle.
+// The dashes of a circle of `radius` px: HUD.dash px every about
+// HUD.dashPeriod px, a whole number of periods around, so it has no seam.
+function dashes(radius) {
+	const circumference = 2 * Math.PI * radius
+	const period = circumference / Math.max(1, Math.round(circumference / HUD.dashPeriod))
+	return `${HUD.dash} ${period - HUD.dash}`
+}
+
 function place(element, cut, angle, { cx, cy, radius }) {
 	const x = cx + radius * Math.cos(angle)
 	const y = cy + radius * Math.sin(angle)
@@ -105,7 +113,15 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	// orbitRing()). It is not cut around the buttons, and runs on past the
 	// HUD's box to the window's edges.
 	const orbit = svgElement('circle', { class: 'hud-line hud-orbit' })
-	ring.append(mask, line, orbit)
+	// A dashed circle around Random eye; each click turns it a quarter turn
+	// further, clockwise (by its dash offset, which style.css eases).
+	const halo = svgElement('circle', { class: 'hud-line hud-halo' })
+	let haloTurns = 0
+	const turnHalo = () => {
+		const radius = (HUD.button * HUD.random.halo) / 2
+		halo.style.strokeDashoffset = `${(-haloTurns * Math.PI * radius) / 2}px`
+	}
+	ring.append(mask, line, orbit, halo)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -132,7 +148,11 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	})
 	zoomGroup.append(zoomIn, knob.element, zoomOut)
 
-	const random = glassButton('random-eye', 'Random eye', icon('shuffle'), onRandom)
+	const random = glassButton('random-eye', 'Random eye', icon('shuffle'), () => {
+		haloTurns++
+		turnHalo()
+		onRandom()
+	})
 
 	element.append(ring, toneGroup, zoomGroup, random)
 
@@ -173,14 +193,16 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 		line.setAttribute('cx', circle.cx)
 		line.setAttribute('cy', circle.cy)
 		line.setAttribute('r', radius)
-		// A whole number of dash periods around the circle, so it has no seam.
-		const circumference = 2 * Math.PI * radius
-		const period = circumference / Math.max(1, Math.round(circumference / HUD.dashPeriod))
-		line.setAttribute('stroke-dasharray', `${HUD.dash} ${period - HUD.dash}`)
+		line.setAttribute('stroke-dasharray', dashes(radius))
 		for (const item of items) {
 			place(item.button, item.cut, item.angle(angles), circle)
 			cutRadius(item)
 		}
+		const haloRadius = (HUD.button * HUD.random.halo) / 2
+		halo.setAttribute('cx', circle.cx + radius * Math.cos(angles.random))
+		halo.setAttribute('cy', circle.cy + radius * Math.sin(angles.random))
+		halo.setAttribute('r', haloRadius)
+		halo.setAttribute('stroke-dasharray', dashes(haloRadius))
 		knob.setTrack({ ...circle, track: angles.track })
 		placed = { ...circle, track: angles.track }
 		placeOrbit()

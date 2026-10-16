@@ -225,9 +225,16 @@ canvas {
 	opacity: 0.3;
 }
 
-/* The second circle, which follows the zoom (src/ui/hud.js): fainter. */
+/* The second circle, which follows the zoom (src/ui/hud.js), and the one
+   around Random eye, fainter; the latter eases the quarter turn of each
+   click. */
 .hud-orbit {
 	opacity: 0.2;
+}
+
+.hud-halo {
+	opacity: 0.25;
+	transition: stroke-dashoffset 0.6s var(--spring);
 }
 
 .hud-cut {
