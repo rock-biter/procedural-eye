@@ -9,7 +9,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    - **Eyeball**: a surface of revolution in eye space with two index groups, coarsely tessellated (96 segments around, 32 rings on the cap, 24 on the sclera): the programs refine the exact surface, and small triangles would make the GPU shade the 2×2 quads along their edges, which cost the optics program dearly.
      - Group 0, the cornea and limbus cap, uses `eyeball-cap-fragment.glsl`: tear-film reflection, two-surface refraction, the iris trace and shading, the limbus and the limbal ring.
      - Group 1, the sclera beyond the cap, uses `eyeball-sclera-fragment.glsl`: the exact sphere point, then a wet, broken-up reflection over the vessel-mapped diffuse white.
-   - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi. Its pigment patterns come from a texture baked with the lid mesh ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)).
+   - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi and the palpebral conjunctiva that closes the sac behind them. Its pigment patterns come from a texture baked with the lid mesh ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)).
    - **Lashes**: tubes with the lash program.
    - **Tear meniscus and bubbles**: the water program; the bubbles are an `InstancedMesh`.
 3. **Accumulation** ([`src/render/accumulationPass.js`](../src/render/accumulationPass.js)):

@@ -566,9 +566,7 @@ function fornixZ(lids, eye, fissure, nasalSign, x, y) {
 	const z = conjunctivaZ(eye, lids, fissure, x, y)
 	const globe = r < eye.scleraRadius ? eye.surfaceZ(r) : -Infinity
 	const reach = fornixReach(nasalSign, x / Math.max(r, 1e-6))
-	return (
-		z - 0.06 * (1 - smoothstep(0, 0.15, z - globe)) - 1.5 * Math.max(0, r - reach + 1.5) ** 2
-	)
+	return z - 0.06 * (1 - smoothstep(0, 0.15, z - globe)) - 1.5 * Math.max(0, r - reach + 1.5) ** 2
 }
 
 // The conjunctiva in the canthi: where the lids pass in front of the receding

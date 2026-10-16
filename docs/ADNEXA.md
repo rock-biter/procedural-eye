@@ -28,7 +28,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 | Surface | Shape |
 | --- | --- |
 | Support (`supportZ()`, `supportAt()`) | What the posterior margins rest on. It merges (smooth maximum over 4 mm) two surfaces: the globe, and a surface through the canthi at `lids.medialDepth` and `lids.lateralDepth`, receding above and below the chord.<br>The globe term includes the cornea, its limbal sulcus bridged by a 0.8 mm smooth maximum; past 0.88 of the sclera radius it is continued by a slope that eases off over 2 mm.<br>Toward the canthi the lids therefore pass in front of the receding globe.<br>Its normal is the sphere's over the globe and the support's elsewhere, averaged over 3 mm. |
-| Conjunctiva (`conjunctivaZ()`) | What lies behind the margins:<br>- the globe, which past 0.96 of its radius turns back into the fornix (over 1.6 mm laterally, 0.9 mm medially);<br>- the caruncle, an elliptic mound about 2.3 × 3.4 mm, centered 1.3 mm from the medial canthus, just behind the margins;<br>- the plica semilunaris, a crescent fold 0.3 mm high about 2.9 mm from the canthus. |
+| Conjunctiva (`conjunctivaZ()`) | What lies behind the margins:<br>- the globe, which past 0.96 of its radius turns back into the fornix (over 1.6 mm laterally, 0.9 mm medially);<br>- in the medial canthus the floor of the lacus lacrimalis (`LACUS`), 1.2 mm behind the margins at the canthus, falling toward the globe past the caruncle's center (2.2 mm per mm) and receding above and below the chord; it meets the globe just lateral of the plica, so the pocket behind the medial canthus is shallow, not a moat down to the fornix;<br>- the caruncle on it, an elliptic mound about 2.3 × 3.4 mm, centered 1.3 mm from the medial canthus, its top 0.45 mm behind the margins;<br>- the plica semilunaris, a crescent fold 0.3 mm high about 2.9 mm from the canthus. |
 | Face (`createFace()`) | A thin-plate spline. It follows closely a ring of 64 points of the open lids' shell, laid out like the mesh's columns so the canthi's fans get points too, so the lids flow into it, and passes loosely through its anatomical landmarks, so it stays smooth. The landmarks are:<br>- the brow (`browHeight`, `browProjection`) and the forehead;<br>- the glabella, the nasion and the nasal dorsum (`noseDistance`, `noseProjection`), and the nasal sidewall;<br>- a recess beside the medial canthus;<br>- the lateral orbital rim (`rimDepth`) and the temple;<br>- the infraorbital rim and the cheek (`cheekProjection`). |
 
 ## Lid Mesh
@@ -82,7 +82,8 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 
 - **Field**: the skin, the conjunctiva and the globe are drawn into a height field seen from the front (0.1 mm cells over ±24 × ±18 mm).
 - **Horizon**: each vertex looks for the horizon over that field in 8 directions, out to 3 mm, against its tangent plane; nearer occluders count more (horizon-based ambient occlusion, Bavoil 2008).
-- **Where**: the lid band (up to 10 mm from the margin) and the conjunctiva; the face beyond it stays open. It darkens the canthi's pockets most, then the posterior margins against the globe and the crease.
+- **Where**: the lid band (up to 10 mm from the margin), the conjunctiva and the palpebral conjunctiva; the face beyond it stays open. It darkens the canthi's pockets most, then the posterior margins against the globe and the crease.
+- **Into the sac**: the field sees the palpebral conjunctiva only edge-on, so its vertices darken with their depth below the margin instead, by e^(−depth / 0.8 mm) (`OCCLUSION.sac`).
 - **Rest**: it is baked with the lids at rest and does not follow the gaze. The skin program scales it by `skin.occlusion`.
 
 ### Conjunctiva
@@ -92,6 +93,15 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 - **Surface**: an annulus on `conjunctivaZ()`, from 0.9 of the sclera radius out to just past the canthi (16.5 mm medially, 15 mm laterally). At its outer edge it falls back behind the skin.
 - **Seam**: it dips 0.06 mm under the globe where it is the globe, so the sclera meets it in a clean line. Past the fornix's start it leaves the globe only tangentially, so the seam holds only because the globe turns in place, about its own center ([`docs/OPTICS.md`](OPTICS.md#eye-space)): a globe shifted by a tenth of a millimeter would cut through it in facets.
 - **Rendering**: [`src/adnexa/lids.js`](../src/adnexa/lids.js) merges it into the lid mesh. The skin program shades it as wet mucosa (`lid` s = 0, `relief` radial and without grooves). It does not follow the gaze.
+
+### Palpebral Conjunctiva
+
+`createPalpebralMesh()` closes the conjunctival sac. The lid is a single sheet and the conjunctiva a height field, so without it a line of sight could pass under a posterior margin, between the margin and the eye, and run behind the lids to the background: from the side, from above or below, in the pockets behind both canthi (and along the globe's outline).
+
+- **Surface**: a curtain hanging from each posterior margin straight back, to 1.5 mm under the conjunctiva or the globe, whichever is lower. Its top row is the lid mesh's posterior margin (the same columns), its rows denser near the margin. Straight, not slanting out under the lid: a line of sight running out of a pocket meets it at the margin's outline.
+- **Where it shows**: in the canthi's pockets, where the margins stand in front of the receding globe, and wherever a margin stands off the globe. Where the margin rests on the globe it stays inside it.
+- **Rendering**: merged into the lid mesh like the conjunctiva and shaded as the margin's posterior border (`lid` s = 0), its front faces toward the opening. It follows the gaze with its margin, so the sac stays closed as the lids follow; its bottom lies near the axis the lids turn about, and barely moves.
+- **Check**: a test projects the lids, the conjunctiva, the curtain and the globe in orthographic views up to 60° to the side and 40° up or down, and requires every line of sight that enters the fissure within 5 mm of a canthus to land on a front face. Views further round (80° to the side, 60° up or down) still let a few hundredths of a square millimeter through.
 
 ### Skin Shading
 

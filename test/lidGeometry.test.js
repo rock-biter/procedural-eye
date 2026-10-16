@@ -5,10 +5,11 @@ import {
 	createConjunctivaMesh,
 	createLidMesh,
 	createMeniscusMesh,
+	createPalpebralMesh,
 	followWeight,
 	lidPoint,
 } from '../src/adnexa/lidGeometry'
-import { supportAt } from '../src/adnexa/periocular'
+import { conjunctivaZ, supportAt, supportZ } from '../src/adnexa/periocular'
 import { createEyeGeometry } from '../src/eye/eyeProfile'
 import { createDefaults } from '../src/params/params'
 import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
@@ -299,6 +300,143 @@ test('the conjunctiva fills the canthi, facing out and only dipping under the gl
 		const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
 		const nz = e1[0] * e2[1] - e1[1] * e2[0]
 		assert.ok(nz > 0, `face ${k / 3} faces away from the viewer`)
+	}
+})
+
+test('the palpebral conjunctiva hangs from the margins, faces the opening, darkens inward', async () => {
+	const { bakeLidOcclusion } = await import('../src/adnexa/lidOcclusion')
+	const around = 280
+	const rows = 12
+	const lids = createLidMesh(params.lids, eye, 1, { around, across: 80 })
+	const curtain = createPalpebralMesh(params.lids, eye, 1, { around, rows })
+	const p = (mesh, index) => Array.from(mesh.positions.subarray(index * 3, index * 3 + 3))
+	for (let i = 0; i < around; i++) {
+		// Its top row is the lid's posterior margin.
+		assert.deepEqual(p(curtain, i * rows), p(lids, i * 80))
+		const bottom = p(curtain, i * rows + rows - 1)
+		const r = Math.hypot(bottom[0], bottom[1])
+		// It reaches under the conjunctiva, or into the globe where the margin
+		// rests on it.
+		const conjunctiva = conjunctivaZ(eye, params.lids, lids.fissure, bottom[0], bottom[1])
+		assert.ok(bottom[2] < Math.min(conjunctiva, eye.surfaceZ(Math.min(r, eye.scleraRadius))) - 1)
+	}
+	const { indices, relief } = curtain
+	for (let k = 0; k < indices.length; k += 3) {
+		const [a, b, c] = [0, 1, 2].map((n) => p(curtain, indices[k + n]))
+		const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+		const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
+		const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2]]
+		const outward = [relief[indices[k] * 4], relief[indices[k] * 4 + 1]]
+		if (Math.hypot(...n) > 1e-9) assert.ok(n[0] * outward[0] + n[1] * outward[1] < 0, 'faces in')
+	}
+	// Deeper in the sac, darker.
+	const conjunctiva = createConjunctivaMesh(params.lids, eye, 1)
+	const ao = bakeLidOcclusion([lids, conjunctiva, curtain], eye)[2]
+	const { medial } = lids.fissure
+	let nearest = 0
+	for (let i = 0; i < around; i++) {
+		const [x, y] = p(curtain, i * rows)
+		const [nx, ny] = p(curtain, nearest * rows)
+		if (Math.hypot(x - medial[0], y - medial[1]) < Math.hypot(nx - medial[0], ny - medial[1]))
+			nearest = i
+	}
+	for (let j = 1; j < rows; j++) assert.ok(ao[nearest * rows + j] < ao[nearest * rows + j - 1])
+})
+
+test('no line of sight through the opening near a canthus reaches the background', () => {
+	// Orthographic views up to 60° to the side and 40° up or down: every point
+	// within 5 mm of each canthus whose line of sight passes inside the fissure
+	// at the depth of that canthus' margins must land on a front face of the
+	// lids and face, the conjunctiva, the palpebral conjunctiva or the globe.
+	const around = 280
+	const lids = createLidMesh(params.lids, eye, 1, { around, across: 80 })
+	const meshes = [
+		lids,
+		createConjunctivaMesh(params.lids, eye, 1),
+		createPalpebralMesh(params.lids, eye, 1, { around }),
+	]
+	const { fissure } = lids
+	const loop = Array.from({ length: 400 }, (_, i) => fissure.loop(i / 400))
+	const inLoop = ([x, y]) => {
+		let inside = false
+		for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+			const [xi, yi] = loop[i]
+			const [xj, yj] = loop[j]
+			if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+		}
+		return inside
+	}
+	const R = eye.scleraRadius
+	const cell = 0.25
+	for (const corner of ['medial', 'lateral']) {
+		const [cx, cy] = fissure[corner]
+		const marginZ = supportZ(eye, params.lids, fissure, cx, cy)
+		for (const azimuth of [-60, -40, -20, 0, 20, 40, 60]) {
+			for (const elevation of [-40, -20, 0, 20, 40]) {
+				const [az, el] = [azimuth * DEG, elevation * DEG]
+				// Toward the camera, and the picture's axes.
+				const d = [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)]
+				const right = [Math.cos(az), 0, -Math.sin(az)]
+				// d × right.
+				const up = [d[1] * right[2], d[2] * right[0] - d[0] * right[2], -d[1] * right[0]]
+				const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+				const center = [dot([cx, cy, marginZ], right), dot([cx, cy, marginZ], up)]
+				const grid = new Map()
+				for (const { positions: P, indices: I } of meshes) {
+					for (let k = 0; k < I.length; k += 3) {
+						const [a, b, c] = [0, 1, 2].map((n) =>
+							Array.from(P.subarray(I[k + n] * 3, I[k + n] * 3 + 3)),
+						)
+						const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+						const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
+						const n = [
+							e1[1] * e2[2] - e1[2] * e2[1],
+							e1[2] * e2[0] - e1[0] * e2[2],
+							e1[0] * e2[1] - e1[1] * e2[0],
+						]
+						// The skin program draws front faces only.
+						if (dot(n, d) <= 0) continue
+						const t = [a, b, c].map((q) => [dot(q, right) - center[0], dot(q, up) - center[1]])
+						const lo = [0, 1].map((m) => Math.min(t[0][m], t[1][m], t[2][m]))
+						const hi = [0, 1].map((m) => Math.max(t[0][m], t[1][m], t[2][m]))
+						if (hi[0] < -5 || lo[0] > 5 || hi[1] < -5 || lo[1] > 5) continue
+						for (let i = Math.floor(lo[0] / cell); i <= Math.floor(hi[0] / cell); i++) {
+							for (let j = Math.floor(lo[1] / cell); j <= Math.floor(hi[1] / cell); j++) {
+								const key = `${i},${j}`
+								if (!grid.has(key)) grid.set(key, [])
+								grid.get(key).push(t)
+							}
+						}
+					}
+				}
+				const covers = ([px, py], [a, b, c]) => {
+					const s1 = (b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0])
+					const s2 = (c[0] - b[0]) * (py - b[1]) - (c[1] - b[1]) * (px - b[0])
+					const s3 = (a[0] - c[0]) * (py - c[1]) - (a[1] - c[1]) * (px - c[0])
+					return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0)
+				}
+				for (let u = -5; u <= 5; u += 0.1) {
+					for (let v = -5; v <= 5; v += 0.1) {
+						if (Math.hypot(u, v) > 5) continue
+						const key = `${Math.floor(u / cell)},${Math.floor(v / cell)}`
+						if ((grid.get(key) ?? []).some((t) => covers([u, v], t))) continue
+						// The line of sight, and where it crosses the margins' depth.
+						const o = [0, 1, 2].map((m) => (center[0] + u) * right[m] + (center[1] + v) * up[m])
+						const along = (o[2] - marginZ) / d[2]
+						if (!inLoop([o[0] - d[0] * along, o[1] - d[1] * along])) continue
+						// The globe: its sphere, the mesh out to 125° from +Z.
+						const off = dot(o, o) - dot(o, d) ** 2
+						if (off < R * R) {
+							const hit = o.map((q, m) => q + d[m] * (Math.sqrt(R * R - off) - dot(o, d)))
+							if (hit[2] / R >= Math.cos(125 * DEG)) continue
+						}
+						assert.fail(
+							`${corner} canthus, view ${azimuth}°/${elevation}°: background at ${u.toFixed(1)}, ${v.toFixed(1)} mm`,
+						)
+					}
+				}
+			}
+		}
 	}
 })
 
