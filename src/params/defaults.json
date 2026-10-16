@@ -330,6 +330,7 @@
     "parallax": 3,
     "parallaxOut": 6,
     "parallaxLag": 0.4,
+    "zoomLag": 0.15,
     "inertia": 0.2
   },
   "post": {

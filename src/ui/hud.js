@@ -99,8 +99,9 @@ function place(element, cut, angle, { cx, cy, radius }) {
 }
 
 // `tones`: [{ name, label, color }]; onTone(name), onZoom('in' | 'out',
-// duration), onZoomLevel(level, including elastic overshoot) and onRandom()
-// run the controls; getZoomElasticity() reads the current drag extension.
+// duration), onZoomLevel(level, including elastic overshoot),
+// onZoomWheel(deltaY) (the wheel over the knob) and onRandom() run the
+// controls; getZoomElasticity() reads the current drag extension.
 // (onZoom without a duration glides over the zoom's own). Returns the
 // element, mount() (once it is in the page), pressTone(color), which presses
 // the tone of `color` (none for another color), and showZoomLevel(level),
@@ -111,6 +112,7 @@ export function createHud({
 	onTone,
 	onZoom,
 	onZoomLevel,
+	onZoomWheel,
 	getZoomElasticity = () => 0,
 	onRandom,
 }) {
@@ -203,6 +205,7 @@ export function createHud({
 	}
 	const knob = zoomKnob({
 		onZoomLevel,
+		onWheel: onZoomWheel,
 		getZoomElasticity,
 		onSnap: (end) => onZoom(end === 1 ? 'in' : 'out', SNAP_GLIDE),
 		cut: cut(),
@@ -429,7 +432,9 @@ export function createHud({
 // The zoom knob: a small square marker that slides along the circle
 // from zoom out (level 0) to zoom in (level 1), over the two buttons, so the
 // pointer always reaches it.
-function zoomKnob({ onZoomLevel, onSnap, getZoomElasticity = () => 0, cut }) {
+// `onWheel(deltaY)`, if given, takes the wheel over the knob (else it sets
+// the level at once).
+function zoomKnob({ onZoomLevel, onWheel, onSnap, getZoomElasticity = () => 0, cut }) {
 	const element = document.createElement('div')
 	element.className = 'hud-button zoom-level'
 	element.innerHTML = '<span class="zoom-marker"></span>'
@@ -520,7 +525,8 @@ function zoomKnob({ onZoomLevel, onSnap, getZoomElasticity = () => 0, cut }) {
 		'wheel',
 		(event) => {
 			event.preventDefault()
-			set((shown ?? 0) - event.deltaY * LEVEL_PER_WHEEL_UNIT)
+			if (onWheel) onWheel(event.deltaY)
+			else set((shown ?? 0) - event.deltaY * LEVEL_PER_WHEEL_UNIT)
 		},
 		{ passive: false },
 	)

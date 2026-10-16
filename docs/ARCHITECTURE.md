@@ -140,7 +140,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `globe`, `cornea`, `chamber`, `limbus`;
   - `iris`, `irisStructure`, `irisColor`;
   - `lids`, `lashes`, `skin`, `shell` (the back shell), `sclera`;
-  - `lighting`, `camera`, `zoom` (the HUD's zoom distances and duration), `controls` (the mouse parallax and the orbit's inertia), `post`, `quality`, `debug`.
+  - `lighting`, `camera`, `zoom` (the HUD's zoom distances and duration), `controls` (the mouse parallax, the wheel zoom's easing and the orbit's inertia), `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
 - **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.
   - `paramSchema.js` writes `BASE_PARAM_SCHEMA` with a `default` per leaf, then `withDefaults()` replaces each default the file names (sanitized like any override) to make `PARAM_SCHEMA`. A leaf the file does not name, such as a new one, keeps the default written in the schema; a name the file has but the schema lacks is reported with a console warning.

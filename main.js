@@ -219,6 +219,8 @@ if (urlParams.get('gui') !== '0') {
 		onTone: (name) => skinTone(name),
 		onZoom: (direction, duration) => zoom(direction, duration),
 		onZoomLevel: (level) => setZoomLevel(level),
+		// The wheel over the knob zooms as over the canvas, smoothly.
+		onZoomWheel: (deltaY) => app.controls.wheel(deltaY),
 		getZoomElasticity: () => app.params.zoom.elasticity,
 		onRandom: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
 	})

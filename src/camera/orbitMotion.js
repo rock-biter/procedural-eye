@@ -51,6 +51,14 @@ export function parallaxReach(controls, distance, limits) {
 	return controls.parallaxOut + (controls.parallax - controls.parallaxOut) * level
 }
 
+// The camera distance `distance` (mm) one step of `dt` s on its way to the
+// wheel's `target`: `follow()` on the log of the distance, so every zoom step
+// eases alike, landing on the target once within 0.01% of it.
+export function zoomToward(distance, target, dt, lag) {
+	const eased = follow(Math.log(distance), Math.log(target), dt, lag, 1e-4)
+	return eased === Math.log(target) ? target : Math.exp(eased)
+}
+
 // `current` glides toward `target` with the time constant `lag` (s; 0 jumps),
 // and lands on it once closer than `rest`.
 export function follow(current, target, dt, lag, rest = 1e-3) {

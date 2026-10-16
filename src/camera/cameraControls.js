@@ -7,7 +7,14 @@
 // of the orbit kept in `parallax`, not in the params, which
 // src/camera/physicalCamera.js adds to the camera's.
 import { setValue } from '../params/params'
-import { coast, follow, parallaxReach, RELEASE_WINDOW, releaseVelocity } from './orbitMotion'
+import {
+	coast,
+	follow,
+	parallaxReach,
+	RELEASE_WINDOW,
+	releaseVelocity,
+	zoomToward,
+} from './orbitMotion'
 
 const ORBIT_DEGREES_PER_PIXEL = 0.12
 const ZOOM_PER_WHEEL_UNIT = 0.0012
@@ -29,6 +36,10 @@ export default class CameraControls {
 		// (degrees) that follows it.
 		this.mouse = { x: 0, y: 0 }
 		this.parallax = { azimuth: 0, elevation: 0 }
+		// The wheel's target distance (mm), or null, and the distance the last
+		// step set (to notice another control taking over).
+		this.zoomTarget = null
+		this.zoomSet = null
 		this.handleDown = this.handleDown.bind(this)
 		this.handleMove = this.handleMove.bind(this)
 		this.handleUp = this.handleUp.bind(this)
@@ -57,6 +68,7 @@ export default class CameraControls {
 	// Stops a coasting orbit (a transition takes the camera).
 	stop() {
 		this.velocity = null
+		this.zoomTarget = null
 	}
 
 	handleDown(event) {
@@ -109,16 +121,39 @@ export default class CameraControls {
 
 	handleWheel(event) {
 		event.preventDefault()
-		const camera = this.params.camera
-		let distance = camera.distance * Math.exp(event.deltaY * ZOOM_PER_WHEEL_UNIT)
+		this.wheel(event.deltaY)
+	}
+
+	// A wheel step of `deltaY` (the canvas's, or the HUD's zoom knob's) moves
+	// the zoom's target distance; update() eases the camera toward it
+	// (controls.zoomLag), so the wheel zooms smoothly instead of in jumps.
+	// Steps add up on the target, which stays within `distanceLimits` (from
+	// outside them it only moves back toward them).
+	wheel(deltaY) {
+		const from = this.zoomTarget ?? this.params.camera.distance
+		let distance = from * Math.exp(deltaY * ZOOM_PER_WHEEL_UNIT)
 		if (this.distanceLimits) {
 			const [min, max] = this.distanceLimits()
-			const low = Math.min(min, camera.distance)
-			const high = Math.max(max, camera.distance)
-			distance = Math.min(Math.max(distance, low), high)
+			distance = Math.min(Math.max(distance, Math.min(min, from)), Math.max(max, from))
 		}
-		if (distance === camera.distance) return
+		if (distance === from) return
+		this.zoomTarget = distance
+		this.zoomSet = null
+	}
+
+	// One step of the camera toward the wheel's target. Anything else that
+	// sets the distance meanwhile (a zoom button, the knob) takes over.
+	stepZoom(dt) {
+		if (this.zoomTarget === null) return
+		const camera = this.params.camera
+		if (this.zoomSet !== null && camera.distance !== this.zoomSet) {
+			this.zoomTarget = null
+			return
+		}
+		const distance = zoomToward(camera.distance, this.zoomTarget, dt, this.params.controls.zoomLag)
 		this.set('camera.distance', distance)
+		this.zoomSet = camera.distance
+		if (distance === this.zoomTarget) this.zoomTarget = null
 		this.onChange()
 	}
 
@@ -128,6 +163,7 @@ export default class CameraControls {
 	// Returns whether the parallax moved.
 	update(dt, living) {
 		if (this.velocity) this.coast(dt)
+		this.stepZoom(dt)
 		const { controls, camera } = this.params
 		const amplitude = parallaxReach(controls, camera.distance, this.distanceLimits?.())
 		const lag = controls.parallaxLag

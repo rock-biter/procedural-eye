@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { coast, follow, parallaxReach, releaseVelocity } from '../src/camera/orbitMotion'
+import {
+	coast,
+	follow,
+	parallaxReach,
+	releaseVelocity,
+	zoomToward,
+} from '../src/camera/orbitMotion'
 
 const close = (a, b, tolerance, label) =>
 	assert.ok(Math.abs(a - b) < tolerance, `${label ?? ''} ${a} vs ${b}`)
@@ -53,6 +59,28 @@ test('the parallax reaches further zoomed out, linear in the zoom level', () => 
 	assert.equal(parallaxReach(controls, 120, limits), 3)
 	assert.equal(parallaxReach(controls, 700, limits), 6)
 	assert.equal(parallaxReach(controls, 480, null), 3)
+})
+
+test('the wheel zoom eases to its target on a log scale, alike at any frame rate', () => {
+	// A time constant along the log of the distance: the same share of the way
+	// zooming in or out.
+	const lag = 0.15
+	const step = (from, to, dt) =>
+		Math.log(zoomToward(from, to, dt, lag) / from) / Math.log(to / from)
+	close(step(300, 200, lag), 1 - Math.exp(-1), 1e-12)
+	close(step(200, 300, lag), 1 - Math.exp(-1), 1e-12)
+	// 60 or 20 frames per second reach the same distance by the same time.
+	const run = (dt) => {
+		let distance = 300
+		for (let t = 0; t < 0.3 - 1e-9; t += dt) distance = zoomToward(distance, 200, dt, lag)
+		return distance
+	}
+	close(run(1 / 60), run(1 / 20), 1e-9)
+	// It lands on the target, and with no lag jumps there.
+	let distance = 300
+	for (let i = 0; i < 200; i++) distance = zoomToward(distance, 200, 1 / 60, lag)
+	assert.equal(distance, 200)
+	assert.equal(zoomToward(300, 200, 1 / 60, 0), 200)
 })
 
 test('follow glides with its lag and lands on the target', () => {
