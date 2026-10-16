@@ -146,13 +146,14 @@ export function createHud({
 	// The circle between the central ring and the outer zoom ring, which
 	// each click on Random eye turns a little further (style.css eases it).
 	const spin = svgElement('circle', { class: 'hud-line hud-spin' })
+	const spinTeeth = svgElement('circle', { class: 'hud-line hud-spin' })
 	let spinTurns = 0
 	// Three arcs inside the inner zoom ring, which each skin tone turns to its
 	// own places (style.css eases them).
 	const arcs = [0, 1, 2].map(() => svgElement('circle', { class: 'hud-line hud-arc' }))
 	let arcTone = 0
 	let arcsPlaced = false
-	ring.append(mask, line, spin, ...arcs)
+	ring.append(mask, line, spin, spinTeeth, ...arcs)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -249,6 +250,11 @@ export function createHud({
 		spin.setAttribute('r', turned.radius)
 		spin.setAttribute('stroke-dasharray', turned.dashArray.join(' '))
 		spin.style.strokeDashoffset = `${turned.dashOffset}px`
+		const { teeth } = turned
+		spinTeeth.setAttribute('r', teeth.radius)
+		spinTeeth.setAttribute('stroke-dasharray', teeth.dashArray.join(' '))
+		spinTeeth.style.strokeWidth = `${teeth.width}px`
+		spinTeeth.style.strokeDashoffset = `${teeth.dashOffset}px`
 	}
 
 	// The arcs for the layout and the tone pressed. Their first placement
@@ -319,8 +325,10 @@ export function createHud({
 		line.setAttribute('cy', circle.cy)
 		line.setAttribute('r', radius)
 		line.setAttribute('stroke-dasharray', dashes(radius))
-		spin.setAttribute('cx', circle.cx)
-		spin.setAttribute('cy', circle.cy)
+		for (const element of [spin, spinTeeth]) {
+			element.setAttribute('cx', circle.cx)
+			element.setAttribute('cy', circle.cy)
+		}
 		for (const item of items) {
 			place(item.button, item.cut, item.angle(angles), circle)
 			cutRadius(item)

@@ -197,10 +197,33 @@ test('the spinning circle lies between the central and the outer ring and turns 
 		const count = (2 * Math.PI * still.radius) / (dash + gap)
 		assert.ok(near(count, Math.round(count), 1e-9))
 		assert.ok(Math.abs(gap - HUD.spin.gap) < (dash + HUD.spin.gap) / 2)
-		assert.equal(still.dashOffset, -0)
 		// Each click turns it HUD.spin.step further, clockwise.
 		const three = spinRing(radius, 3)
-		assert.ok(near(-three.dashOffset / three.radius, 3 * HUD.spin.step))
+		assert.ok(near((still.dashOffset - three.dashOffset) / three.radius, 3 * HUD.spin.step))
+		// Its teeth: HUD.spin.teeth ticks out from the line, evenly spaced from
+		// HUD.spin.toothStart, turning with it.
+		for (const [turns, turned] of [
+			[0, still],
+			[3, three],
+		]) {
+			const { teeth } = turned
+			assert.ok(near(teeth.radius - teeth.width / 2, turned.radius))
+			assert.equal(teeth.width, HUD.spin.tooth)
+			const [mark, space] = teeth.dashArray
+			assert.equal(mark, 1)
+			assert.ok(near(((mark + space) * HUD.spin.teeth) / teeth.radius, 2 * Math.PI))
+			const first = (-teeth.dashOffset + mark / 2) / teeth.radius
+			assert.ok(near(first, HUD.spin.toothStart + turns * HUD.spin.step))
+			// Every tooth falls in the middle of a dash of the line.
+			const [dash, gap] = turned.dashArray
+			const period = dash + gap
+			assert.ok(near(((2 * Math.PI * turned.radius) / period) % HUD.spin.teeth, 0, 1e-6))
+			for (let k = 0; k < HUD.spin.teeth; k++) {
+				const at = (first + (k * 2 * Math.PI) / HUD.spin.teeth) * turned.radius
+				const inPattern = (((at + turned.dashOffset) % period) + period) % period
+				assert.ok(near(inPattern, dash / 2, 1e-6), `tooth ${k}`)
+			}
+		}
 	}
 })
 

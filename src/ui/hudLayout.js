@@ -42,9 +42,18 @@ export const HUD = Object.freeze({
 	outer: Object.freeze({ radiusRatio: 1.42, turn: -30 * DEGREE }),
 	// The circle between the central ring and the outer zoom ring
 	// (`radiusRatio` of the central radius): `dash` px every about
-	// `dash` + `gap` px; each click on Random eye turns it `step` further,
-	// clockwise.
-	spin: Object.freeze({ radiusRatio: 1.13, dash: 40, gap: 22.5, step: 10 * DEGREE }),
+	// `dash` + `gap` px, and `teeth` solid ticks `tooth` px out from it, evenly
+	// spaced from `toothStart`; each click on Random eye turns it `step`
+	// further, clockwise.
+	spin: Object.freeze({
+		radiusRatio: 1.13,
+		dash: 40,
+		gap: 22.5,
+		teeth: 4,
+		tooth: 18,
+		toothStart: 45 * DEGREE,
+		step: 10 * DEGREE,
+	}),
 	// Three arcs `span` long on a circle inside the inner zoom ring
 	// (`radiusRatio` of the central radius), 120° apart at rest. Each skin
 	// tone, fair to deep, turns each arc to its own place: `tones` holds their
@@ -189,17 +198,34 @@ export function orbitRing(radius, level, kind, stretch = false, hud = HUD) {
 }
 
 // The circle between the HUD's circle of `radius` px and the outer zoom
-// ring, after `turns` clicks on Random eye: its radius, its
-// dashes (`spin.dash` px, a whole number of periods around, so it has no
-// seam) and the SVG dash offset that turns it `turns` × `spin.step`
-// clockwise (a circle's dashes start at its right and run clockwise; a
-// negative offset carries them forward).
+// ring, after `turns` clicks on Random eye: its radius, its dashes
+// (`spin.dash` px; their count a multiple of `spin.teeth`, so every tooth
+// falls at the same place in the pattern, and a whole number around, so it
+// has no seam) and the SVG dash offset that centers a dash on each tooth and
+// turns them all `turns` × `spin.step` clockwise (a circle's dashes start at
+// its right and run clockwise; a negative offset carries them forward).
+// `teeth`: a circle `spin.tooth` / 2 px further out, stroked `spin.tooth` px
+// wide with `spin.teeth` 1 px dashes around: solid ticks out from the line,
+// the first at `spin.toothStart`, which their own dash offset turns with the
+// dashes.
 export function spinRing(radius, turns, hud = HUD) {
-	const { radiusRatio, dash, gap, step } = hud.spin
+	const { radiusRatio, dash, gap, teeth, tooth, toothStart, step } = hud.spin
 	const ring = radius * radiusRatio
-	const count = Math.max(1, Math.round((2 * Math.PI * ring) / (dash + gap)))
-	const period = (2 * Math.PI * ring) / count
-	return { radius: ring, dashArray: [dash, period - dash], dashOffset: -turns * step * ring }
+	const perTooth = Math.max(1, Math.round((2 * Math.PI * ring) / (dash + gap) / teeth))
+	const period = (2 * Math.PI * ring) / (perTooth * teeth)
+	const turn = turns * step
+	const toothRing = ring + tooth / 2
+	return {
+		radius: ring,
+		dashArray: [dash, period - dash],
+		dashOffset: dash / 2 - (toothStart + turn) * ring,
+		teeth: {
+			radius: toothRing,
+			width: tooth,
+			dashArray: [1, (2 * Math.PI * toothRing) / teeth - 1],
+			dashOffset: 0.5 - (toothStart + turn) * toothRing,
+		},
+	}
 }
 
 // The three arcs for the skin tone at `tone` (its index, fair first) about
