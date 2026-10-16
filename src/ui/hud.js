@@ -45,6 +45,8 @@ const icon = (name) =>
 const KEY_STEPS = { ArrowUp: 0.1, ArrowRight: 0.1, ArrowDown: -0.1, ArrowLeft: -0.1 }
 const PAGE_STEPS = { PageUp: 0.25, PageDown: -0.25 }
 const LEVEL_PER_WHEEL_UNIT = 0.0012
+// How far (px) a readout keeps from the HUD box's sides, or it hides.
+const READOUT_MARGIN = 4
 // A press that moves less than this (px) is a click.
 const CLICK_SLOP = 4
 // How long (s) the camera glides when a dragged knob snaps to an end, and
@@ -223,36 +225,12 @@ export function createHud({
 	})
 	zoomGroup.append(zoomIn, knob.element, zoomOut)
 
-	// The zoom's value (main.js gives it, formatted), on the middle of the
-	// knob's track, between the spinning circle and the outer zoom ring. GSAP's TextPlugin retypes it whenever
-	// it changes: one tween at a time, each to the latest value, so a gliding
-	// zoom reads as a running counter that settles on the value.
-	const zoomValue = document.createElement('div')
-	zoomValue.className = 'hud-zoom-value'
-	zoomValue.setAttribute('aria-hidden', 'true')
+	// Two readouts between the spinning circle and the outer zoom ring, on
+	// the horizontal (main.js gives their text, formatted): the zoom's value
+	// on the middle of the knob's track, the camera's polar angles opposite.
 	const motionless = window.matchMedia('(prefers-reduced-motion: reduce)')
-	let valueShown = null
-	let valueNext = null
-	let typing = false
-	const typeValue = () => {
-		if (typing || valueNext === valueShown) return
-		const text = valueNext
-		if (valueShown === null || motionless.matches) {
-			zoomValue.textContent = valueShown = text
-			return
-		}
-		typing = true
-		gsap.to(zoomValue, {
-			duration: 0.15,
-			ease: 'none',
-			text: { value: text },
-			onComplete: () => {
-				valueShown = text
-				typing = false
-				typeValue()
-			},
-		})
-	}
+	const zoomValue = readout('hud-zoom-value', motionless)
+	const cameraAngles = readout('hud-camera-angles', motionless)
 
 	const random = hudButton('random-eye', 'Random eye', icon('eye'), () => {
 		spinTurns++
@@ -263,7 +241,8 @@ export function createHud({
 	element.append(
 		...orbitAssets.map(({ wrapper }) => wrapper),
 		ring,
-		zoomValue,
+		zoomValue.element,
+		cameraAngles.element,
 		toneGroup,
 		zoomGroup,
 		random,
@@ -474,8 +453,8 @@ export function createHud({
 		knob.setTrack({ ...circle, track: angles.track })
 		const middle = (angles.track[0] + angles.track[1]) / 2
 		const reach = zoomValueRadius(radius)
-		zoomValue.style.left = `${circle.cx + reach * Math.cos(middle)}px`
-		zoomValue.style.top = `${circle.cy + reach * Math.sin(middle)}px`
+		zoomValue.place(circle, reach, middle, width)
+		cameraAngles.place(circle, reach, middle + Math.PI, width)
 		placed = { ...circle, track: angles.track }
 		placeSpin()
 		placeArcs()
@@ -507,10 +486,9 @@ export function createHud({
 			placeArcs()
 		},
 		// The zoom's value as text (main.js formats it).
-		showZoomValue(text) {
-			valueNext = text
-			typeValue()
-		},
+		showZoomValue: (text) => zoomValue.show(text),
+		// The camera's polar angles as text (main.js formats them).
+		showCameraAngles: (text) => cameraAngles.show(text),
 		showZoomLevel(shown) {
 			knob.show(shown)
 			zoomIn.classList.toggle('at-level', endOf(shown) === 1)
@@ -522,6 +500,60 @@ export function createHud({
 			placeOrbit()
 			placeZoomSymbols()
 		},
+	}
+}
+
+// A readout of the HUD: small text that GSAP's TextPlugin retypes whenever
+// it changes, one tween at a time, each to the latest text, so a gliding
+// value reads as a running counter that settles. With `motionless` (reduced
+// motion) it switches at once. place() centers it `reach` px from the
+// circle's center at `angle`; where it would leave a box `width` px wide
+// (a phone's circle), it hides.
+function readout(className, motionless) {
+	const element = document.createElement('div')
+	element.className = `hud-readout ${className}`
+	element.setAttribute('aria-hidden', 'true')
+	let shown = null
+	let next = null
+	let typing = false
+	// The last placement, redone once there is text to measure.
+	let placement = null
+	const type = () => {
+		if (typing || next === shown) return
+		const text = next
+		if (shown === null || motionless.matches) {
+			const first = shown === null
+			element.textContent = shown = text
+			if (first && placement) place(...placement)
+			return
+		}
+		typing = true
+		gsap.to(element, {
+			duration: 0.15,
+			ease: 'none',
+			text: { value: text },
+			onComplete: () => {
+				shown = text
+				typing = false
+				type()
+			},
+		})
+	}
+	const place = (circle, reach, angle, width) => {
+		placement = [circle, reach, angle, width]
+		const x = circle.cx + reach * Math.cos(angle)
+		const half = element.offsetWidth / 2 + READOUT_MARGIN
+		element.style.left = `${x}px`
+		element.style.top = `${circle.cy + reach * Math.sin(angle)}px`
+		element.classList.toggle('hidden', x - half < 0 || x + half > width)
+	}
+	return {
+		element,
+		show(text) {
+			next = text
+			type()
+		},
+		place,
 	}
 }
 

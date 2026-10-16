@@ -285,10 +285,16 @@ canvas {
 	transition: stroke-dashoffset 0.6s var(--elastic);
 }
 
-/* The zoom's value (src/ui/hud.js): the macro magnification, small, on the
-   middle of the knob's track, centered between the spinning circle and the
-   outer zoom ring; GSAP retypes it as it changes. */
-.hud-zoom-value {
+/* The readouts (src/ui/hud.js), centered between the spinning circle and
+   the outer zoom ring on the horizontal: the zoom's value (the macro
+   magnification) by the knob's track, the camera's polar angles opposite.
+   GSAP retypes them as they change; where they would leave the HUD's box (a
+   phone's circle) they hide. */
+.hud-readout.hidden {
+	visibility: hidden;
+}
+
+.hud-readout {
 	position: absolute;
 	translate: -50% -50%;
 	color: var(--ui-color);

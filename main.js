@@ -235,9 +235,17 @@ if (urlParams.get('gui') !== '0') {
 	// The zoom's value by the knob: the macro magnification of the camera at
 	// its focus distance (camera.distance), as a lens's reproduction ratio
 	// reads (1× is life size on the sensor).
+	// Opposite, the camera's polar angles about the eye, azimuth then
+	// elevation in degrees, the mouse parallax's turn included (it moves the
+	// camera too, CameraControls.parallax): unsigned, without spaces or units.
+	const degrees = (value) => Math.abs(value).toFixed(1)
 	const showZoomLevel = () => {
 		requestAnimationFrame(showZoomLevel)
-		const { distance, focalLength } = app.params.camera
+		const { distance, focalLength, azimuth, elevation } = app.params.camera
+		const { parallax } = app.controls
+		hud.showCameraAngles(
+			`${degrees(azimuth + parallax.azimuth)},${degrees(elevation + parallax.elevation)}`,
+		)
 		hud.showZoomLevel(zoomProgress(distance, zoomLimits()))
 		hud.showZoomValue(`${magnification(focalLength, distance).toFixed(3)}`)
 	}
