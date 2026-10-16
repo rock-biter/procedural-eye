@@ -53,7 +53,7 @@
 | [`src/camera/cameraOptics.js`](../src/camera/cameraOptics.js) * | Thin-lens formulas, blur circle, lens-shift projection shear. |
 | [`src/camera/lensSampling.js`](../src/camera/lensSampling.js) * | Halton and concentric-disk samples (pixel, lens, light). |
 | [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js) | The macro `PerspectiveCamera`, placed and sheared per sample. |
-| [`src/camera/orbitMotion.js`](../src/camera/orbitMotion.js) * | The orbit's release speed and coasting, the lagged follow of the mouse parallax. |
+| [`src/camera/orbitMotion.js`](../src/camera/orbitMotion.js) * | The orbit's release speed and coasting, the mouse parallax's reach by zoom level and its lagged follow. |
 | [`src/camera/cameraControls.js`](../src/camera/cameraControls.js) | Pointer orbit (with inertia), pan and distance, written into `params.camera`; the mouse parallax, a turn of the orbit outside the params. |
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
 | [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, effects. |

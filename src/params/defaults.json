@@ -327,7 +327,8 @@
     "duration": 1.2
   },
   "controls": {
-    "parallax": 1.5,
+    "parallax": 3,
+    "parallaxOut": 6,
     "parallaxLag": 0.4,
     "inertia": 0.2
   },

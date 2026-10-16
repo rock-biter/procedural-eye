@@ -399,12 +399,15 @@ export const BASE_PARAM_SCHEMA = {
 		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),
 	},
 	// The pointer controls (src/camera/cameraControls.js): how far the mouse
-	// turns the view toward itself at the window's edge, how slowly the view
+	// turns the view toward itself at the window's edge, zoomed in and zoomed
+	// out (linear in the zoom level between, src/camera/orbitMotion.js), how
+	// slowly the view
 	// follows it (a time constant; 0 follows at once), and the time constant an
 	// orbit's speed decays with after a drag (it coasts speed × inertia; 0
 	// stops at once).
 	controls: {
-		parallax: num(1.5, 0, 6, 0.1, 'deg', 'uniform', 'mouse parallax'),
+		parallax: num(1.5, 0, 6, 0.1, 'deg', 'uniform', 'mouse parallax (zoomed in)'),
+		parallaxOut: num(3, 0, 12, 0.1, 'deg', 'uniform', 'mouse parallax (zoomed out)'),
 		parallaxLag: num(0.4, 0, 2, 0.01, 's', 'uniform', 'parallax lag'),
 		inertia: num(0.2, 0, 1, 0.01, 's', 'uniform', 'orbit inertia'),
 	},

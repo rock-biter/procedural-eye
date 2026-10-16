@@ -3,10 +3,11 @@
 // wheel changes the focus distance (and with it the magnification) within
 // `distanceLimits`. An orbit coasts after the drag lets go, for
 // `controls.inertia`. The mouse also turns the view a little toward itself
-// (`controls.parallax`): a turn of the orbit kept in `parallax`, not in the
-// params, which src/camera/physicalCamera.js adds to the camera's.
+// (`controls.parallax` zoomed in, `controls.parallaxOut` zoomed out): a turn
+// of the orbit kept in `parallax`, not in the params, which
+// src/camera/physicalCamera.js adds to the camera's.
 import { setValue } from '../params/params'
-import { coast, follow, RELEASE_WINDOW, releaseVelocity } from './orbitMotion'
+import { coast, follow, parallaxReach, RELEASE_WINDOW, releaseVelocity } from './orbitMotion'
 
 const ORBIT_DEGREES_PER_PIXEL = 0.12
 const ZOOM_PER_WHEEL_UNIT = 0.0012
@@ -18,7 +19,8 @@ export default class CameraControls {
 		this.params = params
 		this.onChange = onChange
 		// () => [min, max] distances for the wheel, or null. Outside them, the
-		// wheel only brings the camera back toward them.
+		// wheel only brings the camera back toward them. The parallax's reach
+		// follows the zoom level between them.
 		this.distanceLimits = null
 		this.pointer = null
 		// The coasting orbit's speed (deg/s), or null.
@@ -126,7 +128,9 @@ export default class CameraControls {
 	// Returns whether the parallax moved.
 	update(dt, living) {
 		if (this.velocity) this.coast(dt)
-		const { parallax: amplitude, parallaxLag: lag } = this.params.controls
+		const { controls, camera } = this.params
+		const amplitude = parallaxReach(controls, camera.distance, this.distanceLimits?.())
+		const lag = controls.parallaxLag
 		// Like a short drag from the center: the scene turns toward the mouse.
 		const azimuth = living ? -this.mouse.x * amplitude : 0
 		const elevation = living ? -this.mouse.y * amplitude : 0

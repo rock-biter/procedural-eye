@@ -1,6 +1,7 @@
 // The motion of the pointer controls (src/camera/cameraControls.js), in
 // degrees and seconds: the orbit's speed when a drag lets go, its coasting
-// afterwards, and the lagged follow of the mouse parallax.
+// afterwards, and the reach and lagged follow of the mouse parallax.
+import { zoomLevel } from '../ui/hudLayout'
 
 // How far back the release speed looks: the drag of the last tenth of a
 // second, so a pointer held still before letting go does not coast.
@@ -38,6 +39,16 @@ export function coast(velocity, dt, tau) {
 		elevation: velocity.elevation * share,
 		velocity: left < COAST_REST ? null : next,
 	}
+}
+
+// How far (degrees) the mouse parallax turns the view at the window's edge,
+// at camera `distance`: `controls.parallax` zoomed in, `controls.parallaxOut`
+// zoomed out, linear in the zoom level between the zoom limits `[near, far]`
+// (src/ui/hudLayout.js: a log scale, as the wheel and the dial move). Without
+// limits, as zoomed in.
+export function parallaxReach(controls, distance, limits) {
+	const level = limits ? zoomLevel(distance, limits) : 1
+	return controls.parallaxOut + (controls.parallax - controls.parallaxOut) * level
 }
 
 // `current` glides toward `target` with the time constant `lag` (s; 0 jumps),

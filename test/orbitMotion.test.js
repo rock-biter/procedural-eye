@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { coast, follow, releaseVelocity } from '../src/camera/orbitMotion'
+import { coast, follow, parallaxReach, releaseVelocity } from '../src/camera/orbitMotion'
 
 const close = (a, b, tolerance, label) =>
 	assert.ok(Math.abs(a - b) < tolerance, `${label ?? ''} ${a} vs ${b}`)
@@ -40,6 +40,19 @@ test('coasting covers speed × inertia whatever the frame rate, then stops', () 
 	close(run(1 / 60), 18, 0.01, '60 fps')
 	close(run(1 / 20), 18, 0.01, '20 fps')
 	assert.equal(coast({ azimuth: 90, elevation: 0 }, 1 / 60, 0).velocity, null)
+})
+
+test('the parallax reaches further zoomed out, linear in the zoom level', () => {
+	const controls = { parallax: 3, parallaxOut: 6 }
+	const limits = [180, 480]
+	assert.equal(parallaxReach(controls, 180, limits), 3)
+	assert.equal(parallaxReach(controls, 480, limits), 6)
+	// Halfway on the zoom's log scale, halfway between the two.
+	close(parallaxReach(controls, Math.sqrt(180 * 480), limits), 4.5, 1e-9)
+	// Past the limits it stays at their reach; without limits, zoomed in.
+	assert.equal(parallaxReach(controls, 120, limits), 3)
+	assert.equal(parallaxReach(controls, 700, limits), 6)
+	assert.equal(parallaxReach(controls, 480, null), 3)
 })
 
 test('follow glides with its lag and lands on the target', () => {
