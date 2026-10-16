@@ -669,6 +669,7 @@ canvas {
 	text-decoration: underline;
 	text-underline-offset: 2px;
 	pointer-events: auto;
+	color: #ffb700;
 }
 
 .fps {
@@ -708,17 +709,18 @@ canvas {
 
 .snapshot-icon {
 	position: relative;
+	color: #ffb700;
 	width: 24px;
 	height: 24px;
 	background:
-		linear-gradient(currentColor, currentColor) left top / 6px 1px,
-		linear-gradient(currentColor, currentColor) left top / 1px 6px,
-		linear-gradient(currentColor, currentColor) right top / 6px 1px,
-		linear-gradient(currentColor, currentColor) right top / 1px 6px,
-		linear-gradient(currentColor, currentColor) left bottom / 6px 1px,
-		linear-gradient(currentColor, currentColor) left bottom / 1px 6px,
-		linear-gradient(currentColor, currentColor) right bottom / 6px 1px,
-		linear-gradient(currentColor, currentColor) right bottom / 1px 6px;
+		linear-gradient(currentColor, currentColor) left top / 8px 1px,
+		linear-gradient(currentColor, currentColor) left top / 1px 8px,
+		linear-gradient(currentColor, currentColor) right top / 8px 1px,
+		linear-gradient(currentColor, currentColor) right top / 1px 8px,
+		linear-gradient(currentColor, currentColor) left bottom / 8px 1px,
+		linear-gradient(currentColor, currentColor) left bottom / 1px 8px,
+		linear-gradient(currentColor, currentColor) right bottom / 8px 1px,
+		linear-gradient(currentColor, currentColor) right bottom / 1px 8px;
 	background-repeat: no-repeat;
 }
 
