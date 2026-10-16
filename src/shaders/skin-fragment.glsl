@@ -6,6 +6,9 @@
 // The intermarginal strip: wet conjunctiva behind, the mucocutaneous
 // junction, the row of meibomian orifices, the grey line, the keratinized
 // anterior margin. Wrapped diffuse, GGX specular, mirror reflection where wet.
+// SKIN_SHELL: the back shell (src/adnexa/backShell.js), plain skin far from
+// the lids, without freckles and veins, darker by uShellTone; its pattern
+// coordinates are its own skin unrolled into the front plane.
 #include ./debug-views.glsl
 #include ./lit-surface.glsl
 #include ./key-shadow.glsl
@@ -22,6 +25,9 @@ uniform vec2 uDefocus; // camera aperture diameter, focus distance (mm)
 uniform float uOcclusion; // strength of the baked ambient occlusion
 uniform sampler2D uSkinPattern; // baked pigment patterns (skin-pattern-fragment.glsl)
 uniform vec4 uSkinPatternBox; // its box in the front plane: min x, min y, 1 / width, 1 / height (mm)
+#ifdef SKIN_SHELL
+uniform float uShellTone; // the back shell's albedo, a share of the skin's
+#endif
 
 varying vec3 vWorldPos;
 varying vec3 vRestPos;
@@ -120,6 +126,16 @@ void main() {
 	float upperLid = upper * smoothstep(1.0, 2.5, a) * (1.0 - smoothstep(9.0, 15.0, a));
 	float underEye = (1.0 - upper) * smoothstep(1.0, 3.0, a) * (1.0 - smoothstep(8.0, 13.0, a));
 	float canthi = exp(-sq(distance(p, uCanthi.xy) / 3.5)) + 0.6 * exp(-sq(distance(p, uCanthi.zw) / 3.5));
+#ifdef SKIN_SHELL
+	// The shell's coordinates cover the front plane's again: no canthi there.
+	// Its tension lines wander over about a centimeter: lines all along the
+	// edge streak where the shell turns away, furrows all as shallow cross
+	// into a regular lattice.
+	canthi = 0.0;
+	fan = 0.0;
+	float tensionTurn = PI * valueNoise(p / 12.0, seed + 19u);
+	tension = vec2(cos(tensionTurn), sin(tensionTurn));
+#endif
 
 	// Micro-relief (furrows, fine network, pores) and fine wrinkles: heights
 	// (mm) with their front-plane gradients. The anterior edge of the margin
@@ -151,6 +167,7 @@ void main() {
 	float orifices = 0.0;
 	vec3 marginGradient = vec3(0.0);
 	float orificeRim = 0.0;
+#ifndef SKIN_SHELL
 	if (onMargin > 0.0 && detail > 0.0) {
 		float count = upper > 0.5 ? ORIFICES.x : ORIFICES.y;
 		float x = along * count;
@@ -172,9 +189,17 @@ void main() {
 		orifices = detail * open * exp(-sq(ro / 0.45));
 		orificeRim = detail * open * exp(-sq(ro / 1.3)) * step(0.7, h.w);
 	}
+#endif
 
+#ifdef SKIN_SHELL
+	// The relief's gradient in the unrolled coordinates, carried onto the
+	// surface by theirs (the band stands edge-on to the front plane).
+	vec3 gradient = height.y * surfaceGradient(p.x, geometric, dpdx, dpdy) +
+		height.z * surfaceGradient(p.y, geometric, dpdx, dpdy);
+#else
 	vec3 gradient = vec3(height.yz, 0.0);
 	gradient -= geometric * dot(gradient, geometric);
+#endif
 	vec3 n = normalize(geometric - gradient - marginGradient * onMargin);
 
 	// Albedo: melanin, blood and the venous tint over the skin color.
@@ -182,10 +207,12 @@ void main() {
 	float blood = (pattern.g - 0.5) * 1.2;
 	float venous = 0.0;
 	float cavity = saturate(-fold / 0.5);
+#ifndef SKIN_SHELL
 	melanin += 1.1 * freckles(p, uSkin3.x, seed + 61u);
-	melanin += uSkin3.z * (0.9 * cavity + 0.5 * underEye + 0.4 * canthi);
 	float veins = pattern.b;
 	venous += uSkin3.y * (0.8 * upperLid + 1.0 * underEye + 1.6 * veins * saturate(upperLid + underEye + 0.15));
+#endif
+	melanin += uSkin3.z * (0.9 * cavity + 0.5 * underEye + 0.4 * canthi);
 	// Capillaries: pinker thin skin toward the lash line and in the canthi.
 	blood += uSkin.x * (1.5 * exp(-a / 1.6) + 0.6 * canthi);
 	vec3 albedo = uSkinColor * pow(vec3(0.8, 0.68, 0.56), vec3(melanin)) *
@@ -193,6 +220,9 @@ void main() {
 	// Furrows are a little darker; the lash roots darker still.
 	albedo *= 1.0 + 3.0 * furrowed.x + network.x;
 	albedo *= mix(1.0, 0.7, exp(-a / 0.5) * onSkin);
+#ifdef SKIN_SHELL
+	albedo *= uShellTone;
+#else
 
 	// The margin, from the posterior border (u 0) to the lash line (u 1–2),
 	// mottled along its length by its vessels.
@@ -208,6 +238,7 @@ void main() {
 		margin = mix(margin, vec3(0.8, 0.68, 0.5), 0.3 * saturate(orificeRim));
 		albedo = mix(albedo, margin, onMargin);
 	}
+#endif
 
 	// Folds are shaded (ambient and specular occlusion), grooves a little.
 	float occlusion = (1.0 - 0.45 * pow(cavity, 0.8)) * (1.0 + 4.0 * micro.x + 1.5 * wrinkles.x);

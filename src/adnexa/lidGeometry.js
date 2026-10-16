@@ -50,9 +50,10 @@ const TURN_WEIGHT = 3
 const LATERAL_ROUND = 0.5
 const MEDIAL_ROUND = 1
 // The rows' step (mm) when tracing a column outward, and the patch of face:
-// an ellipse centered on the eye (on the pupil), its semi-axes.
+// an ellipse centered on the eye (on the pupil), its semi-axes. The back shell
+// (src/adnexa/backShell.js) closes the patch from its edge.
 const TRACE_STEP = 0.2
-const PATCH = { width: 32.3, height: 34 }
+export const LID_PATCH = Object.freeze({ width: 32.3, height: 34 })
 // Far from the margin the rows turn from the margin's normal to rays from the
 // fissure's center, which never cross.
 const RADIAL = { start: 2, end: 16 }
@@ -326,7 +327,7 @@ function traceColumn(context, column, maxReach = 70) {
 	const xs = [column.point[0]]
 	const ys = [column.point[1]]
 	let [x, y] = column.point
-	const outside = (px, py) => (px / PATCH.width) ** 2 + (py / PATCH.height) ** 2 - 1
+	const outside = (px, py) => (px / LID_PATCH.width) ** 2 + (py / LID_PATCH.height) ** 2 - 1
 	let reach = maxReach
 	for (let a = 0; a < maxReach; a += TRACE_STEP) {
 		const rx = x - center[0]
@@ -512,7 +513,8 @@ export function lidPoint(t, s, fissure, eye, lids) {
 // Ring mesh data: `around` columns, `across` rows along the profile.
 // Attributes `lid` = (t, s, a, upper share), `relief` = (row direction x, y,
 // groove depth (mm, ≤ 0), share of the way along the margin from the medial
-// canthus) and `follow` = (upper share, follow weight).
+// canthus) and `follow` = (upper share, follow weight). `rim`: the outer row,
+// the patch's edge, column by column.
 export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across = 150 } = {}) {
 	const fissure = createFissure(lids, nasalSign)
 	const context = lidContext(lids, eye, fissure)
@@ -521,6 +523,7 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across =
 	const lid = new Float32Array(around * across * 4)
 	const relief = new Float32Array(around * across * 4)
 	const follow = new Float32Array(around * across * 2)
+	const rim = new Float32Array(around * 3)
 	for (let i = 0; i < around; i++) {
 		const data = columnAt(context, columns[i])
 		const { profile } = data
@@ -533,6 +536,7 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across =
 			relief.set([point.direction[0], point.direction[1], point.fold, profile.along], index * 4)
 			follow.set([profile.share, followWeight(point.a, profile.band)], index * 2)
 		}
+		rim.set(positions.subarray((i * across + across - 1) * 3, (i + 1) * across * 3), i * 3)
 	}
 	const indices = new Uint32Array(around * (across - 1) * 6)
 	let k = 0
@@ -549,7 +553,7 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across =
 			k += 6
 		}
 	}
-	return { positions, lid, relief, follow, indices, fissure }
+	return { positions, lid, relief, follow, indices, fissure, rim }
 }
 
 // How far out (mm) the conjunctiva mesh reaches in the direction whose X is

@@ -276,6 +276,14 @@ export const BASE_PARAM_SCHEMA = {
 		occlusion: num(1, 0, 1, 0.01, '', 'uniform', 'baked ambient occlusion'),
 		backdrop: num(0.55, 0, 1.5, 0.01, '', 'uniform', 'backdrop (× lit skin tone)'),
 	},
+	// The back shell closing the skin patch behind the eye
+	// (src/adnexa/backShell.js): how far it keeps behind the globe and the lids,
+	// the flat band along the patch's edge, and its skin's tone.
+	shell: {
+		clearance: num(1.5, 0.5, 15, 0.1, 'mm', 'rebuild', 'clearance behind the eye'),
+		band: num(2, 0.5, 6, 0.1, 'mm', 'rebuild', 'edge band'),
+		tone: num(0.6, 0.1, 1, 0.01, '', 'uniform', 'tone (× skin albedo)'),
+	},
 	sclera: {
 		color: color('#e7ddd2', 'uniform', 'base color'),
 		irregularity: num(0.35, 0, 1, 0.01, '', 'uniform', 'surface irregularity'),

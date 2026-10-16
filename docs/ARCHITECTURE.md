@@ -6,7 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the dock (Zoom out, Zoom in, Random eye), the skin tones, the title and the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom level, Zoom out and Random eye), the title, the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones, and sets the zoom level; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
@@ -62,7 +62,9 @@
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
-| [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) | The glass refraction of the dock and the skin tones on Chromium: a displacement map per button (a convex bevel refracting by Snell's law), in an SVG filter that also holds the blur of its backdrop. |
+| [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye, cut around each button, with the round glass buttons on it and the zoom level's dial and slider; `main.js` gives it the actions. |
+| [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's radius and every button's angle on the circle (groups spaced in pixels along it); the zoom level of a camera distance (log scale) and back. |
+| [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) | The glass refraction of the HUD's buttons on Chromium: a displacement map per button (a convex bevel refracting by Snell's law), in an SVG filter that also holds the blur of its backdrop. |
 | [`src/math.js`](../src/math.js) *, [`src/random.js`](../src/random.js) * | Scalar and vector helpers; seeds, PCG hash twin, weighted picks, Gaussian samples. |
 | [`src/frameStats.js`](../src/frameStats.js), [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | Frame telemetry and the adaptive resolution rules (from the terrain project). |
 
@@ -138,7 +140,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `globe`, `cornea`, `chamber`, `limbus`;
   - `iris`, `irisStructure`, `irisColor`;
   - `lids`, `lashes`, `skin`, `sclera`;
-  - `lighting`, `camera`, `zoom` (the dock's zoom distances and duration), `controls` (the mouse parallax and the orbit's inertia), `post`, `quality`, `debug`.
+  - `lighting`, `camera`, `zoom` (the HUD's zoom distances and duration), `controls` (the mouse parallax and the orbit's inertia), `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
 - **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.
   - `paramSchema.js` writes `BASE_PARAM_SCHEMA` with a `default` per leaf, then `withDefaults()` replaces each default the file names (sanitized like any override) to make `PARAM_SCHEMA`. A leaf the file does not name, such as a new one, keeps the default written in the schema; a name the file has but the schema lacks is reported with a console warning.

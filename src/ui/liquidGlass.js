@@ -1,4 +1,4 @@
-// Liquid-glass refraction for the dock buttons. Each button is a convex slab
+// Liquid-glass refraction for the HUD's buttons. Each button is a convex slab
 // of glass whose rim is a rounded bevel: an SVG filter, used as the button's
 // `backdrop-filter` (style.css), blurs the scene behind it lightly and bends
 // it near the rim as the bevel would. Only Chromium applies SVG filters in

@@ -19,11 +19,12 @@ pnpm capture    # renders presets headlessly next to the reference photos
 **Controls**
 
 - Drag to orbit (it coasts a little when you let go; the view also turns slightly toward the mouse), shift- or right-drag to pan, scroll to change the distance between the zoom-in and zoom-out framings (the focus stays on the pupil plane).
-- **Zoom out** / **Zoom in** (the − and + at the bottom): glide out to the whole figure and back.
-- **Skin tone** (the dots at the bottom left): glide the skin color from fair to deep.
+- The buttons sit on a dashed circle around the eye.
+- **Zoom out** / **Zoom in** (the − and + at the bottom right of the circle): glide out to the whole figure and back. The dial between them shows the zoom; drag it (or scroll over it) to zoom.
+- **Skin tone** (the dots at the bottom left of the circle): glide the skin color from fair to deep.
 - **Space** toggles photo mode: the eye freezes and the image converges.
 
-**Random eye** (the button at the bottom): an eye drawn from measured population data for the chosen ancestry.
+**Random eye** (the shuffle button, below the zoom): an eye drawn from measured population data for the chosen ancestry.
 
 **Panel** (collapsed at the top, only with `#debug` at the end of the URL; `?gui=0` hides the buttons too)
 

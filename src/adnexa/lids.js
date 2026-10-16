@@ -1,6 +1,8 @@
 // The eyelids: the ring mesh of src/adnexa/lidGeometry.js around the
 // fissure, in world space (it does not turn with the gaze), with the skin
-// program and its baked pigment patterns (src/adnexa/skinPattern.js).
+// program and its baked pigment patterns (src/adnexa/skinPattern.js); and the
+// back shell (src/adnexa/backShell.js) closing the skin patch behind, with the
+// skin program's SKIN_SHELL variant.
 import {
 	BufferAttribute,
 	BufferGeometry,
@@ -17,6 +19,7 @@ import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
+import { createBackShell } from './backShell'
 import {
 	createConjunctivaMesh,
 	createLidMesh,
@@ -58,6 +61,21 @@ export default class Lids {
 		// Casters of the key light's shadow.
 		this.mesh.layers.enable(SHADOW_LAYER)
 		this.fissure = null
+		// The back shell: the same skin uniforms, and its tone. It lies behind
+		// the skin the key light falls on, so it casts no shadow.
+		this.backUniforms = { ...this.uniforms, uShellTone: new Uniform(1) }
+		this.backMaterial = new ShaderMaterial({
+			uniforms: this.backUniforms,
+			defines: { ...this.material.defines, SKIN_SHELL: '' },
+			vertexShader,
+			fragmentShader,
+		})
+		this.backMaterial.name = 'BackShell'
+		this.back = new Mesh(new BufferGeometry(), this.backMaterial)
+		this.back.name = 'BackShell'
+		// The patch's edge and the meshes the back shell closes around.
+		this.rim = null
+		this.enclosed = []
 	}
 
 	// `renderer` bakes the skin patterns over the new mesh.
@@ -110,16 +128,38 @@ export default class Lids {
 			params.lids.seed,
 		)
 		this.fissure = data.fissure
+		this.rim = data.rim
+		this.enclosed = parts
 		const { medial, lateral, lengths } = data.fissure
 		this.uniforms.uCanthi.value.set(medial[0], medial[1], lateral[0], lateral[1])
 		this.uniforms.uMarginLength.value.fromArray(lengths)
 	}
 
+	// The back shell around the last lids (after rebuild()), for
+	// params.shell.
+	rebuildBack(params, eye) {
+		const shell = createBackShell(this.rim, eye, params.shell, this.enclosed)
+		const geometry = new BufferGeometry()
+		geometry.setAttribute('position', new BufferAttribute(shell.positions, 3))
+		geometry.setAttribute('coords', new BufferAttribute(shell.coords, 2))
+		geometry.setAttribute('lid', new BufferAttribute(shell.lid, 4))
+		geometry.setAttribute('relief', new BufferAttribute(shell.relief, 4))
+		geometry.setAttribute('follow', new BufferAttribute(shell.follow, 2))
+		geometry.setAttribute('ao', new BufferAttribute(shell.ao, 1))
+		geometry.setIndex(new BufferAttribute(shell.indices, 1))
+		geometry.computeVertexNormals()
+		geometry.computeBoundingSphere()
+		this.back.geometry.dispose()
+		this.back.geometry = geometry
+	}
+
 	setDebugView(view) {
 		const value = debugViewDefine(view)
-		if (this.material.defines.DEBUG_VIEW === value) return
-		this.material.defines.DEBUG_VIEW = value
-		this.material.needsUpdate = true
+		for (const material of [this.material, this.backMaterial]) {
+			if (material.defines.DEBUG_VIEW === value) continue
+			material.defines.DEBUG_VIEW = value
+			material.needsUpdate = true
+		}
 	}
 
 	update(params, pixelAngle) {
@@ -135,11 +175,14 @@ export default class Lids {
 		u.uSkin2.value.set(skin.wrinkles, skin.translucency, LID_PROFILE.wall, LID_PROFILE.edge)
 		u.uSkin3.value.set(skin.freckles, skin.veins, skin.pigmentation, params.lids.seed)
 		u.uOcclusion.value = skin.occlusion
+		this.backUniforms.uShellTone.value = params.shell.tone
 	}
 
 	dispose() {
 		this.mesh.geometry.dispose()
 		this.material.dispose()
+		this.back.geometry.dispose()
+		this.backMaterial.dispose()
 		this.pattern.dispose()
 	}
 }

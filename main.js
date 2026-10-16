@@ -15,10 +15,11 @@ import { ANCESTRIES, randomEye } from './src/params/populationPriors'
 import { PRESETS } from './src/params/presets'
 import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
-import { GLASS, liquidGlass } from './src/ui/liquidGlass'
+import { createHud } from './src/ui/hud'
+import { zoomDistance, zoomLevel } from './src/ui/hudLayout'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
-// #debug), creates the params, the renderer and the app, the dock unless
+// #debug), creates the params, the renderer and the app, the HUD unless
 // ?gui=0, and the panel while the URL ends in #debug.
 const urlParams = new URLSearchParams(window.location.search)
 const presetName = PRESETS[urlParams.get('preset')] ? urlParams.get('preset') : 'default'
@@ -95,6 +96,16 @@ function zoom(direction) {
 	app.transitionTo(target, settings.duration)
 }
 
+// The zoom level of the HUD's gauge, 0 out to 1 in, between the screen's
+// zoom distances (src/ui/hudLayout.js); setting it moves the camera at once,
+// as the wheel does, and stops a zoom gliding.
+const zoomLimits = () => zoomDistances(app.targetParams.zoom)
+const getZoomLevel = () => zoomLevel(app.params.camera.distance, zoomLimits())
+function setZoomLevel(level) {
+	setValue(PARAM_SCHEMA, app.params, 'camera.distance', zoomDistance(level, zoomLimits()))
+	app.onParamChange('camera.distance')
+}
+
 // Glides `skin.color` to the tone `name` (src/params/skinTones.js), as the
 // skin buttons do. The rest keeps the values a running transition is heading
 // for.
@@ -118,6 +129,8 @@ window.__EYE__ = {
 	loadPreset,
 	randomEye: loadRandomEye,
 	zoom,
+	getZoomLevel,
+	setZoomLevel,
 	skinTone,
 }
 
@@ -150,9 +163,6 @@ function download(blob, filename) {
 	setTimeout(() => URL.revokeObjectURL(link.href), 1000)
 }
 
-// The glass of the skin buttons: a bevel and a bend scaled to their size.
-const SMALL_GLASS = { ...GLASS, bezel: 10, maxOffset: 7 }
-
 // The frame around the page (style.css): a cross of 1 px arms at each corner
 // and a dashed line along each side, across the whole window, made of two
 // halves, each from a window edge to the middle (style.css mirrors the second
@@ -184,82 +194,46 @@ function frame() {
 	return element
 }
 
-// A plus (zoom in) or a minus (zoom out).
-function sign(plus) {
-	return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12${plus ? 'M12 6v12' : ''}"/></svg>`
-}
-
-// A glass button (the dock, the skin tones); it blurs itself after a click,
-// because Space toggles photo mode only when the page has the focus.
-function glassButton(className, label, content, run) {
-	const button = document.createElement('button')
-	button.type = 'button'
-	button.className = `glass ${className}`
-	button.setAttribute('aria-label', label)
-	button.title = label
-	button.innerHTML = content
-	button.addEventListener('click', () => {
-		run()
-		button.blur()
-	})
-	return button
-}
-
 if (urlParams.get('gui') !== '0') {
 	// The frame around the page; the rest of the interface stays inside it.
 	document.body.appendChild(frame())
 
-	// Zoom out, zoom in and Random eye, always in view outside the panel:
-	// bottom right, or on phones and tablets Random-eyes bottom center and the
-	// zoom buttons stacked bottom right (style.css).
-	const dock = document.createElement('div')
-	dock.className = 'dock'
-	dock.append(
-		glassButton('zoom zoom-out', 'Zoom out', sign(false), () => zoom('out')),
-		glassButton('zoom zoom-in', 'Zoom in', sign(true), () => zoom('in')),
-		glassButton('random-eye', 'Random-eyes', 'Random-eyes', () =>
-			console.log('Random-eyes', panelState.ancestry, loadRandomEye()),
-		),
-	)
-	document.body.appendChild(dock)
-	liquidGlass(dock.children)
-
-	// The skin tones, bottom left: a column of small glass buttons, each with
-	// a bead of its color. The one of the color the params are heading for is
-	// pressed, also after the panel or a preset changes it.
-	const skinTones = document.createElement('div')
-	skinTones.className = 'skin-tones'
-	skinTones.setAttribute('role', 'group')
-	skinTones.setAttribute('aria-label', 'Skin tone')
-	const toneButtons = SKIN_TONES.map((tone) => {
-		const button = glassButton('skin', `${tone.label} skin`, '<span></span>', () =>
-			skinTone(tone.name),
-		)
-		button.style.setProperty('--tone', tone.color)
-		return button
+	// The HUD around the eye (src/ui/hud.js): the skin tones, the zoom and
+	// Random eye on a dashed circle. The tone of the color the params are
+	// heading for is pressed, also after the panel or a preset changes it; the
+	// zoom gauge follows the camera every frame, gliding or not.
+	const hud = createHud({
+		tones: SKIN_TONES,
+		onTone: (name) => skinTone(name),
+		onZoom: (direction) => zoom(direction),
+		onZoomLevel: (level) => setZoomLevel(level),
+		onRandom: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
 	})
-	const pressTone = () => {
-		const color = app.targetParams.skin.color
-		toneButtons.forEach((button, i) =>
-			button.setAttribute('aria-pressed', String(SKIN_TONES[i].color === color)),
-		)
-	}
-	skinTones.append(...toneButtons)
-	document.body.appendChild(skinTones)
-	liquidGlass(toneButtons, SMALL_GLASS)
+	document.body.appendChild(hud.element)
+	hud.mount()
+	const pressTone = () => hud.pressTone(app.targetParams.skin.color)
 	pressTone()
 	app.listeners.add((path) => {
 		if (path === '*' || path === 'skin.color') pressTone()
 	})
+	const showZoomLevel = () => {
+		requestAnimationFrame(showZoomLevel)
+		hud.showZoomLevel(getZoomLevel())
+	}
+	requestAnimationFrame(showZoomLevel)
 
-	// The title and the credit line, top left; the credit's link blurs itself
-	// after a click, as the glass buttons do.
+	// The title, top left, and the credit line, bottom left; the credit's
+	// link blurs itself after a click, as the glass buttons do.
 	const masthead = document.createElement('header')
 	masthead.className = 'masthead'
-	masthead.innerHTML =
-		'<h1>Random-eyes</h1><p class="credit">powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5</p>'
-	masthead.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
+	masthead.innerHTML = '<h1>Random-eyes</h1>'
 	document.body.appendChild(masthead)
+	const credit = document.createElement('p')
+	credit.className = 'credit'
+	credit.innerHTML =
+		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
+	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
+	document.body.appendChild(credit)
 
 	// The frame rate, top right, styled as the credit line: the frames the page
 	// shows per second, counted over half a second. A gap longer than a second

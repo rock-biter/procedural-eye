@@ -71,8 +71,10 @@ export default class EyeApp {
 			if (event.code === 'Space' && event.target === document.body) this.toggleFrozen()
 		})
 		this.irisSpace = null
-		// The lids and eye the lid mesh and the fissure map were built for.
+		// The lids and eye the lid mesh and the fissure map were built for, and
+		// those and the shell settings the back shell was.
 		this.lidKey = null
+		this.backKey = null
 		this.dirty = new Set(['rebuild', 'bake', 'define'])
 		this.listeners = new Set()
 		this.lastTime = null
@@ -107,7 +109,7 @@ export default class EyeApp {
 		)
 		this.eyeRig.eyeSpace.add(this.eyeball.mesh)
 		this.lids = new Lids(this.lightRig.worldUniforms, this.keyShadow.uniforms, params.debug.view)
-		setup.scene.add(this.lids.mesh)
+		setup.scene.add(this.lids.mesh, this.lids.back)
 		this.lashes = new Lashes(
 			this.lightRig.worldUniforms,
 			this.keyShadow.uniforms,
@@ -218,6 +220,12 @@ export default class EyeApp {
 			const data = this.fissureMap.image.data
 			for (let i = 0; i < distances.length; i++) data[i] = DataUtils.toHalfFloat(distances[i])
 			this.fissureMap.needsUpdate = true
+		}
+		const { clearance, band } = this.params.shell
+		const backKey = JSON.stringify([lidKey, clearance, band])
+		if (backKey !== this.backKey) {
+			this.backKey = backKey
+			this.lids.rebuildBack(this.params, this.eye)
 		}
 		this.lashes.rebuild(this.params, this.eye)
 		this.tearFilm.rebuild(this.params, this.eye)
