@@ -171,7 +171,7 @@ if (urlParams.get('gui') !== '0') {
 	document.body.appendChild(dock)
 	liquidGlass(dock.children)
 
-	// The credit line, top center; its link blurs itself after a click, as the
+	// The credit line, top left; its link blurs itself after a click, as the
 	// dock's buttons do.
 	const credit = document.createElement('div')
 	credit.className = 'credit'
@@ -179,6 +179,27 @@ if (urlParams.get('gui') !== '0') {
 		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
 	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
 	document.body.appendChild(credit)
+
+	// The frame rate, top right, styled as the credit line: the frames the page
+	// shows per second, counted over half a second. A gap longer than a second
+	// is a hidden tab, not a slow frame, and is not shown.
+	const fps = document.createElement('div')
+	fps.className = 'fps'
+	fps.textContent = '-- fps'
+	document.body.appendChild(fps)
+	let frames = 0
+	let since = null
+	const countFrame = (time) => {
+		requestAnimationFrame(countFrame)
+		since ??= time
+		frames++
+		const elapsed = time - since
+		if (elapsed < 500) return
+		if (elapsed < 1000) fps.textContent = `${Math.round((frames * 1000) / elapsed)} fps`
+		frames = 0
+		since = time
+	}
+	requestAnimationFrame(countFrame)
 
 	// The panel shows while the URL ends in #debug: built the first time, then
 	// hidden and shown again as the hash changes.

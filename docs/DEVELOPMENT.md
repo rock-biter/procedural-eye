@@ -35,7 +35,7 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
   - The terrain project uses lil-gui; Tweakpane is used here for its folders, color pickers and FPS graph.
   - The panel is generated from the schema, so the library stays replaceable.
 - **`alea`** seeds the CPU generators.
-- **JetBrains Mono** (Google Fonts, SIL OFL 1.1) sets the credit line. Its latin subset of weight 400 is a file of the repository, [`fonts/`](../fonts/) with its `OFL.txt`, which Vite bundles from `style.css`; the page loads no font from a CDN.
+- **JetBrains Mono** (Google Fonts, SIL OFL 1.1) sets the credit line and the frame rate. Its latin subset of weight 400 is a file of the repository, [`fonts/`](../fonts/) with its `OFL.txt`, which Vite bundles from `style.css`; the page loads no font from a CDN.
 - Plain JavaScript, no TypeScript step.
 
 ## Code Conventions
@@ -72,7 +72,7 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 | `?state=<string>` | Applies the non-default values encoded by **Copy state URL** or **Save PNG** (base64url JSON), on top of the preset. |
 | `?photo=<n>` | Sets `quality.photoSamples` to `n` and starts in photo mode (frozen clock); the accumulation stops after `n` samples. |
 | `?view=<name>` | Sets `debug.view`; see [`docs/RENDERING.md`](RENDERING.md#debug-views) for the list. |
-| `?gui=0` | Hides the dock, the credit line and the panel (captures). |
+| `?gui=0` | Hides the dock, the credit line, the frame rate and the panel (captures). |
 | `?dpr=<ratio>` | Pins the pixel ratio (0.5–2) and turns the adaptive resolution off. |
 | `?debug=1` | Exposes the app object as `window.__EYE_APP__` for console debugging. |
 | `#debug` | Shows the panel (it is not even loaded otherwise). It follows the hash: adding or removing `#debug` on an open page shows or hides it. |
@@ -90,15 +90,17 @@ The buttons are liquid glass, clear (a 2px blur) and defined by their edges. `st
 
 - **Zoom out** and **Zoom in** (− and +) glide `camera.distance` over `zoom.duration`:
   - Zoom out to `zoom.out`, which frames the whole figure; portrait screens (phones held upright), much narrower, to `zoom.mobileOut`.
-  - Zoom in to `zoom.in` (160 mm by default); portrait screens to the start-up `camera.distance`, where they start.
-  - Landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (0.35 by default, about 272 mm), unless the URL sets `?preset=` or `?state=`; portrait screens start zoomed in.
+  - Zoom in to `zoom.in` (180 mm by default); portrait screens to the start-up `camera.distance`, where they start.
+  - Landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (0.35 by default, 285 mm), unless the URL sets `?preset=` or `?state=`; portrait screens start zoomed in.
   - The wheel stays between the zoom-in and zoom-out distances of the screen.
 - Portrait screens start, and load presets, with `camera.targetZ` 0.
 - **Random eye**.
 
-**The credit line**, small text at the top in JetBrains Mono (`style.css`), links **rockbiter** to the author's X account; only the link takes the pointer, so drags across the text still orbit the camera, and it blurs itself after a click.
+**The credit line**, small text at the top left in JetBrains Mono (`style.css`), links **rockbiter** to the author's X account; only the link takes the pointer, so drags across the text still orbit the camera, and it blurs itself after a click. On narrow screens it wraps, aligned left, before the frame rate.
 
-The panel shows only while the URL ends in `#debug`, and starts collapsed. When its open folders outgrow the viewport it scrolls, and it stops above the dock (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
+**The frame rate**, top right in the credit line's style, counts the frames the page shows per second, over half a second, with a `requestAnimationFrame` loop of its own in `main.js`. A converged photo draws nothing, so it then shows the display's refresh rate.
+
+The panel shows only while the URL ends in `#debug`, and starts collapsed, below the frame rate (and, on phones, below the credit line, which wraps there). When its open folders outgrow the viewport it scrolls, and it stops above the dock (`style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
 
 ## Console API
 

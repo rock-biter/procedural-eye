@@ -8,7 +8,8 @@
 	src: url('./fonts/jetbrains-mono-latin-400.woff2') format('woff2');
 }
 
-/* The color of the interface: the dock's labels and icons, and the credit line. */
+/* The color of the interface: the dock's labels and icons, the credit line
+   and the frame rate. */
 :root {
 	--ui-color: #ffe4c3;
 }
@@ -26,15 +27,27 @@ canvas {
 	touch-action: none;
 }
 
-/* The panel scrolls when its open folders outgrow the viewport, and stops
-   above the dock (8px top + 84px kept for its buttons). */
+/* The panel starts below the frame rate (--panel-top), scrolls when its open
+   folders outgrow the viewport, and stops above the dock (84px kept for its
+   buttons). */
 .tp-dfwv {
+	--panel-top: 40px;
+	top: calc(var(--panel-top) + env(safe-area-inset-top)) !important;
 	width: 320px !important;
-	max-height: calc(100vh - 92px);
-	max-height: calc(100dvh - 92px - env(safe-area-inset-bottom));
+	max-height: calc(100vh - var(--panel-top) - 84px);
+	max-height: calc(
+		100dvh - var(--panel-top) - 84px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+	);
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	scrollbar-width: thin;
+}
+
+/* Phones: below the credit line too, which wraps to two lines there. */
+@media (max-width: 640px) {
+	.tp-dfwv {
+		--panel-top: 56px;
+	}
 }
 
 /* The dock: Zoom out, Zoom in and Random eye, bottom right. */
@@ -127,28 +140,38 @@ canvas {
 	stroke-linecap: round;
 }
 
-/* The credit line, at the top, clear of the notch, in JetBrains Mono. Only its
-   link takes the pointer, so drags across the text still orbit the camera. */
-.credit {
+/* The credit line, top left, and the frame rate, top right: clear of the
+   notch, in JetBrains Mono. Only the credit's link takes the pointer, so drags
+   across the text still orbit the camera. */
+.credit,
+.fps {
 	position: fixed;
 	top: calc(12px + env(safe-area-inset-top));
-	left: 24px;
 	z-index: 10;
-	width: max-content;
-	max-width: calc(100vw - 32px);
-	/* transform: translateX(-50%); */
 	color: var(--ui-color);
 	font:
 		400 12px/1.4 'JetBrains Mono',
 		ui-monospace,
 		monospace;
 	letter-spacing: 0.02em;
-	text-align: center;
 	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 	pointer-events: none;
 	user-select: none;
 	opacity: 0.8;
+}
+
+/* On narrow screens the credit wraps, aligned left, before the frame rate. */
+.credit {
+	left: 24px;
+	width: max-content;
+	max-width: calc(100vw - 120px);
+	text-align: left;
 	text-wrap: balance;
+}
+
+.fps {
+	right: 24px;
+	white-space: nowrap;
 }
 
 .credit a {
