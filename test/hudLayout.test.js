@@ -5,6 +5,7 @@ import {
 	hudLayout,
 	knobAngle,
 	knobSnap,
+	orbitRing,
 	trackLevel,
 	zoomDistance,
 	zoomLevel,
@@ -104,6 +105,43 @@ test('a dragged knob snaps to an end within HUD.zoom.snap px of it or past it', 
 	assert.equal(knobSnap(0.6, track, radius), 0, 'past zoom out')
 	// The snap starts once the knob overlaps the button.
 	assert.ok(HUD.zoom.snap < HUD.button / 2 + HUD.knob / 2)
+})
+
+test('the second circle grows as the zoom goes out and turns against the knob', () => {
+	const radius = 450
+	const track = [-10 * (Math.PI / 180), 20 * (Math.PI / 180)]
+	const zoomedIn = orbitRing(radius, 1, track)
+	const zoomedOut = orbitRing(radius, 0, track)
+	const half = orbitRing(radius, 0.5, track)
+	assert.ok(near(zoomedIn.radius, radius + HUD.orbit.in, 1e-9))
+	assert.ok(near(zoomedOut.radius, radius + HUD.orbit.out, 1e-9))
+	assert.ok(near(half.radius, radius + (HUD.orbit.in + HUD.orbit.out) / 2, 1e-9))
+	// A quarter turn over the zoom: the knob's angle falls as it zooms in
+	// (counter-clockwise), the circle turns clockwise.
+	assert.ok(near(zoomedOut.turn, 0))
+	assert.ok(near(zoomedIn.turn, HUD.orbit.turn, 1e-12))
+	assert.ok(knobAngle(1, track) < knobAngle(0, track))
+	const mirrored = orbitRing(radius, 1, [track[1], track[0]])
+	assert.ok(near(mirrored.turn, -HUD.orbit.turn, 1e-12))
+	for (const ring of [zoomedIn, half, zoomedOut]) {
+		const [dash, gap] = ring.dashArray
+		// The same dashes, a whole number of them around, the gaps stretching.
+		assert.equal(dash, HUD.dash)
+		const count = (2 * Math.PI * ring.radius) / (dash + gap)
+		assert.ok(near(count, Math.round(count), 1e-9))
+		assert.ok(
+			near(
+				count,
+				(2 * Math.PI * zoomedIn.radius) / (zoomedIn.dashArray[0] + zoomedIn.dashArray[1]),
+				1e-9,
+			),
+		)
+		// Turned by its offset along the circle.
+		assert.ok(near(ring.dashOffset, -ring.turn * ring.radius, 1e-9))
+	}
+	assert.ok(zoomedOut.dashArray[1] > zoomedIn.dashArray[1])
+	// Zoomed in, the circle's dashes: HUD.dash every about HUD.dashPeriod px.
+	assert.ok(near(zoomedIn.dashArray[0] + zoomedIn.dashArray[1], HUD.dashPeriod, 0.05))
 })
 
 test('the zoom level runs from 0 out to 1 in on a log scale, and round-trips', () => {

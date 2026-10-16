@@ -29,6 +29,10 @@ export const HUD = Object.freeze({
 	zoom: Object.freeze({ center: 5 * DEGREE, span: 30 * DEGREE, minArc: 160, snap: 28 }),
 	// Random eye below the zoom: at `angle`, or `spacing` px past zoom out.
 	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
+	// The second circle that follows the zoom: `in` px outside the circle
+	// zoomed in (negative: inside it), `out` px zoomed out, turned `turn` over
+	// the whole zoom against the knob.
+	orbit: Object.freeze({ in: -80, out: 250, turn: 90 * DEGREE }),
 })
 
 // The angle of every button on a circle of `radius` px, with `toneCount`
@@ -106,6 +110,25 @@ export function zoomLevel(distance, [near, far]) {
 	if (!(far > near)) return 1
 	const level = Math.log(far / distance) / Math.log(far / near)
 	return Math.min(Math.max(level, 0), 1)
+}
+
+// The second circle about the HUD's circle of `radius` px at a zoom level:
+// its radius, linear in the level from `orbit.out` px outside it (zoomed out)
+// to `orbit.in` px (zoomed in; negative, inside it), and its turn (radians,
+// clockwise), growing to `orbit.turn` zoomed in, against the knob, which runs
+// along the track `[zoomIn, zoomOut]` the other way. Its dashes are the
+// circle's (`dash` px every `dashPeriod` px zoomed in): they keep their length
+// and their count, a whole number around (no seam), so the gaps widen as it
+// grows. `dashArray` and `dashOffset` are its SVG stroke's: a circle's dashes
+// start at its right and run clockwise, and a negative offset carries them
+// forward.
+export function orbitRing(radius, level, [zoomIn, zoomOut], hud = HUD) {
+	const { orbit, dash, dashPeriod } = hud
+	const ring = radius + orbit.out + (orbit.in - orbit.out) * level
+	const count = Math.max(1, Math.round((2 * Math.PI * (radius + orbit.in)) / dashPeriod))
+	const period = (2 * Math.PI * ring) / count
+	const turn = -Math.sign(zoomIn - zoomOut) * orbit.turn * level
+	return { radius: ring, turn, dashArray: [dash, period - dash], dashOffset: -turn * ring }
 }
 
 // The camera distance of a zoom level: the inverse of zoomLevel().

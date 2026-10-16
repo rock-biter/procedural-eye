@@ -7,7 +7,7 @@
 // over it zoom; a click pulses it. The circle's line stops short of each
 // button and of the knob, and only they take the pointer, so drags across
 // the rest still orbit the camera.
-import { HUD, hudLayout, knobAngle, knobSnap, trackLevel } from './hudLayout'
+import { HUD, hudLayout, knobAngle, knobSnap, orbitRing, trackLevel } from './hudLayout'
 import { GLASS, liquidGlass } from './liquidGlass'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -35,6 +35,8 @@ const CLICK_SLOP = 4
 const SNAP_GLIDE = 0.25
 
 const clamp01 = (value) => Math.min(Math.max(value, 0), 1)
+// The end a zoom level sits at, 1 (zoom in) or 0 (zoom out), or null.
+const endOf = (level) => (level >= 0.999 ? 1 : level <= 0.001 ? 0 : null)
 // An angle within π of `center`.
 const near = (angle, center) =>
 	center + ((((angle - center + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI
@@ -84,7 +86,8 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // (onZoom without a duration glides over the zoom's own). Returns the
 // element, mount() (once it is in the page), pressTone(color), which presses
 // the tone of `color` (none for another color), and showZoomLevel(level),
-// where the knob goes.
+// where the knob goes (at an end, its button shows in full) and the second
+// circle's size and turn.
 export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	const element = document.createElement('div')
 	element.className = 'hud'
@@ -97,7 +100,12 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	const mask = svgElement('mask', { id: 'hud-ring-cuts' })
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
-	ring.append(mask, line)
+	// The second circle: inside the circle zoomed in, it grows past it as the
+	// camera zooms out and turns with the zoom, against the knob (hudLayout.js
+	// orbitRing()). It is not cut around the buttons, and runs on past the
+	// HUD's box to the window's edges.
+	const orbit = svgElement('circle', { class: 'hud-line hud-orbit' })
+	ring.append(mask, line, orbit)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -142,6 +150,20 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 		item.cut.style.r = `${(HUD.button / 2) * scale + HUD.gap}px`
 	}
 
+	// The second circle for the circle the layout set and the zoom level shown.
+	let placed = null
+	let level = null
+	const placeOrbit = () => {
+		if (!placed || level === null) return
+		const { cx, cy, radius, track } = placed
+		const ring = orbitRing(radius, level, track)
+		orbit.setAttribute('cx', cx)
+		orbit.setAttribute('cy', cy)
+		orbit.setAttribute('r', ring.radius)
+		orbit.setAttribute('stroke-dasharray', ring.dashArray.join(' '))
+		orbit.setAttribute('stroke-dashoffset', ring.dashOffset)
+	}
+
 	const layout = () => {
 		const { clientWidth: width, clientHeight: height } = element
 		const fit = hudLayout(width, height, tones.length)
@@ -160,6 +182,8 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 			cutRadius(item)
 		}
 		knob.setTrack({ ...circle, track: angles.track })
+		placed = { ...circle, track: angles.track }
+		placeOrbit()
 	}
 	new ResizeObserver(layout).observe(element)
 
@@ -176,7 +200,14 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 			)
 			for (const item of items) cutRadius(item)
 		},
-		showZoomLevel: (level) => knob.show(level),
+		showZoomLevel(shown) {
+			knob.show(shown)
+			zoomIn.classList.toggle('at-level', endOf(shown) === 1)
+			zoomOut.classList.toggle('at-level', endOf(shown) === 0)
+			if (level !== null && Math.abs(shown - level) < 1e-4) return
+			level = shown
+			placeOrbit()
+		},
 	}
 }
 
@@ -201,8 +232,8 @@ function zoomKnob({ onZoomLevel, onSnap, cut }) {
 		if (circle && shown !== null) place(element, cut, knobAngle(shown, circle.track), circle)
 	}
 	const set = (level) => onZoomLevel(clamp01(level))
-	// The end the knob sits at, 1 (zoom in) or 0 (zoom out), or null.
-	const atEnd = () => (shown === null ? null : shown >= 0.999 ? 1 : shown <= 0.001 ? 0 : null)
+	// The end the knob sits at, or null.
+	const atEnd = () => (shown === null ? null : endOf(shown))
 
 	// The pointer's angle about the circle's center, near the track.
 	const pointerAngle = (event) => {
