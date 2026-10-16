@@ -12,6 +12,7 @@ import {
 	spinRing,
 	swayTurn,
 	toneArcs,
+	zoomValueRadius,
 	trackLevel,
 	zoomDistance,
 	zoomLevel,
@@ -155,6 +156,15 @@ test('the knob sits on the horizontal at the middle of the zoom, the ends symmet
 	}
 	// The start framing sits there: halfway on the zoom's log scale.
 	assert.ok(near(zoomLevel(zoomDistance(0.5, [180, 480]), [180, 480]), 0.5))
+})
+
+test('the zoom value reads between the spinning circle and the outer zoom ring', () => {
+	for (const radius of [150, 460]) {
+		const at = zoomValueRadius(radius)
+		const spin = spinRing(radius, 0)
+		assert.ok(at > spin.teeth.radius + spin.teeth.width / 2 - 1)
+		assert.ok(at < orbitRing(radius, 0.5, 'outer').radius)
+	}
 })
 
 test('the layers sway with the mouse, alternating ways, the inner ones the most', () => {

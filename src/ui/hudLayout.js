@@ -267,6 +267,13 @@ export function swayTurn(layer, mouse) {
 	return (layer.turn * (mouse.x + mouse.y / 2)) / 1.5
 }
 
+// Where the zoom's value reads, as a radius about the HUD's circle of
+// `radius` px: halfway between the spinning circle and the outer zoom ring
+// (on the middle of the knob's track, hud.js).
+export function zoomValueRadius(radius, hud = HUD) {
+	return (radius * (hud.spin.radiusRatio + hud.outer.radiusRatio)) / 2
+}
+
 // The camera distance of a zoom level: the inverse of zoomLevel().
 export function zoomDistance(level, [near, far]) {
 	return far * (near / far) ** level

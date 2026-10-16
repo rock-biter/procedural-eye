@@ -281,6 +281,23 @@ canvas {
 	transition: stroke-dashoffset 0.6s var(--elastic);
 }
 
+/* The zoom's value (src/ui/hud.js): the macro magnification, small, on the
+   middle of the knob's track, centered between the spinning circle and the
+   outer zoom ring; GSAP retypes it as it changes. */
+.hud-zoom-value {
+	position: absolute;
+	translate: -50% -50%;
+	color: var(--ui-color);
+	font:
+		400 12px/1 'JetBrains Mono',
+		ui-monospace,
+		monospace;
+	letter-spacing: 0.04em;
+	white-space: pre;
+	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+	pointer-events: none;
+}
+
 /* The three arcs inside the inner zoom ring (src/ui/hud.js): solid; a change
    of skin tone carries each to its new place, elastically. */
 .hud-arc {

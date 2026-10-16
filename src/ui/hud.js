@@ -13,13 +13,18 @@ import {
 	swayTurn,
 	toneArcs,
 	trackLevel,
+	zoomValueRadius,
 } from './hudLayout'
+import { gsap } from 'gsap'
+import { TextPlugin } from 'gsap/TextPlugin'
 import { follow } from '../camera/orbitMotion'
 import bracketAsset from './assets/bracket.svg?url'
 import innerRingAsset from './assets/zoom-ring-inner.svg?url'
 import outerRingAsset from './assets/zoom-ring-outer.svg?url'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
+
+gsap.registerPlugin(TextPlugin)
 
 // Stroked icons on a 24 px grid: a plus, a minus and two crossing arrows.
 const ICONS = {
@@ -106,7 +111,8 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // element, mount() (once it is in the page), pressTone(color), which presses
 // the tone of `color` (none for another color), and showZoomLevel(level),
 // where the knob goes (at an end, its button shows in full) and the two
-// segmented rings' sizes and turns.
+// segmented rings' sizes and turns, and showZoomValue(text), the zoom's
+// value by the knob.
 export function createHud({
 	tones,
 	onTone,
@@ -212,13 +218,51 @@ export function createHud({
 	})
 	zoomGroup.append(zoomIn, knob.element, zoomOut)
 
+	// The zoom's value (main.js gives it, formatted), on the middle of the
+	// knob's track, between the spinning circle and the outer zoom ring. GSAP's TextPlugin retypes it whenever
+	// it changes: one tween at a time, each to the latest value, so a gliding
+	// zoom reads as a running counter that settles on the value.
+	const zoomValue = document.createElement('div')
+	zoomValue.className = 'hud-zoom-value'
+	zoomValue.setAttribute('aria-hidden', 'true')
+	const motionless = window.matchMedia('(prefers-reduced-motion: reduce)')
+	let valueShown = null
+	let valueNext = null
+	let typing = false
+	const typeValue = () => {
+		if (typing || valueNext === valueShown) return
+		const text = valueNext
+		if (valueShown === null || motionless.matches) {
+			zoomValue.textContent = valueShown = text
+			return
+		}
+		typing = true
+		gsap.to(zoomValue, {
+			duration: 0.15,
+			ease: 'none',
+			text: { value: text },
+			onComplete: () => {
+				valueShown = text
+				typing = false
+				typeValue()
+			},
+		})
+	}
+
 	const random = hudButton('random-eye', 'Random eye', icon('shuffle'), () => {
 		spinTurns++
 		placeSpin()
 		onRandom()
 	})
 
-	element.append(...orbitAssets.map(({ wrapper }) => wrapper), ring, toneGroup, zoomGroup, random)
+	element.append(
+		...orbitAssets.map(({ wrapper }) => wrapper),
+		ring,
+		zoomValue,
+		toneGroup,
+		zoomGroup,
+		random,
+	)
 
 	// Each button with its angle on the circle and its cut in the line.
 	const items = [
@@ -387,6 +431,10 @@ export function createHud({
 			cutRadius(item)
 		}
 		knob.setTrack({ ...circle, track: angles.track })
+		const middle = (angles.track[0] + angles.track[1]) / 2
+		const reach = zoomValueRadius(radius)
+		zoomValue.style.left = `${circle.cx + reach * Math.cos(middle)}px`
+		zoomValue.style.top = `${circle.cy + reach * Math.sin(middle)}px`
 		placed = { ...circle, track: angles.track }
 		placeSpin()
 		placeArcs()
@@ -414,6 +462,11 @@ export function createHud({
 			if (tone < 0 || tone === arcTone) return
 			arcTone = tone
 			placeArcs()
+		},
+		// The zoom's value as text (main.js formats it).
+		showZoomValue(text) {
+			valueNext = text
+			typeValue()
 		},
 		showZoomLevel(shown) {
 			knob.show(shown)

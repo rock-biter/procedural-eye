@@ -15,6 +15,7 @@ import { ANCESTRIES, randomEye } from './src/params/populationPriors'
 import { PRESETS } from './src/params/presets'
 import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
+import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
 import { zoomDistance, zoomLevel, zoomProgress } from './src/ui/hudLayout'
 
@@ -231,9 +232,14 @@ if (urlParams.get('gui') !== '0') {
 	app.listeners.add((path) => {
 		if (path === '*' || path === 'skin.color') pressTone()
 	})
+	// The zoom's value by the knob: the macro magnification of the camera at
+	// its focus distance (camera.distance), as a lens's reproduction ratio
+	// reads (1× is life size on the sensor).
 	const showZoomLevel = () => {
 		requestAnimationFrame(showZoomLevel)
-		hud.showZoomLevel(zoomProgress(app.params.camera.distance, zoomLimits()))
+		const { distance, focalLength } = app.params.camera
+		hud.showZoomLevel(zoomProgress(distance, zoomLimits()))
+		hud.showZoomValue(`${magnification(focalLength, distance).toFixed(3)}`)
 	}
 	showZoomLevel()
 
