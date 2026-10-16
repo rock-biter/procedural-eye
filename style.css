@@ -60,19 +60,18 @@ canvas {
 	}
 }
 
-/* The frame: a cross (20% white) at each corner and dotted lines (30%
-   white) along the sides, running across the whole window and cut around
-   each cross (--frame-cut: half the cross and a gap). The 1px lines take the
-   first and last rows and columns of the box; each cross centers its arms
-   on them (the arms are the middle row and column, rounded down). It never
-   takes the pointer. */
+/* The frame: a cross (20% white) at each corner and dashed lines (30%
+   white) along the sides, running across the whole window. The 1px lines
+   take the first and last rows and columns of the box; each cross centers
+   its arms on them (the arms are the middle row and column, rounded down).
+   It never takes the pointer. */
 .frame {
 	--frame-top: calc(var(--frame-inset) + env(safe-area-inset-top));
 	--frame-right: calc(var(--frame-inset) + env(safe-area-inset-right));
 	--frame-bottom: calc(var(--frame-inset) + env(safe-area-inset-bottom));
 	--frame-left: calc(var(--frame-inset) + env(safe-area-inset-left));
 	--frame-cross: 14px;
-	--frame-cut: calc(var(--frame-cross) / 2 + 6px);
+	--frame-cut: 14px;
 	position: fixed;
 	top: var(--frame-top);
 	right: var(--frame-right);
@@ -85,47 +84,38 @@ canvas {
 .frame svg {
 	position: absolute;
 	display: block;
-	overflow: visible;
 	fill: #fff;
 }
 
+/* Each side is two lines, from either window edge (--edge before its cross)
+   to the middle, the second mirrored, so every corner looks the same. A line
+   is cut --frame-cut to either side of its cross. The dashes (main.js) are
+   centered every 8px from the edge and the insets are multiples of 8, so a
+   cross sits on a dash and a cut of 6, 14 or 22px ends between dashes. */
 .frame-line {
-	opacity: 0.3;
+	--frame-mask: linear-gradient(
+		var(--along),
+		#000 calc(var(--edge) - var(--frame-cut)),
+		transparent 0 calc(var(--edge) + var(--frame-cut)),
+		#000 0
+	);
+	-webkit-mask-image: var(--frame-mask);
+	mask-image: var(--frame-mask);
+	opacity: 0.15;
 }
 
 .frame-top,
 .frame-bottom {
-	left: calc(-1 * var(--frame-left));
-	width: calc(100% + var(--frame-left) + var(--frame-right));
+	--along: to right;
+	width: calc(50% + (var(--frame-left) + var(--frame-right)) / 2);
 	height: 1px;
-	--mask: linear-gradient(
-		to right,
-		#000 calc(var(--frame-left) - var(--frame-cut)),
-		transparent 0 calc(var(--frame-left) + var(--frame-cut)),
-		#000 0 calc(100% - var(--frame-right) - var(--frame-cut)),
-		transparent 0 calc(100% - var(--frame-right) + var(--frame-cut)),
-		#000 0
-	);
 }
 
 .frame-left,
 .frame-right {
-	top: calc(-1 * var(--frame-top));
+	--along: to bottom;
 	width: 1px;
-	height: calc(100% + var(--frame-top) + var(--frame-bottom));
-	--mask: linear-gradient(
-		to bottom,
-		#000 calc(var(--frame-top) - var(--frame-cut)),
-		transparent 0 calc(var(--frame-top) + var(--frame-cut)),
-		#000 0 calc(100% - var(--frame-bottom) - var(--frame-cut)),
-		transparent 0 calc(100% - var(--frame-bottom) + var(--frame-cut)),
-		#000 0
-	);
-}
-
-.frame-line {
-	-webkit-mask-image: var(--mask);
-	mask-image: var(--mask);
+	height: calc(50% + (var(--frame-top) + var(--frame-bottom)) / 2);
 }
 
 .frame-top {
@@ -144,10 +134,36 @@ canvas {
 	right: 0;
 }
 
+.frame-top.frame-start,
+.frame-bottom.frame-start {
+	--edge: var(--frame-left);
+	left: calc(-1 * var(--frame-left));
+}
+
+.frame-top.frame-end,
+.frame-bottom.frame-end {
+	--edge: var(--frame-right);
+	right: calc(-1 * var(--frame-right));
+	transform: scaleX(-1);
+}
+
+.frame-left.frame-start,
+.frame-right.frame-start {
+	--edge: var(--frame-top);
+	top: calc(-1 * var(--frame-top));
+}
+
+.frame-left.frame-end,
+.frame-right.frame-end {
+	--edge: var(--frame-bottom);
+	bottom: calc(-1 * var(--frame-bottom));
+	transform: scaleY(-1);
+}
+
 .frame-cross {
 	width: var(--frame-cross);
 	height: var(--frame-cross);
-	opacity: 0.2;
+	opacity: 0.25;
 }
 
 .frame-top-left,
@@ -383,7 +399,6 @@ canvas {
 
 	.frame {
 		--frame-cross: 12px;
-		--frame-cut: calc(var(--frame-cross) / 2 + 4px);
 	}
 
 	.dock {

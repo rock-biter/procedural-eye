@@ -154,20 +154,28 @@ function download(blob, filename) {
 const SMALL_GLASS = { ...GLASS, bezel: 10, maxOffset: 7 }
 
 // The frame around the page (style.css): a cross of 1 px arms at each corner
-// and a dotted line along each side, across the whole window: a 1 px dot
-// every FRAME_DOT_SPACING px of an SVG pattern.
-const FRAME_DOT_SPACING = 8
+// and a dashed line along each side, across the whole window, made of two
+// halves, each from a window edge to the middle (style.css mirrors the second
+// one). The dashes are an SVG pattern: FRAME_DASH px every FRAME_DASH_PERIOD
+// px from the edge, one centered on the first pixel of every period (rounded
+// toward the edge). A square dash in a square cell dashes the 1 px lines of
+// both directions.
+const FRAME_DASH = 3
+const FRAME_DASH_PERIOD = 8
 function frame() {
 	const element = document.createElement('div')
 	element.className = 'frame'
 	element.setAttribute('aria-hidden', 'true')
-	const sides = ['top', 'right', 'bottom', 'left']
+	const lines = ['top', 'right', 'bottom', 'left'].flatMap((side) =>
+		['start', 'end'].map((end) => [side, end]),
+	)
 	const corners = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+	const origin = -Math.floor(FRAME_DASH / 2)
 	element.innerHTML = [
-		...sides.map(
-			(side) =>
-				`<svg class="frame-line frame-${side}"><pattern id="frame-dots-${side}" width="${FRAME_DOT_SPACING}" height="${FRAME_DOT_SPACING}" patternUnits="userSpaceOnUse"><rect width="1" height="1"/></pattern><rect width="100%" height="100%" fill="url(#frame-dots-${side})"/></svg>`,
-		),
+		...lines.map(([side, end]) => {
+			const id = `frame-dashes-${side}-${end}`
+			return `<svg class="frame-line frame-${side} frame-${end}"><pattern id="${id}" x="${origin}" y="${origin}" width="${FRAME_DASH_PERIOD}" height="${FRAME_DASH_PERIOD}" patternUnits="userSpaceOnUse"><rect width="${FRAME_DASH}" height="${FRAME_DASH}"/></pattern><rect width="100%" height="100%" fill="url(#${id})"/></svg>`
+		}),
 		...corners.map(
 			(corner) =>
 				`<svg class="frame-cross frame-${corner}"><rect x="50%" width="1" height="100%"/><rect y="50%" width="100%" height="1"/></svg>`,
