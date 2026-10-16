@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { backShellSurface, GLOBE_CUT, keepInside } from '../src/adnexa/backShell'
 import { createFissure } from '../src/adnexa/fissure'
 import {
 	createConjunctivaMesh,
@@ -347,13 +348,17 @@ test('no line of sight through the opening near a canthus reaches the background
 	// Orthographic views up to 60° to the side and 40° up or down: every point
 	// within 5 mm of each canthus whose line of sight passes inside the fissure
 	// at the depth of that canthus' margins must land on a front face of the
-	// lids and face, the conjunctiva, the palpebral conjunctiva or the globe.
+	// lids and face, the conjunctiva, the palpebral conjunctiva (both kept
+	// inside the back shell, as the app builds them) or the globe in front of
+	// its cut.
 	const around = 280
 	const lids = createLidMesh(params.lids, eye, 1, { around, across: 80 })
+	const back = backShellSurface(lids, eye, params.shell)
+	const { clearance } = params.shell
 	const meshes = [
 		lids,
-		createConjunctivaMesh(params.lids, eye, 1),
-		createPalpebralMesh(params.lids, eye, 1, { around }),
+		keepInside(createConjunctivaMesh(params.lids, eye, 1), back, clearance),
+		keepInside(createPalpebralMesh(params.lids, eye, 1, { around }), back, clearance),
 	]
 	const { fissure } = lids
 	const loop = Array.from({ length: 400 }, (_, i) => fissure.loop(i / 400))
@@ -424,11 +429,11 @@ test('no line of sight through the opening near a canthus reaches the background
 						const o = [0, 1, 2].map((m) => (center[0] + u) * right[m] + (center[1] + v) * up[m])
 						const along = (o[2] - marginZ) / d[2]
 						if (!inLoop([o[0] - d[0] * along, o[1] - d[1] * along])) continue
-						// The globe: its sphere, the mesh out to 125° from +Z.
+						// The globe: its sphere, in front of its cut.
 						const off = dot(o, o) - dot(o, d) ** 2
 						if (off < R * R) {
 							const hit = o.map((q, m) => q + d[m] * (Math.sqrt(R * R - off) - dot(o, d)))
-							if (hit[2] / R >= Math.cos(125 * DEG)) continue
+							if (hit[2] >= GLOBE_CUT * R) continue
 						}
 						assert.fail(
 							`${corner} canthus, view ${azimuth}°/${elevation}°: background at ${u.toFixed(1)}, ${v.toFixed(1)} mm`,

@@ -155,7 +155,7 @@ test('the shell passes the clearance behind the globe and the lids, the hidden p
 			}
 		}
 		// The lids, the conjunctiva and the curtain; the lids and the curtain
-		// follow the gaze (lid-follow.glsl), the lids keep the clearance up to 35°
+		// follow the gaze (lid-follow.glsl), the lids keep the clearance up to 60°
 		// of pitch, the curtain's deep end stays inside.
 		for (const [index, { positions, follow }] of parts.entries()) {
 			for (let v = 0; v < positions.length / 3; v++) {
@@ -164,7 +164,7 @@ test('the shell passes the clearance behind the globe and the lids, the hidden p
 				behind(x, y, z, `part ${index}`)
 				const weight = follow[v * 2 + 1]
 				if (weight === 0) continue
-				for (const pitch of [-35, -20, 20, 35]) {
+				for (const pitch of [-60, -30, 30, 60]) {
 					const turn = (pitch * Math.PI) / 180
 					const angle = -turn * (0.35 + 0.55 * follow[v * 2]) * weight
 					const c = Math.cos(angle)

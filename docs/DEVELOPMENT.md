@@ -98,7 +98,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 
 **The HUD** ([`src/ui/hud.js`](../src/ui/hud.js)) puts every button on a dashed circle around the eye, centered in the frame. The circle is inscribed in the box inside the frame (460 px on a 1600 × 1000 window), or smaller where its buttons would not fit in that box, as on phones (`hudLayout()` in [`src/ui/hudLayout.js`](../src/ui/hudLayout.js)). The buttons are round glass of one size (44 px), the zoom knob half of it (22 px). Angles run clockwise from the right (`HUD` in `hudLayout.js`):
 
-- The five skin tones in the bottom-left quadrant, fair highest, 48 px apart around 135°.
+- The five skin tones in the bottom-left quadrant, fair highest, 60 px apart around 165° (on a 1600 × 1000 window from 150° up to the left side); where that would take them out of the quadrant (a small circle) they move toward its middle.
 - At the right, around 5°: **Zoom in** (+) above **Zoom out** (−), 30° apart (or 160 px, on a small circle), with the zoom knob on the arc between them; below, **Random eye** (a shuffle icon) at 50°, or 60 px past Zoom out.
 - On a small circle the tones and Random eye therefore spread over a wider angle without overlapping. Phones and tablets keep this layout on a smaller circle.
 - The circle's line has the frame's dashes (3 px every 8 px, adjusted to a whole number around; white at 30%) and stops 6 px short of each button and of the knob, through an SVG mask that follows the tones as they grow and shrink and the knob as it slides.
@@ -118,7 +118,7 @@ The buttons are liquid glass (the `glass` class), clear (a 2px blur) and defined
 - Portrait screens start, and load presets, with `camera.targetZ` 0.
 - **Random eye**.
 
-**The skin tones**: five buttons, each with a bead of its color. A click glides `skin.color` to that tone ([`src/params/skinTones.js`](../src/params/skinTones.js): fair, light, medium, brown, deep) over the panel's **transition (s)**; nothing else of the skin changes, and the other params keep heading where they were. The button of the color the params are heading for is pressed (`aria-pressed`), also after the panel or a preset changes the color; a color of no tone presses none. The pressed one is full size with its bead ringed; the others shrink to 75% (`HUD.toneScale`) and grow a little when hovered.
+**The skin tones**: five buttons, each with a bead of its color. A click glides `skin.color` to that tone ([`src/params/skinTones.js`](../src/params/skinTones.js): fair, light, medium, brown, deep) over the panel's **transition (s)**; nothing else of the skin changes, and the other params keep heading where they were. The button of the color the params are heading for is pressed (`aria-pressed`), also after the panel or a preset changes the color; a color of no tone presses none. The pressed one is full size, its bead larger (26 px against 18), opaque and ringed; the others shrink to 75% (`HUD.toneScale`), their bead at half opacity, and grow and brighten a little when hovered.
 
 **The title and the credit line** in JetBrains Mono (`style.css`): **Random-eyes** at 32 px in white at the top left, the credit line at 12 px at the bottom left. The credit links **rockbiter** to the author's X account; only the link takes the pointer, so drags across the text still orbit the camera, and it blurs itself after a click. On narrow screens it wraps, aligned left.
 

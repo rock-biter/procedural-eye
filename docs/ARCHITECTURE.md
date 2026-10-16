@@ -33,7 +33,7 @@
 | [`src/adnexa/fissure.js`](../src/adnexa/fissure.js) * | The palpebral fissure: the margins between the canthi, their closure. |
 | [`src/adnexa/periocular.js`](../src/adnexa/periocular.js) * | The margins' support, the conjunctiva with the lacus, caruncle and plica, the face around the orbit (thin-plate spline). |
 | [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | The lid ring (columns, profile, shell turning into the face) and the patch's edge, the conjunctiva, palpebral conjunctiva and meniscus meshes. |
-| [`src/adnexa/backShell.js`](../src/adnexa/backShell.js) * | The back shell closing the skin patch: the flat band along its edge and the dome behind, as deep as the globe and the lids need. |
+| [`src/adnexa/backShell.js`](../src/adnexa/backShell.js) * | The back shell closing the skin patch: the flat band along its edge and the dome following the face behind, as thick as the lids and the globe in front of its cut need; the hidden conjunctiva brought inside it; the globe's cut plane. |
 | [`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js) * | Ambient occlusion baked into the lid and conjunctiva vertices (horizon-based, over a front height field; by depth into the sac). |
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
@@ -79,8 +79,7 @@
      - the eye geometry (`createEyeGeometry()`);
      - the entrance-pupil depth the camera aims at;
      - the eyeball mesh;
-     - the lid mesh, its skin patterns (baked on the GPU) and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
-     - the back shell around them (about 70 ms), only when they or `shell.clearance` and `shell.band` changed;
+     - the lid mesh with the back shell, its skin patterns (baked on the GPU) and the fissure map (baked in JS into a half-float texture), only when the lids, `shell.clearance`, `shell.band` or the eye geometry changed: together they take about 0.8 s;
      - the lashes and the tear film.
 
      A rebuild always bakes too.

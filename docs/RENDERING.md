@@ -8,7 +8,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
 2. **Scene pass** ([`src/render/scenePass.js`](../src/render/scenePass.js), in place of pmndrs' `RenderPass`, into an RGBA16F buffer with depth). The lashes draw first (`renderOrder` −1) and the eyeball last (`renderOrder` 1): the depth test then skips the costly optics wherever the lids and lashes cover the eye. Frames that pass through the accumulation are split ([Split Frames](#split-frames)).
    - **Eyeball**: a surface of revolution in eye space with two index groups, coarsely tessellated (96 segments around, 32 rings on the cap, 24 on the sclera): the programs refine the exact surface, and small triangles would make the GPU shade the 2×2 quads along their edges, which cost the optics program dearly.
      - Group 0, the cornea and limbus cap, uses `eyeball-cap-fragment.glsl`: tear-film reflection, two-surface refraction, the iris trace and shading, the limbus and the limbal ring.
-     - Group 1, the sclera beyond the cap, uses `eyeball-sclera-fragment.glsl`: the exact sphere point, then a wet, broken-up reflection over the vessel-mapped diffuse white.
+     - Group 1, the sclera beyond the cap, uses `eyeball-sclera-fragment.glsl`: the exact sphere point, then a wet, broken-up reflection over the vessel-mapped diffuse white. Behind the world plane `uGlobeCut` it discards the globe, which lies there under the conjunctiva, inside the back shell ([`docs/ADNEXA.md`](ADNEXA.md#back-shell)).
    - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi and the palpebral conjunctiva that closes the sac behind them. Its pigment patterns come from a texture baked with the lid mesh ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)).
    - **Back shell**: the skin program compiled with `SKIN_SHELL`, closing the skin patch behind ([`docs/ADNEXA.md`](ADNEXA.md#back-shell)). It draws after the lids (a later material), so from the front the depth test skips it; it is not on the shadow layer.
    - **Lashes**: tubes with the lash program.
@@ -88,6 +88,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uCameraEye`, `uPixelAngle` | Camera position in eye space (per sample); radians per pixel (ray cones). |
 | `uLimbus`, `uLimbusOverlap` | Limbus opacity range, ring width and strength, vertical overlap. |
 | `uScleraColor`, `uSclera`, `uScleraVessels`, `uScleraPsi` | Sclera base color; (redness, yellowing, irregularity); vessel map and its ψ range. |
+| `uGlobeCut` | The world z (mm) behind which the sclera program discards the globe (`GLOBE_CUT` × the sclera radius). |
 | `uFissureMap`, `uFissureExtent` | Signed distance to the fissure and its extent. |
 | `uLidReflection`, `uLidRadiance`, `uLashRadiance` | Lid and lash reflections ([`docs/OPTICS.md`](OPTICS.md#reflections-of-the-lids-and-lashes)). |
 | `uIrisAtlas`, `uIrisPigment`, `uIrisColorLut` | Structure atlas, pigment atlas, color lookup ([`docs/IRIS.md`](IRIS.md)). |

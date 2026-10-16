@@ -29,8 +29,8 @@ export const GLOBE_CUT = 0.2
 const CAP_ANGLE = (50 * Math.PI) / 180
 // The gaze pitch (degrees) at either end of the lids' follow
 // (src/animation/animator.js: 0.9 of it on the upper lid, 0.35 on the lower):
-// the wandering eye's range and its look-around.
-const FOLLOW_PITCH = 35
+// the eye that looks at the camera follows it up to its elevation limit.
+const FOLLOW_PITCH = 60
 // Lid vertices nearer the edge than this normalized radius stand on the band.
 const EDGE_ZONE = 0.95
 // The face is sampled on a grid this fine (mm), read bilinearly, and smoothed
@@ -47,6 +47,16 @@ const COLUMNS = 128
 export const SHELL_MARGIN_DISTANCE = 60
 
 const TAU = Math.PI * 2
+
+// The turns about the X axis (radians) of vertex `v` at rest and at either
+// end of the lids' follow (lid-follow.glsl), `follow` = (upper share, follow
+// weight) per vertex.
+function followTurns(follow, v) {
+	const weight = follow ? follow[v * 2 + 1] : 0
+	if (weight === 0) return [0]
+	const turn = ((FOLLOW_PITCH * Math.PI) / 180) * (0.35 + 0.55 * follow[v * 2]) * weight
+	return [0, turn, -turn]
+}
 
 // Normalized cap profile: 1 at the pole, 0 at the edge.
 function cap(rho) {
@@ -162,25 +172,21 @@ export function backShellSurface(lid, eye, shell) {
 	const R = eye.scleraRadius
 	const cut = GLOBE_CUT * R
 	const disk = Math.sqrt(R * R - cut * cut)
-	for (let r = 0; r <= disk; r = r < disk - 0.5 ? r + 0.5 : r === disk ? Infinity : disk) {
-		const count = r === disk ? 512 : 64
+	const rings = Math.ceil(disk / 0.5)
+	for (let i = 0; i <= rings; i++) {
+		const r = (disk * i) / rings
+		const count = i === rings ? 512 : 64
 		for (let k = 0; k < count; k++) {
 			const angle = (k / count) * TAU
 			enclose(r * Math.cos(angle), r * Math.sin(angle), cut)
 		}
 	}
 	// The lids, the vertices that follow the gaze also at either end of their
-	// travel (lid-follow.glsl). Their skin near the edge stands on the band.
-	const pitch = (FOLLOW_PITCH * Math.PI) / 180
+	// travel. Their skin near the edge stands on the band.
 	const { positions, follow } = lid
 	for (let v = 0; v < positions.length / 3; v++) {
 		const [x, y, z] = positions.subarray(v * 3, v * 3 + 3)
-		enclose(x, y, z, EDGE_ZONE)
-		const weight = follow[v * 2 + 1]
-		if (weight === 0) continue
-		const share = follow[v * 2]
-		for (const sign of [-1, 1]) {
-			const angle = -sign * pitch * (0.35 + 0.55 * share) * weight
+		for (const angle of followTurns(follow, v)) {
 			const c = Math.cos(angle)
 			const s = Math.sin(angle)
 			enclose(x, c * y - s * z, s * y + c * z, EDGE_ZONE)
@@ -203,17 +209,33 @@ export function backShellSurface(lid, eye, shell) {
 }
 
 // Brings a hidden part (the conjunctiva's or the palpebral conjunctiva's mesh
-// data, { positions, depth? }) inside the shell `surface`: every vertex at
-// least `clearance` in front of the dome. Only what lies under the lids moves:
-// the fornix past the globe's outline and the palpebral conjunctiva's deep
-// end. `depth` (into the sac) shrinks with the rise. In place; returns `part`.
+// data, { positions, follow, depth? }) inside the shell `surface`: every vertex
+// raised until it stands `clearance` in front of the dome, also at either end
+// of the lids' follow. Only what lies under the lids moves: the fornix past
+// the globe's outline and the palpebral conjunctiva's deep end. `depth` (into
+// the sac) shrinks with the rise. In place; returns `part`.
 export function keepInside(part, surface, clearance) {
-	const { positions, depth } = part
+	const { positions, follow, depth } = part
 	for (let v = 0; v < positions.length / 3; v++) {
-		const floor = surface.heightAt(positions[v * 3], positions[v * 3 + 1]) + clearance
-		const rise = floor - positions[v * 3 + 2]
-		if (rise <= 0) continue
-		positions[v * 3 + 2] = floor
+		const [x, y, z] = positions.subarray(v * 3, v * 3 + 3)
+		const turns = followTurns(follow, v)
+		let rise = 0
+		// A rise lifts a turned vertex by its cosine and slides it along the
+		// dome: a few steps settle it.
+		for (let step = 0; step < 8; step++) {
+			let short = 0
+			for (const angle of turns) {
+				const c = Math.cos(angle)
+				const s = Math.sin(angle)
+				const ty = c * y - s * (z + rise)
+				const tz = s * y + c * (z + rise)
+				short = Math.max(short, (surface.heightAt(x, ty) + clearance - tz) / c)
+			}
+			if (short <= 1e-4) break
+			rise += short
+		}
+		if (rise === 0) continue
+		positions[v * 3 + 2] = z + rise
 		if (depth) depth[v] = Math.max(0, depth[v] - rise)
 	}
 	return part

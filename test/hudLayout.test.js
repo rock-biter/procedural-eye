@@ -25,9 +25,10 @@ const point = (radius, angle) => [radius * Math.cos(angle), radius * Math.sin(an
 const chord = (radius, a, b) =>
 	Math.hypot(...point(radius, a).map((v, i) => v - point(radius, b)[i]))
 
-test('desktop: the circle is inscribed in the box, the zoom 30° apart around 5°', () => {
+test('desktop: the circle is inscribed in the box, the tones around 165°, the zoom 30° apart around 5°', () => {
 	const { radius, angles } = hudLayout(...SCREENS.desktop, TONES)
 	assert.equal(radius, 460)
+	assert.ok(near(angles.tones[(TONES - 1) / 2], HUD.tones.center))
 	assert.ok(near(angles.zoomOut - angles.zoomIn, 30 * DEGREE))
 	assert.ok(near((angles.zoomIn + angles.zoomOut) / 2, 5 * DEGREE))
 	assert.ok(near(angles.random, HUD.random.angle))
@@ -52,12 +53,11 @@ for (const [screen, [width, height]] of Object.entries(SCREENS)) {
 	test(`${screen}: the tones lie in the bottom-left quadrant, fair highest, evenly spaced`, () => {
 		const { tones } = angles
 		assert.equal(tones.length, TONES)
-		for (const angle of tones) assert.ok(angle > Math.PI / 2 && angle < Math.PI, `${angle}`)
+		for (const angle of tones) assert.ok(angle >= Math.PI / 2 && angle <= Math.PI, `${angle}`)
 		for (let i = 1; i < tones.length; i++) {
 			assert.ok(tones[i] < tones[i - 1], 'each tone lower than the one before')
 			assert.ok(near((tones[i - 1] - tones[i]) * radius, HUD.tones.spacing), 'spacing in px')
 		}
-		assert.ok(near(tones[(TONES - 1) / 2], HUD.tones.center))
 	})
 
 	test(`${screen}: zoom in above zoom out, the knob's track between them, Random eye below`, () => {

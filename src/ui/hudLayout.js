@@ -2,7 +2,8 @@
 // the eye, at angles in radians clockwise from the right (screen y points
 // down, so π/2 is the bottom). The skin tones keep their spacing in pixels
 // along the circle, so on a small circle (a phone) they spread over a wider
-// angle; the zoom keeps its angle, and a length in pixels at least, for its
+// angle, moving toward the quadrant's middle to stay in it; the zoom keeps
+// its angle, and a length in pixels at least, for its
 // knob to slide; Random eye moves down, clear of the zoom.
 
 const DEGREE = Math.PI / 180
@@ -18,8 +19,9 @@ export const HUD = Object.freeze({
 	gap: 6,
 	dash: 3,
 	dashPeriod: 8,
-	// The skin tones in the bottom-left quadrant, the first (fair) highest.
-	tones: Object.freeze({ center: 135 * DEGREE, spacing: 48 }),
+	// The skin tones in the bottom-left quadrant, the first (fair) highest,
+	// around `center` or nearer the quadrant's middle where they would leave it.
+	tones: Object.freeze({ center: 165 * DEGREE, spacing: 60 }),
 	// Zoom in and zoom out around `center`, zoom in higher, `span` apart, or
 	// `minArc` px on a small circle. The knob slides from under one to under
 	// the other, and a drag snaps it to either end within `snap` px of it
@@ -38,9 +40,13 @@ export function hudAngles(radius, toneCount, hud = HUD) {
 	const zoomIn = hud.zoom.center - span / 2
 	const zoomOut = hud.zoom.center + span / 2
 	const random = Math.max(hud.random.angle, zoomOut + arc(hud.random.spacing))
+	const half = ((toneCount - 1) / 2) * arc(hud.tones.spacing)
+	const middle = 0.75 * Math.PI
+	const room = Math.max(Math.PI / 4 - half, 0)
+	const center = Math.min(Math.max(hud.tones.center, middle - room), middle + room)
 	const tones = Array.from(
 		{ length: toneCount },
-		(_, i) => hud.tones.center + ((toneCount - 1) / 2 - i) * arc(hud.tones.spacing),
+		(_, i) => center + ((toneCount - 1) / 2 - i) * arc(hud.tones.spacing),
 	)
 	return { tones, zoomIn, zoomOut, track: [zoomIn, zoomOut], random }
 }
