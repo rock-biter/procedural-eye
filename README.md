@@ -24,7 +24,7 @@ pnpm capture    # renders presets headlessly next to the reference photos
 - **Skin tone** (the dots at the left of the circle): glide the skin color from fair to deep.
 - **Space** toggles photo mode: the eye freezes and the image converges.
 
-**Random eye** (the shuffle button, below the zoom): an eye drawn from measured population data for the chosen ancestry.
+**Random eye** (the eye button, below the zoom): an eye drawn from measured population data for the chosen ancestry.
 
 **Panel** (collapsed at the top, only with `#debug` at the end of the URL; `?gui=0` hides the buttons too)
 

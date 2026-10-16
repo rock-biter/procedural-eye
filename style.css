@@ -441,7 +441,15 @@ canvas {
 	rotate: calc(-1 * var(--hud-angle));
 }
 
+/* The filled parts of an icon (the eye's pupil). */
+.hud-button .icon .icon-fill {
+	fill: currentColor;
+	stroke: none;
+}
+
 .random-eye .icon {
+	width: 26px;
+	height: 26px;
 	stroke-width: 2;
 }
 

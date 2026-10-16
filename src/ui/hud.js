@@ -28,14 +28,17 @@ const SVG_NS = 'http://www.w3.org/2000/svg'
 
 gsap.registerPlugin(TextPlugin)
 
-// Stroked icons on a 24 px grid: a plus, a minus and two crossing arrows.
+// Icons on a 24 px grid, stroked: a plus, a minus, and an eye for Random eye
+// (a filled dot, the pupil, under a flattened arc, the upper lid: wide and
+// low, its ends a little above the pupil's middle and meeting at an angle,
+// like the canthi, so it reads as an eye, not as a wifi sign).
 const ICONS = {
-	plus: 'M6 12h12M12 6v12',
-	minus: 'M6 12h12',
-	shuffle: 'M3 7h3c4 0 6 10 10 10h5M3 17h3c4 0 6-10 10-10h5M18 4l3 3-3 3M18 14l3 3-3 3',
+	plus: '<path d="M6 12h12M12 6v12"/>',
+	minus: '<path d="M6 12h12"/>',
+	eye: '<path d="M3 13.5C6.5 6.5 17.5 6.5 21 13.5"/><circle class="icon-fill" cx="12" cy="14.5" r="2.75"/>',
 }
 const icon = (name) =>
-	`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`
+	`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`
 
 // The level's steps for the arrow keys and Page Up / Page Down, and per
 // wheel unit.
@@ -251,7 +254,7 @@ export function createHud({
 		})
 	}
 
-	const random = hudButton('random-eye', 'Random eye', icon('shuffle'), () => {
+	const random = hudButton('random-eye', 'Random eye', icon('eye'), () => {
 		spinTurns++
 		placeSpin()
 		onRandom()
