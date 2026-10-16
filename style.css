@@ -25,11 +25,15 @@
    --elastic, a damped bounce, the HUD's turning circles and arcs (where
    linear() easing is missing, it overshoots once, as --spring). */
 :root {
-	--ui-color: #ffffff77;
+	--ui-color: #ffffff99;
 	--frame-inset: 24px;
-	--frame-gap: 16px;
+	--frame-gap: 12px;
 	--ui-inset: calc(var(--frame-inset) + var(--frame-gap));
+	--ui-inset-y: calc(var(--frame-inset) + var(--frame-gap) - 8px);
+
 	--spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+	/* The room Snapshot takes at the bottom right, which the credit leaves. */
+	--snapshot-room: 120px;
 	--elastic: var(--spring);
 	text-transform: uppercase;
 }
@@ -586,12 +590,14 @@ canvas {
 	}
 }
 
-/* The title, top left, the credit line, bottom left, and the frame rate, top
-   right: inside the frame, in JetBrains Mono, the title in Kode Mono. Only the credit's link takes
-   the pointer, so drags across the text still orbit the camera. */
+/* The title, top left, the credit line, bottom left, the frame rate, top
+   right, and Snapshot, bottom right: inside the frame, in JetBrains Mono, the
+   title in Kode Mono. Only the credit's link and Snapshot take the pointer,
+   so drags across the text still orbit the camera. */
 .masthead,
 .credit,
-.fps {
+.fps,
+.snapshot {
 	position: fixed;
 	z-index: 10;
 	color: var(--ui-color);
@@ -600,38 +606,54 @@ canvas {
 		ui-monospace,
 		monospace;
 	letter-spacing: 0.02em;
-	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+	/* text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); */
 	pointer-events: none;
 	user-select: none;
 	opacity: 0.8;
 }
 
+.snapshot {
+	color: white;
+	font-family: 'Kode Mono', 'JetBrains Mono', ui-monospace, monospace;
+	font-size: 28px;
+}
+
 .masthead {
-	top: calc(var(--ui-inset) + env(safe-area-inset-top));
+	top: calc(var(--ui-inset-y) + env(safe-area-inset-top));
 	left: calc(var(--ui-inset) + env(safe-area-inset-left));
 }
 
 .masthead h1 {
-	margin: 0;
+	margin: 0px 0 0 -6px;
 	font-family: 'Kode Mono', 'JetBrains Mono', ui-monospace, monospace;
-	font-size: 46px;
+	font-size: 124px;
 	font-weight: inherit;
-	line-height: 0.8;
-	color: white;
+	line-height: 0.9;
+	color: #fff;
+	letter-spacing: -0.035em;
+	span {
+		/* color: #ffb700; Example color for the "eyes" part of the title */
+	}
 }
 
 /* Under the title, the project in a few lines. */
 .masthead p {
-	max-width: 46ch;
-	margin: 12px 0 0;
+	max-width: 76ch;
+	margin: 4px 0 0 0px;
 	text-wrap: pretty;
+	font-size: 12px;
+
+	span {
+		color: #ffb700;
+	}
 }
 
-/* On narrow screens the credit wraps, aligned left. */
+/* On narrow screens the credit wraps, aligned left, clear of Snapshot
+   (--snapshot-room). */
 .credit {
 	bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
 	left: calc(var(--ui-inset) + env(safe-area-inset-left));
-	max-width: calc(100vw - 2 * var(--ui-inset));
+	max-width: calc(100vw - 2 * var(--ui-inset) - var(--snapshot-room));
 	margin: 0;
 	text-wrap: balance;
 }
@@ -647,6 +669,63 @@ canvas {
 	top: calc(var(--ui-inset) + env(safe-area-inset-top));
 	right: calc(var(--ui-inset) + env(safe-area-inset-right));
 	white-space: nowrap;
+}
+
+/* Snapshot: the icon (four open corners, as the HUD's reticles, around a
+   dot) then the word, on the credit line's baseline; brighter when hovered
+   or focused. */
+.snapshot {
+	bottom: calc(var(--ui-inset-y) + env(safe-area-inset-bottom));
+	right: calc(var(--ui-inset) + env(safe-area-inset-right));
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0;
+	border: 0;
+	background: none;
+	text-transform: inherit;
+	white-space: nowrap;
+	pointer-events: auto;
+	cursor: pointer;
+	transition: opacity 0.2s;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.snapshot:is(:hover, :focus-visible) {
+	opacity: 1;
+}
+
+.snapshot:focus-visible {
+	outline: 1px solid #ffffffaa;
+	outline-offset: 6px;
+}
+
+.snapshot-icon {
+	position: relative;
+	width: 24px;
+	height: 24px;
+	background:
+		linear-gradient(currentColor, currentColor) left top / 6px 1px,
+		linear-gradient(currentColor, currentColor) left top / 1px 6px,
+		linear-gradient(currentColor, currentColor) right top / 6px 1px,
+		linear-gradient(currentColor, currentColor) right top / 1px 6px,
+		linear-gradient(currentColor, currentColor) left bottom / 6px 1px,
+		linear-gradient(currentColor, currentColor) left bottom / 1px 6px,
+		linear-gradient(currentColor, currentColor) right bottom / 6px 1px,
+		linear-gradient(currentColor, currentColor) right bottom / 1px 6px;
+	background-repeat: no-repeat;
+}
+
+.snapshot-icon::after {
+	content: '';
+	position: absolute;
+	inset: 9px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.snapshot:active .snapshot-icon {
+	scale: 0.9;
 }
 
 /* Phones and tablets: the frame 8px from the edges and the interface 12px

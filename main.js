@@ -249,7 +249,7 @@ if (urlParams.get('gui') !== '0') {
 	// (--masthead-height, style.css).
 	const masthead = document.createElement('header')
 	masthead.className = 'masthead'
-	masthead.innerHTML = `<h1>Random-eyes</h1><p>Your personal digital eye configurator. Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with the eyes.</p>`
+	masthead.innerHTML = `<h1>Random<span>-eyes</span></h1><p>The digital eye configurator.<br> Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with <span>the eyes</span>.</p>`
 	document.body.appendChild(masthead)
 	new ResizeObserver(() => {
 		document.documentElement.style.setProperty('--masthead-height', `${masthead.offsetHeight}px`)
@@ -260,6 +260,22 @@ if (urlParams.get('gui') !== '0') {
 		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
 	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
 	document.body.appendChild(credit)
+
+	// Snapshot, bottom right: saves the image as the panel's Save PNG does
+	// (the state in a tEXt chunk). An icon of the HUD's reticle corners with a
+	// dot in the middle, then the word; it blurs itself after a click, as the
+	// HUD buttons do (Space toggles photo mode only when the page has the
+	// focus).
+	const snapshot = document.createElement('button')
+	snapshot.type = 'button'
+	snapshot.className = 'snapshot'
+	snapshot.title = 'Save a PNG of the image'
+	snapshot.innerHTML = '<span class="snapshot-icon" aria-hidden="true"></span>Snapshot'
+	snapshot.addEventListener('click', () => {
+		snapshot.blur()
+		savePng()
+	})
+	document.body.appendChild(snapshot)
 
 	// The frame rate, top right, styled as the credit line: the frames the page
 	// shows per second, counted over half a second. A gap longer than a second
