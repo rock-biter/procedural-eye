@@ -26,6 +26,8 @@
    linear() easing is missing, it overshoots once, as --spring). */
 :root {
 	--ui-color: #ffffff99;
+	/* The accent: the orange of the title's line and the credit's link. */
+	--accent: #ffb700;
 	--frame-inset: 24px;
 	--frame-gap: 12px;
 	--ui-inset: calc(var(--frame-inset) + var(--frame-gap));
@@ -282,7 +284,22 @@ canvas {
 .hud-spin {
 	stroke-width: 1;
 	opacity: 0.5;
-	transition: stroke-dashoffset 0.6s var(--elastic);
+	transition:
+		stroke-dashoffset 0.6s var(--elastic),
+		stroke 0.4s;
+}
+
+/* A layer in use lights up in the accent (src/ui/hud.js `activate()`): the
+   zoom rings, the zoom value and the knob's marker, the arcs, the spinning
+   circle, the camera angles, eased from white and back. */
+.hud-spin.active,
+.hud-arc.active {
+	stroke: var(--accent);
+}
+
+.hud-readout.active,
+.hud-orbit.active {
+	color: var(--accent);
 }
 
 /* The readouts (src/ui/hud.js), centered between the spinning circle and
@@ -306,30 +323,57 @@ canvas {
 	white-space: pre;
 	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 	pointer-events: none;
+	transition: color 0.4s;
 }
 
-/* The three arcs inside the inner zoom ring (src/ui/hud.js): solid; a change
-   of skin tone carries each to its new place, elastically. */
+/* The three arcs inside the inner zoom ring (src/ui/hud.js): solid, in the
+   accent; a change of skin tone carries each to its new place, elastically. */
 .hud-arc {
 	stroke-width: 2;
-	opacity: 0.3;
-	transition: stroke-dashoffset 1s var(--elastic);
+	opacity: 0.4;
+	transition:
+		stroke-dashoffset 1s var(--elastic),
+		stroke 0.4s;
 }
 
-/* Figma's segmented rings, including their linear rotation markers. Images
-   retain their intrinsic geometry; hud.js scales and turns the wrappers. */
+/* The segmented zoom rings (src/ui/assets/): their SVGs keep their intrinsic
+   geometry; hud.js scales and turns the wrappers. */
 .hud-orbit {
 	position: absolute;
 	width: 0;
 	height: 0;
+	color: #fff;
 	transform-origin: 0 0;
 	pointer-events: none;
+	transition:
+		color 0.4s,
+		opacity 0.4s;
 }
 
-.hud-orbit img {
+/* Their opacity at rest (the SVGs' strokes are opaque, the outer ring's
+   arcs 0.75 of its ticks); lit, they also show more (`.active`). */
+.hud-orbit-inner {
+	opacity: 0.35;
+}
+
+.hud-orbit-outer {
+	opacity: 0.4;
+}
+
+.hud-orbit.active {
+	opacity: 0.85;
+}
+
+/* Each ring's SVG masks a box of the wrapper's color (its strokes' own
+   opacities carried as the mask's alpha), so the color can change. */
+.hud-orbit-art {
 	position: absolute;
 	display: block;
-	max-width: none;
+	background: currentColor;
+	-webkit-mask-size: 100% 100%;
+	mask-size: 100% 100%;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
 }
 
 .hud-cut {
@@ -534,7 +578,10 @@ canvas {
 }
 
 .hud.springing .hud-orbit {
-	transition: transform 0.5s var(--spring);
+	transition:
+		transform 0.5s var(--spring),
+		color 0.4s,
+		opacity 0.4s;
 }
 
 /* The + and − shrink to nothing about their center as the marker reaches
@@ -566,8 +613,15 @@ canvas {
 	height: 8px;
 	background: #d9d9d9;
 	rotate: var(--hud-angle);
-	transition: scale 0.2s;
+	transition:
+		scale 0.2s,
+		background 0.4s;
 	pointer-events: none;
+}
+
+/* The marker lights up with the zoom's other layers (src/ui/hud.js). */
+.zoom-marker.active {
+	background: var(--accent);
 }
 
 .zoom-level.dragging {

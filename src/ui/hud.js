@@ -45,6 +45,9 @@ const icon = (name) =>
 const KEY_STEPS = { ArrowUp: 0.1, ArrowRight: 0.1, ArrowDown: -0.1, ArrowLeft: -0.1 }
 const PAGE_STEPS = { PageUp: 0.25, PageDown: -0.25 }
 const LEVEL_PER_WHEEL_UNIT = 0.0012
+// How long (ms) a layer stays in the accent past its control's last move:
+// the arcs and the spinning circle past their glides.
+const ACTIVE_HOLD = { zoom: 700, tone: 1300, random: 1000, camera: 700 }
 // How far (px) a readout keeps from the HUD box's sides, or it hides.
 const READOUT_MARGIN = 4
 // A press that moves less than this (px) is a click.
@@ -140,24 +143,27 @@ export function createHud({
 	const mask = svgElement('mask', { id: 'hud-ring-cuts' })
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
-	// The rings' SVGs at their intrinsic size, centered on their circle (of
-	// `radius` px at `cx`, `cy`): their wrappers turn and scale them about it.
-	// Turned 0, each is symmetric about the horizontal: the inner one two
-	// lines (a tick in, an arc over ±31°, a tick in), the outer one two arcs
-	// over ±33.4° with a tick out from each on the horizontal.
+	// The rings' SVGs at their intrinsic size (`size` px square), centered on
+	// their circle (of `radius` px at `cx`, `cy`): their wrappers turn and
+	// scale them about it. Turned 0, each is symmetric about the horizontal:
+	// the inner one two lines (a tick in, an arc over ±31°, a tick in), the
+	// outer one two arcs over ±33.4° with a tick out from each on the
+	// horizontal. Each SVG masks a box filled with the wrapper's color, so the
+	// rings take the accent when active (style.css).
 	const orbitAssets = [
-		{ kind: 'inner', src: innerRingAsset, cx: 410, cy: 410, radius: 409 },
-		{ kind: 'outer', src: outerRingAsset, cx: 729.5, cy: 729.5, radius: 652.5 },
+		{ kind: 'inner', src: innerRingAsset, size: 820, cx: 410, cy: 410, radius: 409 },
+		{ kind: 'outer', src: outerRingAsset, size: 1459, cx: 729.5, cy: 729.5, radius: 652.5 },
 	].map((asset) => {
 		const wrapper = document.createElement('div')
 		wrapper.className = `hud-orbit hud-orbit-${asset.kind}`
 		wrapper.setAttribute('aria-hidden', 'true')
-		const image = document.createElement('img')
-		image.src = asset.src
-		image.alt = ''
-		image.style.left = `${-asset.cx}px`
-		image.style.top = `${-asset.cy}px`
-		wrapper.append(image)
+		const art = document.createElement('span')
+		art.className = 'hud-orbit-art'
+		art.style.left = `${-asset.cx}px`
+		art.style.top = `${-asset.cy}px`
+		art.style.width = art.style.height = `${asset.size}px`
+		art.style.webkitMaskImage = art.style.maskImage = `url("${asset.src}")`
+		wrapper.append(art)
 		return { ...asset, wrapper }
 	})
 	// The circle between the central ring and the outer zoom ring, which
@@ -235,8 +241,36 @@ export function createHud({
 	const random = hudButton('random-eye', 'Random eye', icon('eye'), () => {
 		spinTurns++
 		placeSpin()
+		activate('random')
 		onRandom()
 	})
+
+	// The HUD's layers take the accent while their control is in use, as if
+	// they lit up (style.css eases the color from white and back): the zoom
+	// rings, the zoom value and the knob's marker while the zoom moves or the
+	// knob is held, the
+	// arcs as a new tone is pressed, the spinning circle at a click on Random
+	// eye, the camera angles while the camera orbits. Each stays lit
+	// `ACTIVE_HOLD` ms past the control's last move.
+	const layers = {
+		zoom: () => [
+			...orbitAssets.map(({ wrapper }) => wrapper),
+			zoomValue.element,
+			knob.element.firstElementChild,
+		],
+		tone: () => arcs,
+		random: () => [spin, spinTeeth],
+		camera: () => [cameraAngles.element],
+	}
+	const activeTimers = {}
+	const activate = (name) => {
+		const elements = layers[name]()
+		for (const element of elements) element.classList.add('active')
+		clearTimeout(activeTimers[name])
+		activeTimers[name] = setTimeout(() => {
+			for (const element of elements) element.classList.remove('active')
+		}, ACTIVE_HOLD[name])
+	}
 
 	element.append(
 		...orbitAssets.map(({ wrapper }) => wrapper),
@@ -275,6 +309,7 @@ export function createHud({
 		if (steps === toneTarget) return
 		const first = toneTarget === null
 		toneTarget = steps
+		if (!first) activate('tone')
 		if (first || motionless.matches) {
 			gsap.killTweensOf(toneShift)
 			toneShift.steps = steps
@@ -488,14 +523,20 @@ export function createHud({
 		// The zoom's value as text (main.js formats it).
 		showZoomValue: (text) => zoomValue.show(text),
 		// The camera's polar angles as text (main.js formats them).
-		showCameraAngles: (text) => cameraAngles.show(text),
+		// `orbiting`: the camera's orbit moved (not the mouse parallax alone).
+		showCameraAngles(text, orbiting) {
+			cameraAngles.show(text)
+			if (orbiting) activate('camera')
+		},
 		showZoomLevel(shown) {
 			knob.show(shown)
 			zoomIn.classList.toggle('at-level', endOf(shown) === 1)
 			zoomOut.classList.toggle('at-level', endOf(shown) === 0)
 			releaseEngaged(shown, level)
 			const released = updateStretch()
+			if (knob.dragging) activate('zoom')
 			if (!released && level !== null && Math.abs(shown - level) < 1e-4) return
+			if (level !== null) activate('zoom')
 			level = shown
 			placeOrbit()
 			placeZoomSymbols()

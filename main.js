@@ -238,13 +238,19 @@ if (urlParams.get('gui') !== '0') {
 	// Opposite, the camera's polar angles about the eye, azimuth then
 	// elevation in degrees, the mouse parallax's turn included (it moves the
 	// camera too, CameraControls.parallax): unsigned, without spaces or units.
+	// The angles light up while the orbit moves (a drag, its coasting, a
+	// glide), not for the parallax alone.
 	const degrees = (value) => Math.abs(value).toFixed(1)
+	let orbit = null
 	const showZoomLevel = () => {
 		requestAnimationFrame(showZoomLevel)
 		const { distance, focalLength, azimuth, elevation } = app.params.camera
 		const { parallax } = app.controls
+		const orbiting = orbit !== null && (orbit[0] !== azimuth || orbit[1] !== elevation)
+		orbit = [azimuth, elevation]
 		hud.showCameraAngles(
 			`${degrees(azimuth + parallax.azimuth)},${degrees(elevation + parallax.elevation)}`,
+			orbiting,
 		)
 		hud.showZoomLevel(zoomProgress(distance, zoomLimits()))
 		hud.showZoomValue(`${magnification(focalLength, distance).toFixed(3)}`)
