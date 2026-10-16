@@ -5,8 +5,11 @@ import {
 	elasticZoomLevel,
 	hudLayout,
 	knobAngle,
+	knobLevel,
 	knobSnap,
 	orbitRing,
+	pullLevel,
+	spinRing,
 	trackLevel,
 	zoomDistance,
 	zoomLevel,
@@ -137,6 +140,9 @@ test('the two zoom rings keep their zoom-out sizes and counter-rotate inside and
 	}
 	assert.ok(near(orbitRing(450, 1, 'inner').turn, 45 * DEGREE))
 	assert.ok(near(orbitRing(450, 1, 'outer').turn, -30 * DEGREE))
+	// Stretched past an end by a drag, they turn on a little.
+	assert.ok(near(orbitRing(450, 1.1, 'inner', true).turn, 1.2 * 45 * DEGREE))
+	assert.ok(near(orbitRing(450, -0.1, 'outer', true).turn, 1.2 * 30 * DEGREE))
 })
 
 test('the knob sits on the horizontal at the middle of the zoom, the ends symmetric about it', () => {
@@ -147,6 +153,55 @@ test('the knob sits on the horizontal at the middle of the zoom, the ends symmet
 	}
 	// The start framing sits there: halfway on the zoom's log scale.
 	assert.ok(near(zoomLevel(zoomDistance(0.5, [180, 480]), [180, 480]), 0.5))
+})
+
+test('the spinning circle lies near the outer ring, inside it, and turns a step per click', () => {
+	for (const radius of [150, 460]) {
+		const outer = orbitRing(radius, 0.5, 'outer').radius
+		const still = spinRing(radius, 0)
+		assert.ok(still.radius > (radius + outer) / 2 && still.radius < outer - 8)
+		const [dash, gap] = still.dashArray
+		assert.equal(dash, HUD.spin.dash)
+		// A whole number of dashes around, about spin.gap apart.
+		const count = (2 * Math.PI * still.radius) / (dash + gap)
+		assert.ok(near(count, Math.round(count), 1e-9))
+		assert.ok(Math.abs(gap - HUD.spin.gap) < (dash + HUD.spin.gap) / 2)
+		assert.equal(still.dashOffset, -0)
+		// Each click turns it HUD.spin.step further, clockwise.
+		const three = spinRing(radius, 3)
+		assert.ok(near(-three.dashOffset / three.radius, 3 * HUD.spin.step))
+	}
+})
+
+test('past an end the knob runs further than the camera, which keeps its overshoot', () => {
+	const elasticity = 0.12
+	const stretch = HUD.zoom.stretch
+	assert.ok(stretch >= 3)
+	// Along the track the knob is the camera's level.
+	for (const level of [0, 0.3, 0.5, 1]) assert.equal(knobLevel(level, elasticity), level)
+	// pullLevel() undoes the resistance.
+	for (const pull of [-0.8, -0.2, -0.01, 1.01, 1.3, 2]) {
+		assert.ok(near(pullLevel(elasticZoomLevel(pull, elasticity), elasticity), pull, 1e-9))
+	}
+	let previous = 1
+	for (let pull = 1.001; pull < 4; pull *= 1.2) {
+		const camera = elasticZoomLevel(pull, elasticity)
+		const knob = knobLevel(camera, elasticity)
+		// Further than the camera, short of the pull, bounded by stretch times
+		// the camera's limit, and still moving outward.
+		assert.ok(knob > camera && knob <= pull + 1e-12)
+		assert.ok(knob - 1 < stretch * elasticity)
+		assert.ok(knob > previous)
+		previous = knob
+	}
+	// Both ends alike, continuous at them, and none without elasticity.
+	assert.ok(near(knobLevel(-0.05, elasticity) - 0, -(knobLevel(1.05, elasticity) - 1), 1e-12))
+	assert.ok(near(knobLevel(1 + 1e-7, elasticity), 1 + 1e-7, 1e-9))
+	assert.equal(knobLevel(1.05, 0), 1)
+	// A pull of a whole track past the end: the camera overshoots as before,
+	// the knob more than three times as far.
+	const camera = elasticZoomLevel(2, elasticity) - 1
+	assert.ok((knobLevel(1 + camera, elasticity) - 1) / camera > 3)
 })
 
 test('drag overshoot is continuous, symmetric, bounded and increasingly resistant', () => {

@@ -1,7 +1,17 @@
 // The HUD's flat reticles sit on the central ring. Two segmented rings
 // follow the camera's zoom; the controls keep their native pointer and
 // keyboard behavior, with brackets revealing hover and selection.
-import { HUD, hudLayout, knobAngle, knobSnap, orbitRing, trackLevel } from './hudLayout'
+import {
+	HUD,
+	hudLayout,
+	knobAngle,
+	knobLevel,
+	knobSnap,
+	orbitRing,
+	pullLevel,
+	spinRing,
+	trackLevel,
+} from './hudLayout'
 import bracketAsset from './assets/bracket.svg?url'
 import innerRingAsset from './assets/zoom-ring-inner.svg?url'
 import outerRingAsset from './assets/zoom-ring-outer.svg?url'
@@ -24,8 +34,10 @@ const PAGE_STEPS = { PageUp: 0.25, PageDown: -0.25 }
 const LEVEL_PER_WHEEL_UNIT = 0.0012
 // A press that moves less than this (px) is a click.
 const CLICK_SLOP = 4
-// How long (s) the camera glides when a dragged knob snaps to an end.
+// How long (s) the camera glides when a dragged knob snaps to an end, and
+// how long (ms) the rings and brackets take to spring back (style.css).
 const SNAP_GLIDE = 0.25
+const SPRING_BACK = 600
 
 const clamp01 = (value) => Math.min(Math.max(value, 0), 1)
 // The end a zoom level sits at, 1 (zoom in) or 0 (zoom out), or null.
@@ -91,7 +103,14 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // the tone of `color` (none for another color), and showZoomLevel(level),
 // where the knob goes (at an end, its button shows in full) and the two
 // segmented rings' sizes and turns.
-export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticity, onRandom }) {
+export function createHud({
+	tones,
+	onTone,
+	onZoom,
+	onZoomLevel,
+	getZoomElasticity = () => 0,
+	onRandom,
+}) {
 	const element = document.createElement('div')
 	element.className = 'hud'
 	element.style.setProperty('--hud-button', `${HUD.button}px`)
@@ -123,7 +142,11 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 		wrapper.append(image)
 		return { ...asset, wrapper }
 	})
-	ring.append(mask, line)
+	// The circle between the central ring and the outer zoom ring, which
+	// each click on Random eye turns a little further (style.css eases it).
+	const spin = svgElement('circle', { class: 'hud-line hud-spin' })
+	let spinTurns = 0
+	ring.append(mask, line, spin)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -141,8 +164,31 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 	toneGroup.append(...toneButtons)
 
 	const zoomGroup = group('Zoom')
-	const zoomIn = hudButton('zoom-in', 'Zoom in', icon('plus'), () => onZoom('in'))
-	const zoomOut = hudButton('zoom-out', 'Zoom out', icon('minus'), () => onZoom('out'))
+	const zoomIn = hudButton('zoom-in', 'Zoom in', icon('plus'), () => {
+		engage(zoomIn, 1)
+		onZoom('in')
+	})
+	const zoomOut = hudButton('zoom-out', 'Zoom out', icon('minus'), () => {
+		engage(zoomOut, 0)
+		onZoom('out')
+	})
+	// A clicked zoom button stays engaged (its brackets shown) while the zoom
+	// glides to its end, also once the pointer has left it; it lets go there
+	// (at-level takes over), when the zoom turns back or a drag takes the knob.
+	let engaged = null
+	const engage = (button, end) => {
+		for (const other of [zoomIn, zoomOut]) other.classList.toggle('engaged', other === button)
+		engaged = { button, end }
+	}
+	const releaseEngaged = (shown, previous) => {
+		if (!engaged) return
+		const reached = endOf(shown) === engaged.end
+		const back =
+			previous !== null && (engaged.end === 1 ? shown < previous - 1e-4 : shown > previous + 1e-4)
+		if (!reached && !back && !knob.dragging) return
+		engaged.button.classList.remove('engaged')
+		engaged = null
+	}
 	const knob = zoomKnob({
 		onZoomLevel,
 		getZoomElasticity,
@@ -151,7 +197,11 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 	})
 	zoomGroup.append(zoomIn, knob.element, zoomOut)
 
-	const random = hudButton('random-eye', 'Random eye', icon('shuffle'), onRandom)
+	const random = hudButton('random-eye', 'Random eye', icon('shuffle'), () => {
+		spinTurns++
+		placeSpin()
+		onRandom()
+	})
 
 	element.append(...orbitAssets.map(({ wrapper }) => wrapper), ring, toneGroup, zoomGroup, random)
 
@@ -170,6 +220,31 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 		item.cut.style.r = `${(HUD.reticle / 2) * scale + HUD.gap}px`
 	}
 
+	// A drag stretches the knob, and with it the rings and the brackets, past
+	// an end (`stretching`); released there, they spring back for SPRING_BACK
+	// ms (the HUD's `springing` class eases them, style.css).
+	let stretching = false
+	let springTimer = 0
+	const updateStretch = () => {
+		if (knob.dragging === stretching) return false
+		stretching = knob.dragging
+		if (!stretching && (knob.level < 0 || knob.level > 1)) {
+			element.classList.add('springing')
+			clearTimeout(springTimer)
+			springTimer = setTimeout(() => element.classList.remove('springing'), SPRING_BACK)
+		}
+		return true
+	}
+
+	// The spinning circle for the layout and the clicks so far.
+	const placeSpin = () => {
+		if (!placed) return
+		const turned = spinRing(placed.radius, spinTurns)
+		spin.setAttribute('r', turned.radius)
+		spin.setAttribute('stroke-dasharray', turned.dashArray.join(' '))
+		spin.style.strokeDashoffset = `${turned.dashOffset}px`
+	}
+
 	// Both segmented rings for the current layout and zoom level.
 	let placed = null
 	let level = null
@@ -177,7 +252,7 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 		if (!placed || level === null) return
 		const { cx, cy, radius } = placed
 		for (const asset of orbitAssets) {
-			const ring = orbitRing(radius, level, asset.kind)
+			const ring = orbitRing(radius, level, asset.kind, stretching)
 			asset.wrapper.style.left = `${cx}px`
 			asset.wrapper.style.top = `${cy}px`
 			asset.wrapper.style.transform = `rotate(${ring.turn}rad) scale(${ring.radius / asset.radius})`
@@ -185,16 +260,25 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 	}
 
 	// Fade by arc distance so the approach feels the same on every screen,
-	// also when the elastic drag crosses a button from the other side.
+	// also when the elastic drag crosses a button from the other side. While
+	// the knob is dragged past an end, that button's brackets close in on its
+	// reticle (--zoom-squeeze, 0 to 1, as far as the knob can stretch).
 	const placeZoomSymbols = () => {
 		if (!placed || knob.level === null) return
 		const arc = placed.radius * Math.abs(placed.track[1] - placed.track[0])
+		const reach = HUD.zoom.stretch * getZoomElasticity()
 		for (const [button, end] of [
 			[zoomIn, 1],
 			[zoomOut, 0],
 		]) {
 			const t = clamp01((Math.abs(knob.level - end) * arc) / HUD.button)
 			button.style.setProperty('--zoom-symbol-visibility', t * t * (3 - 2 * t))
+			const past = end === 1 ? knob.level - 1 : -knob.level
+			const squeeze = stretching && reach > 0 ? clamp01(past / reach) : 0
+			button.style.setProperty('--zoom-squeeze', squeeze)
+			// Squeezed, the brackets follow the drag at once; back under the
+			// end they ease out as any button's do.
+			button.classList.toggle('squeezed', squeeze > 0)
 		}
 	}
 
@@ -208,12 +292,15 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 		line.setAttribute('cy', circle.cy)
 		line.setAttribute('r', radius)
 		line.setAttribute('stroke-dasharray', dashes(radius))
+		spin.setAttribute('cx', circle.cx)
+		spin.setAttribute('cy', circle.cy)
 		for (const item of items) {
 			place(item.button, item.cut, item.angle(angles), circle)
 			cutRadius(item)
 		}
 		knob.setTrack({ ...circle, track: angles.track })
 		placed = { ...circle, track: angles.track }
+		placeSpin()
 		placeOrbit()
 		placeZoomSymbols()
 	}
@@ -234,7 +321,9 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticit
 			knob.show(shown)
 			zoomIn.classList.toggle('at-level', endOf(shown) === 1)
 			zoomOut.classList.toggle('at-level', endOf(shown) === 0)
-			if (level !== null && Math.abs(shown - level) < 1e-4) return
+			releaseEngaged(shown, level)
+			const released = updateStretch()
+			if (!released && level !== null && Math.abs(shown - level) < 1e-4) return
 			level = shown
 			placeOrbit()
 			placeZoomSymbols()
@@ -257,11 +346,14 @@ function zoomKnob({ onZoomLevel, onSnap, getZoomElasticity = () => 0, cut }) {
 	element.setAttribute('aria-valuemax', '100')
 	cut.style.r = `${HUD.marker / 2 + HUD.gap}px`
 
-	// The circle and the track on it (set by the layout), and the level shown.
+	// The circle and the track on it (set by the layout), and the camera's
+	// zoom level shown. Past an end the marker runs further than the camera
+	// (knobLevel()).
 	let circle = null
 	let shown = null
+	const marker = () => knobLevel(shown, getZoomElasticity())
 	const update = () => {
-		if (circle && shown !== null) place(element, cut, knobAngle(shown, circle.track), circle)
+		if (circle && shown !== null) place(element, cut, knobAngle(marker(), circle.track), circle)
 	}
 	const set = (level) => onZoomLevel(clamp01(level))
 
@@ -294,7 +386,9 @@ function zoomKnob({ onZoomLevel, onSnap, getZoomElasticity = () => 0, cut }) {
 		const { pointerId: id, clientX: x, clientY: y } = event
 		const angle = pointerAngle(event)
 		const level = shown ?? 0
-		const offset = angle - knobAngle(level, circle.track)
+		// Measured from the pull the camera's level resists (past an end, beyond
+		// the marker), so grabbing a returning marker holds the camera there.
+		const offset = angle - knobAngle(pullLevel(level, getZoomElasticity()), circle.track)
 		drag = { id, x, y, offset, angle, level, moved: false }
 		recovering = false
 		// Grabbing a returning marker stops its camera glide at this point.
@@ -345,8 +439,12 @@ function zoomKnob({ onZoomLevel, onSnap, getZoomElasticity = () => 0, cut }) {
 
 	return {
 		element,
+		// Where the marker sits, and whether a drag holds it.
 		get level() {
-			return shown
+			return shown === null ? null : marker()
+		},
+		get dragging() {
+			return drag !== null
 		},
 		setTrack(value) {
 			if (drag) release({ pointerId: drag.id }, false)

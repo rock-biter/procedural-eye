@@ -27,8 +27,10 @@ export const HUD = Object.freeze({
 	// Zoom in and zoom out around `center`, zoom in higher, `span` apart, or
 	// `minArc` px on a small circle. The knob slides from under one to under
 	// the other; releasing a drag within `snap` px of an end or past it
-	// snaps there. During the drag the track can stretch past either end.
-	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20 }),
+	// snaps there. During the drag the track can stretch past either end:
+	// the camera by zoom.elasticity, the knob `stretch` times as far
+	// (knobLevel()).
+	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20, stretch: 5 }),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
 	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
 	// Ratios keep the inner arcs inside and the outer arcs outside even on
@@ -38,6 +40,11 @@ export const HUD = Object.freeze({
 	// the other way.
 	inner: Object.freeze({ radiusRatio: 0.88, turn: 45 * DEGREE }),
 	outer: Object.freeze({ radiusRatio: 1.42, turn: -30 * DEGREE }),
+	// The circle between the central ring and the outer zoom ring, near the
+	// latter (`radiusRatio` of the central radius): `dash` px every about
+	// `dash` + `gap` px; each click on Random eye turns it `step` further,
+	// clockwise.
+	spin: Object.freeze({ radiusRatio: 1.13, dash: 40, gap: 22.5, step: 10 * DEGREE }),
 })
 
 // The angle of every button on a circle of `radius` px, with `toneCount`
@@ -103,6 +110,25 @@ export function elasticZoomLevel(level, elasticity = 0) {
 	return end + (elasticity * excess) / (elasticity + Math.abs(excess))
 }
 
+// The pull that elasticZoomLevel() resists to `level`, its inverse: past an
+// end, the pull grows without bound as the resisted overshoot nears
+// `elasticity`.
+export function pullLevel(level, elasticity = 0) {
+	const end = Math.min(Math.max(level, 0), 1)
+	const excess = level - end
+	if (excess === 0 || elasticity <= 0) return end
+	const resisted = Math.min(Math.abs(excess), elasticity * (1 - 1e-9))
+	return end + (Math.sign(excess) * elasticity * resisted) / (elasticity - resisted)
+}
+
+// The knob's level for the camera's zoom progress: the same along the track;
+// past an end, the camera's resisted overshoot is traced back to the pull and
+// resisted again with `stretch` times the elasticity, so the knob runs much
+// further past the end than the camera zooms.
+export function knobLevel(progress, elasticity = 0, stretch = HUD.zoom.stretch) {
+	return elasticZoomLevel(pullLevel(progress, elasticity), elasticity * stretch)
+}
+
 // With no elasticity this clamps to the track; a drag can opt into overshoot.
 export function trackLevel(angle, [zoomIn, zoomOut], elasticity = 0) {
 	if (zoomIn === zoomOut) return 1
@@ -133,15 +159,30 @@ export function zoomLevel(distance, limits) {
 // The segmented rings keep their zoom-out size and counter-rotate: level
 // with the horizontal at the middle of the zoom (where the desktop start
 // framing and the knob sit), turned `turn` (radians, clockwise) zoomed in and
-// as much the other way zoomed out. Their ratios preserve strict separation
-// from the central ring at any size.
-export function orbitRing(radius, level, kind, hud = HUD) {
+// as much the other way zoomed out. Past an end (`stretch`: an elastic drag,
+// up to zoom.elasticity) they turn on; otherwise they stop at the end. Their
+// ratios preserve strict separation from the central ring at any size.
+export function orbitRing(radius, level, kind, stretch = false, hud = HUD) {
 	const orbit = hud[kind]
-	const zoom = Math.min(Math.max(level, 0), 1)
+	const zoom = stretch ? level : Math.min(Math.max(level, 0), 1)
 	return {
 		radius: radius * orbit.radiusRatio,
 		turn: orbit.turn * (2 * zoom - 1),
 	}
+}
+
+// The circle between the HUD's circle of `radius` px and the outer zoom
+// ring, near the latter, after `turns` clicks on Random eye: its radius, its
+// dashes (`spin.dash` px, a whole number of periods around, so it has no
+// seam) and the SVG dash offset that turns it `turns` × `spin.step`
+// clockwise (a circle's dashes start at its right and run clockwise; a
+// negative offset carries them forward).
+export function spinRing(radius, turns, hud = HUD) {
+	const { radiusRatio, dash, gap, step } = hud.spin
+	const ring = radius * radiusRatio
+	const count = Math.max(1, Math.round((2 * Math.PI * ring) / (dash + gap)))
+	const period = (2 * Math.PI * ring) / count
+	return { radius: ring, dashArray: [dash, period - dash], dashOffset: -turns * step * ring }
 }
 
 // The camera distance of a zoom level: the inverse of zoomLevel().

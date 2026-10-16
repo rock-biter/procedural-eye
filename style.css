@@ -197,6 +197,24 @@ canvas {
 	right: calc(1px - var(--frame-cross) / 2);
 }
 
+/* The brackets at the middle of the left and right sides (main.js): 8 px
+   inside the lines, their ticks inward, as bright as the crosses. */
+.frame-bracket {
+	top: calc(50% - 16px);
+	width: 9px;
+	height: 33px;
+	opacity: 0.25;
+}
+
+.frame-bracket-left {
+	left: 8px;
+}
+
+.frame-bracket-right {
+	right: 8px;
+	transform: scaleX(-1);
+}
+
 /* The HUD (src/ui/hud.js): a dashed circle (white at 30%) inside the frame,
    centered on the page, with every button on it; src/ui/hudLayout.js sets
    the circle and each button's center (left, top). The mask cuts the line
@@ -231,6 +249,30 @@ canvas {
 	stroke: #fff;
 	stroke-width: 1;
 	opacity: 0.3;
+}
+
+/* The circle between the central ring and the outer zoom ring: long, thick
+   dashes, faint; each click on Random eye turns it 10° further (src/ui/hud.js),
+   quickly, with an elastic settle (a damped bounce where linear() easing is
+   supported, the overshooting --spring elsewhere). */
+.hud-spin {
+	stroke-width: 1;
+	opacity: 0.5;
+	transition: stroke-dashoffset 0.5s var(--spring);
+	transition: stroke-dashoffset 0.6s
+		linear(
+			0,
+			0.45 8%,
+			0.85 16%,
+			1.12 26%,
+			1.18 32%,
+			1.12 40%,
+			0.97 52%,
+			0.94 58%,
+			0.98 70%,
+			1.01 82%,
+			1
+		);
 }
 
 /* Figma's segmented rings, including their linear rotation markers. Images
@@ -332,20 +374,23 @@ canvas {
 	transform: translateY(48px) rotate(90deg);
 }
 
-.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level) .hud-bracket {
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
+	.hud-bracket {
 	opacity: 1;
 }
 
-.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level)
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
 	.hud-bracket-start {
 	transform: translateY(-32px) rotate(-90deg);
 }
 
-.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level) .hud-bracket-end {
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
+	.hud-bracket-end {
 	transform: translateY(32px) rotate(90deg);
 }
 
-.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level) .hud-reticle {
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
+	.hud-reticle {
 	opacity: 1;
 }
 
@@ -367,6 +412,11 @@ canvas {
 
 .random-eye .icon {
 	stroke-width: 2;
+}
+
+/* Random eye stays in full white, or it would not show over the skin. */
+.random-eye .hud-reticle {
+	opacity: 1;
 }
 
 .skin .tone-fill {
@@ -407,15 +457,46 @@ canvas {
 		1px 5px;
 }
 
+/* Past an end, its brackets close in on the reticle as the knob stretches
+   (--zoom-squeeze, src/ui/hud.js), following the drag at once while they
+   are squeezed; dragged back under the end they ease out as usual, and
+   released past it they and the rings spring back (the HUD's `springing`
+   class). */
+.zoom-in.at-level .hud-bracket-start,
+.zoom-out.at-level .hud-bracket-start {
+	transform: translateY(calc(-32px + 16px * var(--zoom-squeeze, 0))) rotate(-90deg);
+}
+
+.zoom-in.at-level .hud-bracket-end,
+.zoom-out.at-level .hud-bracket-end {
+	transform: translateY(calc(32px - 16px * var(--zoom-squeeze, 0))) rotate(90deg);
+}
+
+.zoom-in.squeezed .hud-bracket,
+.zoom-out.squeezed .hud-bracket {
+	transition: opacity 0.25s;
+}
+
+.hud.springing .zoom-in .hud-bracket,
+.hud.springing .zoom-out .hud-bracket {
+	transition:
+		transform 0.5s var(--spring),
+		opacity 0.25s;
+}
+
+.hud.springing .hud-orbit {
+	transition: transform 0.5s var(--spring);
+}
+
+/* The + and − shrink to nothing about their center as the marker reaches
+   them. src/ui/hud.js sets the scale every frame: a transition restarting
+   under it moved the icons by a pixel now and then. */
 .zoom-in .icon,
 .zoom-out .icon {
 	width: 18px;
 	height: 18px;
+	transform-origin: center;
 	scale: var(--zoom-symbol-visibility, 1);
-	opacity: var(--zoom-symbol-visibility, 1);
-	transition:
-		scale 0.1s ease-out,
-		opacity 0.1s ease-out;
 }
 
 .zoom-in .hud-bracket,

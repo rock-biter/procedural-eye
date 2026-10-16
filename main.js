@@ -175,7 +175,9 @@ function download(blob, filename) {
 // one). The dashes are an SVG pattern: FRAME_DASH px every FRAME_DASH_PERIOD
 // px from the edge, one centered on the first pixel of every period (rounded
 // toward the edge). A square dash in a square cell dashes the 1 px lines of
-// both directions.
+// both directions. At the middle of the left and right sides a bracket (a
+// 33 px upright with an 8 px tick inward from its middle row) stands 8 px
+// inside the line.
 const FRAME_DASH = 3
 const FRAME_DASH_PERIOD = 8
 function frame() {
@@ -195,6 +197,10 @@ function frame() {
 		...corners.map(
 			(corner) =>
 				`<svg class="frame-cross frame-${corner}"><rect x="50%" width="1" height="100%"/><rect y="50%" width="100%" height="1"/></svg>`,
+		),
+		...['left', 'right'].map(
+			(side) =>
+				`<svg class="frame-bracket frame-bracket-${side}"><rect width="1" height="33"/><rect x="1" y="16" width="8" height="1"/></svg>`,
 		),
 	].join('')
 	return element
