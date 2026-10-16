@@ -223,7 +223,7 @@ if (urlParams.get('gui') !== '0') {
 	showZoomLevel()
 
 	// The title, top left, and the credit line, bottom left; the credit's
-	// link blurs itself after a click, as the glass buttons do.
+	// link blurs itself after a click, as the HUD buttons do.
 	const masthead = document.createElement('header')
 	masthead.className = 'masthead'
 	masthead.innerHTML = '<h1>Random-eyes</h1>'

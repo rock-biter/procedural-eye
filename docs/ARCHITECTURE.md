@@ -63,9 +63,8 @@
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
-| [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye, cut around each button, with the round glass buttons on it and the zoom knob sliding along it; `main.js` gives it the actions. |
-| [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's circle (inscribed in its box, or smaller until its buttons fit) and every button's angle on it; the knob's track, its angle at a zoom level and back, and the ends a drag snaps to; the zoom level of a camera distance (log scale) and back. |
-| [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) | The glass refraction of the HUD's buttons on Chromium: a displacement map per button (a convex bevel refracting by Snell's law), in an SVG filter that also holds the blur of its backdrop. |
+| [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye, cut around each button, with flat square reticles, animated selection brackets, two counter-rotating segmented zoom rings and the square zoom marker sliding along it; `main.js` gives it the actions. |
+| [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's circle (inscribed in its box, or smaller until its buttons fit) and every button's angle on it; the knob's track, its angle at a zoom level and back, and the ends a drag snaps to; the zoom level of a camera distance (log scale) and back; the inner and outer segmented rings' fixed radius ratios and their turns at that level. |
 | [`src/math.js`](../src/math.js) *, [`src/random.js`](../src/random.js) * | Scalar and vector helpers; seeds, PCG hash twin, weighted picks, Gaussian samples. |
 | [`src/frameStats.js`](../src/frameStats.js), [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | Frame telemetry and the adaptive resolution rules (from the terrain project). |
 

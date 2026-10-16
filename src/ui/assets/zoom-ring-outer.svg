@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="1588" height="718" viewBox="0 0 1588 718" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="zoom ring outer">
+<mask id="mask0_0_9" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="1588" height="718">
+<rect id="Rectangle 10" width="1588" height="718" fill="#D9D9D9"/>
+</mask>
+<g mask="url(#mask0_0_9)">
+<ellipse id="Ellipse 3" cx="787.5" cy="359.5" rx="652.288" ry="652.5" stroke="white" stroke-opacity="0.3" stroke-dasharray="3 4"/>
+<path id="Vector 4" opacity="0.4" d="M62.5904 355.21L64.6286 355.21M135.967 355.21L133.929 355.21M68.7051 355.21L72.7815 355.21M76.858 355.21L80.9345 355.21M85.0109 355.21L89.0874 355.21M93.1639 355.21L97.2404 355.21M101.317 355.21L105.393 355.21M109.47 355.21L113.546 355.21M117.623 355.21L121.699 355.21M125.776 355.21L129.852 355.21" stroke="white"/>
+<path id="Vector 7" opacity="0.4" d="M1440 354.93L1441.95 354.93M1518.19 354.93L1516.24 354.93M1445.86 354.93L1449.77 354.93M1453.68 354.93L1457.59 354.93M1461.5 354.93L1465.41 354.93M1469.32 354.93L1473.23 354.93M1477.14 354.93L1481.05 354.93M1484.96 354.93L1488.87 354.93M1492.78 354.93L1496.69 354.93M1500.6 354.93L1504.51 354.93M1508.42 354.93L1512.33 354.93" stroke="white"/>
+</g>
+</g>
+</svg>

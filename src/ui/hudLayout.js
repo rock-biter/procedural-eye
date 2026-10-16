@@ -9,10 +9,12 @@
 const DEGREE = Math.PI / 180
 
 export const HUD = Object.freeze({
-	// Every button's size (px) and the zoom knob's; the skin tones that are
-	// not pressed shrink to toneScale of it.
+	// Hit areas and visible reticle/marker sizes (px). Only the glyph of an
+	// unselected skin tone shrinks; its pointer target stays full size.
 	button: 44,
-	knob: 22,
+	knob: 44,
+	reticle: 32,
+	marker: 8,
 	toneScale: 0.75,
 	// The circle's line stops `gap` px from each button. Its dashes are those
 	// of the frame around the page: `dash` px every `dashPeriod` px.
@@ -21,19 +23,18 @@ export const HUD = Object.freeze({
 	dashPeriod: 8,
 	// The skin tones in the bottom-left quadrant, the first (fair) highest,
 	// around `center` or nearer the quadrant's middle where they would leave it.
-	tones: Object.freeze({ center: 165 * DEGREE, spacing: 60 }),
+	tones: Object.freeze({ center: 140 * DEGREE, spacing: 60 }),
 	// Zoom in and zoom out around `center`, zoom in higher, `span` apart, or
 	// `minArc` px on a small circle. The knob slides from under one to under
 	// the other, and a drag snaps it to either end within `snap` px of it
 	// (overlapping the button a little).
-	zoom: Object.freeze({ center: 5 * DEGREE, span: 30 * DEGREE, minArc: 160, snap: 28 }),
-	// Random eye below the zoom: at `angle`, or `spacing` px past zoom out; a
-	// dashed circle around it, `halo` times the button across.
-	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60, halo: 5 }),
-	// The second circle that follows the zoom: `in` px outside the circle
-	// zoomed in (negative: inside it), `out` px zoomed out, turned `turn` over
-	// the whole zoom against the knob.
-	orbit: Object.freeze({ in: -80, out: 250, turn: 90 * DEGREE }),
+	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20 }),
+	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
+	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
+	// Ratios keep the inner arcs inside and the outer arcs outside even on
+	// phones, fixed at the former zoom-out sizes throughout the zoom.
+	inner: Object.freeze({ radiusRatio: 0.88, turn: 22.5 * DEGREE, start: -20 * DEGREE }),
+	outer: Object.freeze({ radiusRatio: 1.42, turn: -45 * DEGREE, start: 9.37 * DEGREE }),
 })
 
 // The angle of every button on a circle of `radius` px, with `toneCount`
@@ -113,23 +114,15 @@ export function zoomLevel(distance, [near, far]) {
 	return Math.min(Math.max(level, 0), 1)
 }
 
-// The second circle about the HUD's circle of `radius` px at a zoom level:
-// its radius, linear in the level from `orbit.out` px outside it (zoomed out)
-// to `orbit.in` px (zoomed in; negative, inside it), and its turn (radians,
-// clockwise), growing to `orbit.turn` zoomed in, against the knob, which runs
-// along the track `[zoomIn, zoomOut]` the other way. Its dashes are the
-// circle's (`dash` px every `dashPeriod` px zoomed in): they keep their length
-// and their count, a whole number around (no seam), so the gaps widen as it
-// grows. `dashArray` and `dashOffset` are its SVG stroke's: a circle's dashes
-// start at its right and run clockwise, and a negative offset carries them
-// forward.
-export function orbitRing(radius, level, [zoomIn, zoomOut], hud = HUD) {
-	const { orbit, dash, dashPeriod } = hud
-	const ring = radius + orbit.out + (orbit.in - orbit.out) * level
-	const count = Math.max(1, Math.round((2 * Math.PI * (radius + orbit.in)) / dashPeriod))
-	const period = (2 * Math.PI * ring) / count
-	const turn = -Math.sign(zoomIn - zoomOut) * orbit.turn * level
-	return { radius: ring, turn, dashArray: [dash, period - dash], dashOffset: -turn * ring }
+// The segmented rings keep their zoom-out size and counter-rotate.
+// Their ratios preserve strict separation from the central ring at any size.
+export function orbitRing(radius, level, kind, hud = HUD) {
+	const orbit = hud[kind]
+	const zoom = Math.min(Math.max(level, 0), 1)
+	return {
+		radius: radius * orbit.radiusRatio,
+		turn: orbit.start + orbit.turn * (zoom - 0.65),
+	}
 }
 
 // The camera distance of a zoom level: the inverse of zoomLevel().

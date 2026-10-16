@@ -12,8 +12,7 @@
    and the frame rate. The frame around the page runs --frame-inset inside
    the window's safe area (8px on phones and tablets, see the end), and the
    interface stays --frame-gap inside the frame, at --ui-inset from the
-   edges. --spring overshoots a little: the glass swelling, the tones
-   growing. */
+   edges. --spring gives the brackets and tone selection a soft landing. */
 :root {
 	--ui-color: #ffffff77;
 	--frame-inset: 24px;
@@ -225,16 +224,20 @@ canvas {
 	opacity: 0.3;
 }
 
-/* The second circle, which follows the zoom (src/ui/hud.js), and the one
-   around Random eye, fainter; the latter eases the quarter turn of each
-   click. */
+/* Figma's segmented rings, including their linear rotation markers. Images
+   retain their intrinsic geometry; hud.js scales and turns the wrappers. */
 .hud-orbit {
-	opacity: 0.2;
+	position: absolute;
+	width: 0;
+	height: 0;
+	transform-origin: 0 0;
+	pointer-events: none;
 }
 
-.hud-halo {
-	opacity: 0.25;
-	transition: stroke-dashoffset 0.6s var(--spring);
+.hud-orbit img {
+	position: absolute;
+	display: block;
+	max-width: none;
 }
 
 .hud-cut {
@@ -242,210 +245,209 @@ canvas {
 	transition: r 0.35s var(--spring);
 }
 
+/* Invisible hit areas stay large while the drawn controls remain fine. */
 .hud-button {
 	position: absolute;
 	display: grid;
 	place-items: center;
 	width: var(--hud-button);
-	min-height: var(--hud-button);
 	height: var(--hud-button);
 	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	color: #fff;
 	translate: -50% -50%;
 	pointer-events: auto;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
 }
 
-/* Stroked icons: a plus, a minus, the shuffle of Random eye. */
+.hud-button:focus-visible {
+	outline: 1px solid #ffffffaa;
+	outline-offset: 10px;
+}
+
+.hud-glyph {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 32px;
+	height: 32px;
+	rotate: var(--hud-angle);
+	transition: scale 0.35s var(--spring);
+	pointer-events: none;
+}
+
+.hud-reticle {
+	display: grid;
+	place-items: center;
+	box-sizing: border-box;
+	width: 32px;
+	height: 32px;
+	/* Four open corners, like the interrupted square in the reference. */
+	background:
+		linear-gradient(#fff, #fff) left top / 8px 1px,
+		linear-gradient(#fff, #fff) left top / 1px 8px,
+		linear-gradient(#fff, #fff) right top / 8px 1px,
+		linear-gradient(#fff, #fff) right top / 1px 8px,
+		linear-gradient(#fff, #fff) left bottom / 8px 1px,
+		linear-gradient(#fff, #fff) left bottom / 1px 8px,
+		linear-gradient(#fff, #fff) right bottom / 8px 1px,
+		linear-gradient(#fff, #fff) right bottom / 1px 8px;
+	background-repeat: no-repeat;
+	opacity: 0.5;
+	transition: opacity 0.2s;
+}
+
+/* The exported bracket is vertical (8.5 × 32). Turn the two copies across
+   the reticle's ends; their motion follows the button's radial orientation. */
+.hud-bracket {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	display: block;
+	max-width: none;
+	opacity: 0;
+	translate: -50% -50%;
+	transition:
+		transform 0.35s var(--spring),
+		opacity 0.25s;
+}
+
+.hud-bracket-start {
+	transform: translateY(-48px) rotate(-90deg);
+}
+
+.hud-bracket-end {
+	transform: translateY(48px) rotate(90deg);
+}
+
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level) .hud-bracket {
+	opacity: 1;
+}
+
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level)
+	.hud-bracket-start {
+	transform: translateY(-32px) rotate(-90deg);
+}
+
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level) .hud-bracket-end {
+	transform: translateY(32px) rotate(90deg);
+}
+
+.hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level) .hud-reticle {
+	opacity: 1;
+}
+
+.hud-button:active .hud-glyph {
+	scale: 0.94;
+}
+
 .hud-button .icon {
 	width: 20px;
 	height: 20px;
 	fill: none;
 	stroke: currentColor;
-	stroke-width: 2;
+	stroke-width: 1;
 	stroke-linecap: round;
 	stroke-linejoin: round;
-	filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
-	color: #ffffffdd;
+	/* Icons stay upright while their surrounding reticles turn. */
+	rotate: calc(-1 * var(--hud-angle));
 }
 
-/* Liquid glass: clear glass over the eye, defined by soft edges. A glossy
-   dome of light reflects on its upper half and the light it lets through
-   gathers above the bottom edge; specular rims light the top-right and
-   bottom-left edges, each with a faint crescent inside it, and a faint dark
-   line inside the edge gives the glass its thickness. On Chromium an SVG
-   filter replaces the backdrop filter, and the bevel also refracts the scene
-   (--glass-refraction, src/ui/liquidGlass.js). Hovered, the glass tints
-   (--glass-tint); pressed, it swells. Every button of the HUD is of this
-   glass. */
-.glass {
-	--glass-tint: rgba(255, 255, 255, 0.04);
-	min-height: 44px;
-	border: none;
-	border-radius: 999px;
-	background:
-		radial-gradient(60% 65% at 70% 0%, rgba(255, 255, 255, 0.2), transparent),
-		radial-gradient(60% 40% at 30% 100%, rgba(255, 255, 255, 0.08), transparent), var(--glass-tint);
-	box-shadow:
-		inset 2.5px -2.5px 2px -2.5px rgba(255, 255, 255, 0.7),
-		inset -2.5px 2.5px 2px -1.5px rgba(255, 255, 255, 0.9),
-		inset 5px -5px 4px -5px rgba(255, 255, 255, 0.15),
-		inset -5px 5px 4px -5px rgba(255, 255, 255, 0.15),
-		inset 0 0 3px rgba(0, 0, 0, 0.25),
-		0 4px 12px rgba(0, 0, 0, 0.12);
-	color: var(--ui-color);
-	font:
-		300 12px/1.4 'JetBrains Mono',
-		ui-monospace,
-		monospace;
-	letter-spacing: 0.02em;
-	/* text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); */
-	white-space: nowrap;
-	cursor: pointer;
-	-webkit-backdrop-filter: var(--glass-refraction, blur(2px));
-	backdrop-filter: var(--glass-refraction, blur(2px));
-	-webkit-tap-highlight-color: transparent;
-	transition:
-		background 0.2s,
-		transform 0.35s var(--spring);
+.random-eye .icon {
+	stroke-width: 2;
 }
 
-.glass:hover {
-	--glass-tint: rgba(255, 255, 255, 0.08);
+.skin .tone-fill {
+	box-sizing: border-box;
+	width: 20px;
+	height: 20px;
+	border: 1px solid #fff;
+	background: var(--tone);
 }
 
-.glass:active {
-	--glass-tint: rgba(255, 255, 255, 0.12);
-	transform: scale(1.06);
-}
-
-.glass:focus-visible {
-	outline: 2px solid var(--ui-color);
-	outline-offset: 2px;
-}
-
-/* The skin tones: a bead of its color in each button, shaded from a lighter
-   one at the top right through the color to a darker one at the bottom
-   left. The pressed one (the color the params are heading for) is full size
-   and opaque, its bead larger; the others shrink to --tone-scale
-   (HUD.toneScale) and fade, glass and bead, and grow and brighten when
-   hovered. */
-.skin {
-	transition:
-		background 0.2s,
-		opacity 0.2s,
-		transform 0.35s var(--spring),
-		scale 0.35s var(--spring);
-}
-
-.skin:not([aria-pressed='true']) {
+.skin:not([aria-pressed='true']) .hud-glyph {
 	scale: var(--tone-scale);
+}
+
+.skin:not([aria-pressed='true']) .hud-reticle {
 	opacity: 0.3;
 }
 
-.skin:not([aria-pressed='true']):hover {
+.skin:not([aria-pressed='true']):is(:hover, :focus-visible) .hud-glyph {
 	scale: calc(var(--tone-scale) + 0.1);
+}
+
+.skin:not([aria-pressed='true']):is(:hover, :focus-visible) .hud-reticle {
 	opacity: 0.8;
 }
 
-.skin span {
+.zoom-in .hud-glyph,
+.zoom-out .hud-glyph {
+	transform: scale(1.5);
+}
+
+.zoom-in .hud-reticle,
+.zoom-out .hud-reticle {
+	width: 20px;
+	height: 20px;
+	background-size:
+		5px 1px,
+		1px 5px;
+}
+
+.zoom-in .icon,
+.zoom-out .icon {
 	width: 18px;
 	height: 18px;
-	border-radius: 50%;
-	background: linear-gradient(
-		to bottom left,
-		color-mix(in oklab, var(--tone), #ffffff 30%),
-		var(--tone) 45%,
-		color-mix(in oklab, var(--tone), #000000 35%)
-	);
-	box-shadow:
-		inset 0 -2px 3px rgba(0, 0, 0, 0.25),
-		inset 0 1px 1px rgba(255, 255, 255, 0.25),
-		0 1px 2px rgba(0, 0, 0, 0.3);
-	transition:
-		width 0.35s var(--spring),
-		height 0.35s var(--spring);
 }
 
-.skin[aria-pressed='true'] span {
-	width: 26px;
-	height: 26px;
+.zoom-in .hud-bracket,
+.zoom-out .hud-bracket {
+	scale: 0.625;
 }
 
-/* Zoom in and zoom out: faint, clearer when hovered, in full while the zoom
-   is at their end (src/ui/hud.js). */
-.zoom-in,
-.zoom-out {
-	opacity: 0.5;
-	transition:
-		background 0.2s,
-		opacity 0.2s,
-		transform 0.35s var(--spring);
-}
-
-.zoom-in:hover,
-.zoom-out:hover {
-	opacity: 0.8;
-}
-
-.zoom-in.at-level,
-.zoom-out.at-level {
-	opacity: 1;
-}
-
-/* The zoom knob: a small empty glass button that slides along the circle
-   from − to + (src/ui/hud.js places it), over them, so the pointer always
-   reaches it. At either end, over + or −, its glass lightens. Dragged, the
-   glass swells; clicked, it bounces and a ring spreads from it. */
 .zoom-level {
 	width: var(--hud-knob);
-	min-height: var(--hud-knob);
 	height: var(--hud-knob);
 	z-index: 1;
 	cursor: grab;
 	touch-action: none;
 }
 
-.zoom-level.dragging {
-	--glass-tint: rgba(255, 255, 255, 0.12);
-	cursor: grabbing;
-	transform: scale(1.3);
-}
-
-.zoom-level.at-end {
-	--glass-tint: rgba(255, 255, 255, 0.3);
-}
-
-.zoom-level::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border: 1px solid #fff;
-	border-radius: 50%;
-	opacity: 0;
+.zoom-marker {
+	width: 8px;
+	height: 8px;
+	background: #d9d9d9;
+	rotate: var(--hud-angle);
+	transition: scale 0.2s;
 	pointer-events: none;
 }
 
-.zoom-level.pulse {
-	animation: zoom-bounce 0.5s var(--spring);
+.zoom-level.dragging {
+	cursor: grabbing;
 }
 
-.zoom-level.pulse::after {
-	animation: zoom-ripple 0.7s ease-out;
+.zoom-level:is(:hover, :focus-visible, .dragging) .zoom-marker {
+	scale: 1.3;
+}
+
+.zoom-level.pulse .zoom-marker {
+	animation: zoom-bounce 0.5s var(--spring);
 }
 
 @keyframes zoom-bounce {
 	35% {
-		transform: scale(1.4);
+		scale: 1.5;
 	}
 }
 
-@keyframes zoom-ripple {
-	from {
-		opacity: 0.6;
-		transform: scale(1);
-	}
-	to {
-		opacity: 0;
-		transform: scale(2.6);
+@media (prefers-reduced-motion: reduce) {
+	.hud * {
+		transition: none;
+		animation: none;
 	}
 }
 
