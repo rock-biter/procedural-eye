@@ -10,6 +10,7 @@ import {
 	orbitRing,
 	pullLevel,
 	spinRing,
+	toneArcs,
 	trackLevel,
 } from './hudLayout'
 import bracketAsset from './assets/bracket.svg?url'
@@ -146,7 +147,12 @@ export function createHud({
 	// each click on Random eye turns a little further (style.css eases it).
 	const spin = svgElement('circle', { class: 'hud-line hud-spin' })
 	let spinTurns = 0
-	ring.append(mask, line, spin)
+	// Three arcs inside the inner zoom ring, which each skin tone turns to its
+	// own places (style.css eases them).
+	const arcs = [0, 1, 2].map(() => svgElement('circle', { class: 'hud-line hud-arc' }))
+	let arcTone = 0
+	let arcsPlaced = false
+	ring.append(mask, line, spin, ...arcs)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -245,6 +251,27 @@ export function createHud({
 		spin.style.strokeDashoffset = `${turned.dashOffset}px`
 	}
 
+	// The arcs for the layout and the tone pressed. Their first placement
+	// does not animate.
+	const placeArcs = () => {
+		if (!placed) return
+		const turned = toneArcs(placed.radius, arcTone)
+		arcs.forEach((arc, i) => {
+			if (!arcsPlaced) arc.style.transition = 'none'
+			arc.setAttribute('cx', placed.cx)
+			arc.setAttribute('cy', placed.cy)
+			arc.setAttribute('r', turned[i].radius)
+			arc.setAttribute('stroke-dasharray', turned[i].dashArray.join(' '))
+			arc.style.strokeDashoffset = `${turned[i].dashOffset}px`
+		})
+		if (!arcsPlaced) {
+			arcsPlaced = true
+			requestAnimationFrame(() => {
+				for (const arc of arcs) arc.style.transition = ''
+			})
+		}
+	}
+
 	// Both segmented rings for the current layout and zoom level.
 	let placed = null
 	let level = null
@@ -301,6 +328,7 @@ export function createHud({
 		knob.setTrack({ ...circle, track: angles.track })
 		placed = { ...circle, track: angles.track }
 		placeSpin()
+		placeArcs()
 		placeOrbit()
 		placeZoomSymbols()
 	}
@@ -316,6 +344,11 @@ export function createHud({
 				button.setAttribute('aria-pressed', String(tones[i].color === color)),
 			)
 			for (const item of items) cutRadius(item)
+			// A color of no tone leaves the arcs where they are.
+			const tone = tones.findIndex((candidate) => candidate.color === color)
+			if (tone < 0 || tone === arcTone) return
+			arcTone = tone
+			placeArcs()
 		},
 		showZoomLevel(shown) {
 			knob.show(shown)

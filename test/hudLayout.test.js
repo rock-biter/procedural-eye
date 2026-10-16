@@ -10,6 +10,7 @@ import {
 	orbitRing,
 	pullLevel,
 	spinRing,
+	toneArcs,
 	trackLevel,
 	zoomDistance,
 	zoomLevel,
@@ -155,11 +156,41 @@ test('the knob sits on the horizontal at the middle of the zoom, the ends symmet
 	assert.ok(near(zoomLevel(zoomDistance(0.5, [180, 480]), [180, 480]), 0.5))
 })
 
-test('the spinning circle lies near the outer ring, inside it, and turns a step per click', () => {
+test('three arcs inside the inner ring take the places of each skin tone', () => {
+	for (const radius of [150, 460]) {
+		const inner = orbitRing(radius, 0.5, 'inner').radius
+		HUD.arcs.tones.forEach((centers, tone) => {
+			const arcs = toneArcs(radius, tone)
+			assert.equal(arcs.length, 3)
+			for (const [i, arc] of arcs.entries()) {
+				assert.ok(arc.radius < inner - 8, 'inside the inner zoom ring')
+				const [length, gap] = arc.dashArray
+				// One dash around, HUD.arcs.span long, centered on its place.
+				assert.ok(near(length + gap, 2 * Math.PI * arc.radius, 1e-9))
+				assert.ok(near(length / arc.radius, HUD.arcs.span, 1e-12))
+				const middle = (-arc.dashOffset + length / 2) / arc.radius
+				assert.ok(near(middle, centers[i], 1e-12))
+			}
+			// The arcs never overlap.
+			const sorted = [...centers].sort((a, b) => a - b)
+			for (let i = 0; i < 3; i++) {
+				const next = i === 2 ? sorted[0] + 2 * Math.PI : sorted[i + 1]
+				assert.ok(next - sorted[i] > HUD.arcs.span, `tone ${tone}`)
+			}
+		})
+	}
+	// At rest (the first tone) they are 120° apart; a tone per skin button.
+	const [a, b, c] = HUD.arcs.tones[0]
+	assert.ok(near(b - a, (2 * Math.PI) / 3) && near(c - b, (2 * Math.PI) / 3))
+	assert.equal(HUD.arcs.tones.length, 5)
+	assert.deepEqual(toneArcs(460, 5), toneArcs(460, 0))
+})
+
+test('the spinning circle lies between the central and the outer ring and turns a step per click', () => {
 	for (const radius of [150, 460]) {
 		const outer = orbitRing(radius, 0.5, 'outer').radius
 		const still = spinRing(radius, 0)
-		assert.ok(still.radius > (radius + outer) / 2 && still.radius < outer - 8)
+		assert.ok(still.radius > radius + 8 && still.radius < outer - 8)
 		const [dash, gap] = still.dashArray
 		assert.equal(dash, HUD.spin.dash)
 		// A whole number of dashes around, about spin.gap apart.

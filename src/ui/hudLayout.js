@@ -40,11 +40,28 @@ export const HUD = Object.freeze({
 	// the other way.
 	inner: Object.freeze({ radiusRatio: 0.88, turn: 45 * DEGREE }),
 	outer: Object.freeze({ radiusRatio: 1.42, turn: -30 * DEGREE }),
-	// The circle between the central ring and the outer zoom ring, near the
-	// latter (`radiusRatio` of the central radius): `dash` px every about
+	// The circle between the central ring and the outer zoom ring
+	// (`radiusRatio` of the central radius): `dash` px every about
 	// `dash` + `gap` px; each click on Random eye turns it `step` further,
 	// clockwise.
 	spin: Object.freeze({ radiusRatio: 1.13, dash: 40, gap: 22.5, step: 10 * DEGREE }),
+	// Three arcs `span` long on a circle inside the inner zoom ring
+	// (`radiusRatio` of the central radius), 120° apart at rest. Each skin
+	// tone, fair to deep, turns each arc to its own place: `tones` holds their
+	// centers per tone (radians clockwise from the right; −90° is the top).
+	arcs: Object.freeze({
+		radiusRatio: 0.8,
+		span: 36 * DEGREE,
+		tones: Object.freeze(
+			[
+				[-90, 30, 150],
+				[-45, 75, 195],
+				[-120, -20, 140],
+				[-30, 60, 240],
+				[-150, 0, 90],
+			].map((centers) => Object.freeze(centers.map((center) => center * DEGREE))),
+		),
+	}),
 })
 
 // The angle of every button on a circle of `radius` px, with `toneCount`
@@ -172,7 +189,7 @@ export function orbitRing(radius, level, kind, stretch = false, hud = HUD) {
 }
 
 // The circle between the HUD's circle of `radius` px and the outer zoom
-// ring, near the latter, after `turns` clicks on Random eye: its radius, its
+// ring, after `turns` clicks on Random eye: its radius, its
 // dashes (`spin.dash` px, a whole number of periods around, so it has no
 // seam) and the SVG dash offset that turns it `turns` × `spin.step`
 // clockwise (a circle's dashes start at its right and run clockwise; a
@@ -183,6 +200,23 @@ export function spinRing(radius, turns, hud = HUD) {
 	const count = Math.max(1, Math.round((2 * Math.PI * ring) / (dash + gap)))
 	const period = (2 * Math.PI * ring) / count
 	return { radius: ring, dashArray: [dash, period - dash], dashOffset: -turns * step * ring }
+}
+
+// The three arcs for the skin tone at `tone` (its index, fair first) about
+// the HUD's circle of `radius` px: each a circle of the arcs' radius with a
+// single dash `arcs.span` long, which its SVG dash offset centers on the
+// arc's place (a circle's dashes start at its right and run clockwise; a
+// negative offset carries them forward). Tones past the list wrap round.
+export function toneArcs(radius, tone, hud = HUD) {
+	const { radiusRatio, span, tones } = hud.arcs
+	const ring = radius * radiusRatio
+	const length = span * ring
+	const centers = tones[((tone % tones.length) + tones.length) % tones.length]
+	return centers.map((center) => ({
+		radius: ring,
+		dashArray: [length, 2 * Math.PI * ring - length],
+		dashOffset: -(center - span / 2) * ring,
+	}))
 }
 
 // The camera distance of a zoom level: the inverse of zoomLevel().

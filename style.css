@@ -21,14 +21,35 @@
    and the frame rate. The frame around the page runs --frame-inset inside
    the window's safe area (8px on phones and tablets, see the end), and the
    interface stays --frame-gap inside the frame, at --ui-inset from the
-   edges. --spring gives the brackets and tone selection a soft landing. */
+   edges. --spring gives the brackets and tone selection a soft landing;
+   --elastic, a damped bounce, the HUD's turning circles and arcs (where
+   linear() easing is missing, it overshoots once, as --spring). */
 :root {
 	--ui-color: #ffffff77;
 	--frame-inset: 24px;
 	--frame-gap: 16px;
 	--ui-inset: calc(var(--frame-inset) + var(--frame-gap));
 	--spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+	--elastic: var(--spring);
 	text-transform: uppercase;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+	:root {
+		--elastic: linear(
+			0,
+			0.45 8%,
+			0.85 16%,
+			1.12 26%,
+			1.18 32%,
+			1.12 40%,
+			0.97 52%,
+			0.94 58%,
+			0.98 70%,
+			1.01 82%,
+			1
+		);
+	}
 }
 
 html,
@@ -251,28 +272,21 @@ canvas {
 	opacity: 0.3;
 }
 
-/* The circle between the central ring and the outer zoom ring: long, thick
-   dashes, faint; each click on Random eye turns it 10° further (src/ui/hud.js),
-   quickly, with an elastic settle (a damped bounce where linear() easing is
-   supported, the overshooting --spring elsewhere). */
+/* The circle between the central ring and the outer zoom ring: long
+   dashes; each click on Random eye turns it 10° further (src/ui/hud.js),
+   quickly, with the --elastic settle. */
 .hud-spin {
 	stroke-width: 1;
 	opacity: 0.5;
-	transition: stroke-dashoffset 0.5s var(--spring);
-	transition: stroke-dashoffset 0.6s
-		linear(
-			0,
-			0.45 8%,
-			0.85 16%,
-			1.12 26%,
-			1.18 32%,
-			1.12 40%,
-			0.97 52%,
-			0.94 58%,
-			0.98 70%,
-			1.01 82%,
-			1
-		);
+	transition: stroke-dashoffset 0.6s var(--elastic);
+}
+
+/* The three arcs inside the inner zoom ring (src/ui/hud.js): solid; a change
+   of skin tone carries each to its new place, elastically. */
+.hud-arc {
+	stroke-width: 2;
+	opacity: 0.3;
+	transition: stroke-dashoffset 1s var(--elastic);
 }
 
 /* Figma's segmented rings, including their linear rotation markers. Images
