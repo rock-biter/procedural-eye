@@ -12,7 +12,9 @@ import {
 	spinRing,
 	swayTurn,
 	toneArcs,
+	toneSteps,
 	trackLevel,
+	turnTones,
 	zoomValueRadius,
 } from './hudLayout'
 import { gsap } from 'gsap'
@@ -265,12 +267,46 @@ export function createHud({
 	)
 
 	// Each button with its angle on the circle and its cut in the line.
+	// The tones' angles are their group's, turned (`toneShift`).
 	const items = [
-		...toneButtons.map((button, i) => ({ button, angle: (angles) => angles.tones[i] })),
+		...toneButtons.map((button, i) => ({ button, angle: (angles, toned) => toned[i] })),
 		{ button: zoomIn, angle: (angles) => angles.zoomIn },
 		{ button: zoomOut, angle: (angles) => angles.zoomOut },
 		{ button: random, angle: (angles) => angles.random },
 	]
+	const toneItems = items.slice(0, toneButtons.length)
+
+	// The tone group turns along the circle to bring the pressed tone to its
+	// center, on the horizontal (toneSteps()), gliding there with an elastic
+	// settle (GSAP). The first press, and any with reduced motion, sets it.
+	const toneShift = { steps: 0 }
+	let toneTarget = null
+	let placedAngles = null
+	const placeTones = () => {
+		if (!placed || !placedAngles) return
+		const toned = turnTones(placedAngles.tones, placed.radius, toneShift.steps)
+		for (const item of toneItems)
+			place(item.button, item.cut, item.angle(placedAngles, toned), placed)
+	}
+	const turnToTone = (tone) => {
+		const steps = toneSteps(tone, tones.length)
+		if (steps === toneTarget) return
+		const first = toneTarget === null
+		toneTarget = steps
+		if (first || motionless.matches) {
+			gsap.killTweensOf(toneShift)
+			toneShift.steps = steps
+			placeTones()
+			return
+		}
+		gsap.to(toneShift, {
+			steps,
+			duration: 1,
+			ease: 'elastic.out(1, 0.75)',
+			overwrite: true,
+			onUpdate: placeTones,
+		})
+	}
 	for (const item of items) item.cut = cut()
 	const cutRadius = (item) => {
 		const pressed = item.button.getAttribute('aria-pressed') === 'true'
@@ -426,10 +462,12 @@ export function createHud({
 			element.setAttribute('cx', circle.cx)
 			element.setAttribute('cy', circle.cy)
 		}
+		const toned = turnTones(angles.tones, radius, toneShift.steps)
 		for (const item of items) {
-			place(item.button, item.cut, item.angle(angles), circle)
+			place(item.button, item.cut, item.angle(angles, toned), circle)
 			cutRadius(item)
 		}
+		placedAngles = angles
 		knob.setTrack({ ...circle, track: angles.track })
 		const middle = (angles.track[0] + angles.track[1]) / 2
 		const reach = zoomValueRadius(radius)
@@ -457,9 +495,11 @@ export function createHud({
 				button.setAttribute('aria-pressed', String(tones[i].color === color)),
 			)
 			for (const item of items) cutRadius(item)
-			// A color of no tone leaves the arcs where they are.
+			// A color of no tone leaves the tones and the arcs where they are.
 			const tone = tones.findIndex((candidate) => candidate.color === color)
-			if (tone < 0 || tone === arcTone) return
+			if (tone < 0) return
+			turnToTone(tone)
+			if (tone === arcTone) return
 			arcTone = tone
 			placeArcs()
 		},

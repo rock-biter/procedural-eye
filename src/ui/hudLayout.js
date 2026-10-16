@@ -2,9 +2,8 @@
 // the eye, at angles in radians clockwise from the right (screen y points
 // down, so π/2 is the bottom). The skin tones keep their spacing in pixels
 // along the circle, so on a small circle (a phone) they spread over a wider
-// angle, moving toward the quadrant's middle to stay in it; the zoom keeps
-// its angle, and a length in pixels at least, for its
-// knob to slide; Random eye moves down, clear of the zoom.
+// angle about their center; the zoom keeps its angle, and a length in pixels
+// at least, for its knob to slide; Random eye moves down, clear of the zoom.
 
 const DEGREE = Math.PI / 180
 
@@ -21,9 +20,11 @@ export const HUD = Object.freeze({
 	gap: 6,
 	dash: 3,
 	dashPeriod: 8,
-	// The skin tones in the bottom-left quadrant, the first (fair) highest,
-	// around `center` or nearer the quadrant's middle where they would leave it.
-	tones: Object.freeze({ center: 140 * DEGREE, spacing: 60 }),
+	// The skin tones around `center`, at the left on the horizontal, the
+	// first (fair) highest, `spacing` px apart. At rest the middle tone sits
+	// there; the group turns along the circle to bring the pressed one there
+	// (turnTones()).
+	tones: Object.freeze({ center: 180 * DEGREE, spacing: 60 }),
 	// Zoom in and zoom out around `center`, zoom in higher, `span` apart, or
 	// `minArc` px on a small circle. The knob slides from under one to under
 	// the other; releasing a drag within `snap` px of an end or past it
@@ -96,26 +97,48 @@ export function hudAngles(radius, toneCount, hud = HUD) {
 	const zoomIn = hud.zoom.center - span / 2
 	const zoomOut = hud.zoom.center + span / 2
 	const random = Math.max(hud.random.angle, zoomOut + arc(hud.random.spacing))
-	const half = ((toneCount - 1) / 2) * arc(hud.tones.spacing)
-	const middle = 0.75 * Math.PI
-	const room = Math.max(Math.PI / 4 - half, 0)
-	const center = Math.min(Math.max(hud.tones.center, middle - room), middle + room)
 	const tones = Array.from(
 		{ length: toneCount },
-		(_, i) => center + ((toneCount - 1) / 2 - i) * arc(hud.tones.spacing),
+		(_, i) => hud.tones.center + ((toneCount - 1) / 2 - i) * arc(hud.tones.spacing),
 	)
 	return { tones, zoomIn, zoomOut, track: [zoomIn, zoomOut], random }
 }
 
+// How many spacings the tone group turns (clockwise) to bring the tone at
+// `pressed` (its index, fair first) of `count` to the group's center.
+export function toneSteps(pressed, count) {
+	return pressed - (count - 1) / 2
+}
+
+// The tones' angles on a circle of `radius` px, turned `steps` spacings
+// clockwise (fractional while they glide).
+export function turnTones(tones, radius, steps, hud = HUD) {
+	const turn = (steps * hud.tones.spacing) / radius
+	return tones.map((angle) => angle + turn)
+}
+
+// Every angle a tone can take, turned to bring any tone to the center, and a
+// quarter spacing past either end for the glide's overshoot, every quarter
+// spacing.
+export function toneReach(angles, radius, hud = HUD) {
+	const count = angles.tones.length
+	const steps = []
+	for (let k = -4 * (count - 1) - 1; k <= 4 * (count - 1) + 1; k++) steps.push(k / 4)
+	const step = hud.tones.spacing / radius
+	const middle = angles.tones.reduce((sum, angle) => sum + angle, 0) / count
+	return steps.map((k) => middle + k * step)
+}
+
 // Whether every button, and the knob anywhere along its track, lies inside a
-// box of `width` × `height` px centered on the circle.
+// box of `width` × `height` px centered on the circle; the tones anywhere
+// their group turns.
 function fits(radius, angles, width, height, hud) {
 	const inside = (angle, half) => {
 		const x = width / 2 + radius * Math.cos(angle)
 		const y = height / 2 + radius * Math.sin(angle)
 		return x >= half && x <= width - half && y >= half && y <= height - half
 	}
-	const buttons = [...angles.tones, angles.zoomIn, angles.zoomOut, angles.random]
+	const buttons = [...toneReach(angles, radius, hud), angles.zoomIn, angles.zoomOut, angles.random]
 	if (!buttons.every((angle) => inside(angle, hud.button / 2))) return false
 	const [from, to] = angles.track
 	const steps = Math.max(1, Math.ceil(((to - from) * radius) / 4))

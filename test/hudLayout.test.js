@@ -12,6 +12,9 @@ import {
 	spinRing,
 	swayTurn,
 	toneArcs,
+	toneReach,
+	toneSteps,
+	turnTones,
 	zoomValueRadius,
 	trackLevel,
 	zoomDistance,
@@ -34,7 +37,7 @@ const point = (radius, angle) => [radius * Math.cos(angle), radius * Math.sin(an
 const chord = (radius, a, b) =>
 	Math.hypot(...point(radius, a).map((v, i) => v - point(radius, b)[i]))
 
-test('desktop: the circle is inscribed in the box, the tones around 140°, the zoom 32° apart around 0°', () => {
+test('desktop: the circle is inscribed in the box, the tones around 180°, the zoom 32° apart around 0°', () => {
 	const { radius, angles } = hudLayout(...SCREENS.desktop, TONES)
 	assert.equal(radius, 460)
 	assert.ok(near(angles.tones[(TONES - 1) / 2], HUD.tones.center))
@@ -52,17 +55,19 @@ for (const [screen, [width, height]] of Object.entries(SCREENS)) {
 			const [x, y] = point(radius, angle)
 			return Math.abs(x) <= width / 2 - half && Math.abs(y) <= height / 2 - half
 		}
-		const buttons = [...angles.tones, angles.zoomIn, angles.zoomOut, angles.random]
+		// The tones anywhere their group turns, glide and overshoot included.
+		const buttons = [...toneReach(angles, radius), angles.zoomIn, angles.zoomOut, angles.random]
 		for (const angle of buttons) assert.ok(inside(angle, HUD.button / 2), `${angle}`)
 		for (let level = 0; level <= 1; level += 0.05) {
 			assert.ok(inside(knobAngle(level, angles.track), HUD.knob / 2), `level ${level}`)
 		}
 	})
 
-	test(`${screen}: the tones lie in the bottom-left quadrant, fair highest, evenly spaced`, () => {
+	test(`${screen}: the tones lie at the left, the middle one on the horizontal, fair highest, evenly spaced`, () => {
 		const { tones } = angles
 		assert.equal(tones.length, TONES)
-		for (const angle of tones) assert.ok(angle >= Math.PI / 2 && angle <= Math.PI, `${angle}`)
+		assert.ok(near(tones[(TONES - 1) / 2], Math.PI), 'the middle tone on the horizontal')
+		for (const angle of tones) assert.ok(angle > Math.PI / 2 && angle < 1.5 * Math.PI, `${angle}`)
 		for (let i = 1; i < tones.length; i++) {
 			assert.ok(tones[i] < tones[i - 1], 'each tone lower than the one before')
 			assert.ok(near((tones[i - 1] - tones[i]) * radius, HUD.tones.spacing), 'spacing in px')
@@ -79,12 +84,23 @@ for (const [screen, [width, height]] of Object.entries(SCREENS)) {
 		assert.ok((random - zoomOut) * radius >= HUD.random.spacing - 1e-9)
 	})
 
-	test(`${screen}: no two buttons overlap`, () => {
-		const all = [...angles.tones, angles.zoomIn, angles.zoomOut, angles.random]
-		for (let i = 0; i < all.length; i++) {
-			for (let j = i + 1; j < all.length; j++) {
-				const distance = chord(radius, all[i], all[j])
-				assert.ok(distance >= HUD.button, `buttons ${i} and ${j}: ${distance.toFixed(1)} px`)
+	test(`${screen}: no two buttons overlap, whichever tone is pressed`, () => {
+		for (let pressed = 0; pressed < TONES; pressed++) {
+			const turned = turnTones(angles.tones, radius, toneSteps(pressed, TONES))
+			// The pressed tone at the group's center, on the horizontal.
+			assert.ok(near(turned[pressed], HUD.tones.center))
+			const all = [...turned, angles.zoomIn, angles.zoomOut, angles.random]
+			for (let i = 0; i < all.length; i++) {
+				for (let j = i + 1; j < all.length; j++) {
+					const distance = chord(radius, all[i], all[j])
+					assert.ok(distance >= HUD.button, `buttons ${i} and ${j}: ${distance.toFixed(1)} px`)
+				}
+			}
+		}
+		// Nor anywhere between, as the group glides.
+		for (const angle of toneReach(angles, radius)) {
+			for (const other of [angles.zoomIn, angles.zoomOut, angles.random]) {
+				assert.ok(chord(radius, angle, other) >= HUD.button, `${angle} near ${other}`)
 			}
 		}
 	})
