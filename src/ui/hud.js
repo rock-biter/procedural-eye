@@ -71,14 +71,17 @@ function svgElement(name, attributes = {}) {
 }
 
 // A reticle button; it blurs itself after a click, because Space toggles
-// photo mode only when the page has the focus.
-function hudButton(className, label, content, run) {
+// photo mode only when the page has the focus. `content` sits inside the
+// reticle and fades with it; `symbol`, over it, keeps its own opacity (the
+// zoom buttons' + and −).
+function hudButton(className, label, content, run, symbol = '') {
 	const button = document.createElement('button')
 	button.type = 'button'
 	button.className = `hud-button ${className}`
 	button.setAttribute('aria-label', label)
 	button.title = label
-	button.innerHTML = `<span class="hud-glyph"><span class="hud-reticle">${content}</span><img class="hud-bracket hud-bracket-start" src="${bracketAsset}" alt=""/><img class="hud-bracket hud-bracket-end" src="${bracketAsset}" alt=""/></span>`
+	const over = symbol && `<span class="hud-symbol">${symbol}</span>`
+	button.innerHTML = `<span class="hud-glyph"><span class="hud-reticle">${content}</span>${over}<img class="hud-bracket hud-bracket-start" src="${bracketAsset}" alt=""/><img class="hud-bracket hud-bracket-end" src="${bracketAsset}" alt=""/></span>`
 	button.addEventListener('click', () => {
 		run()
 		button.blur()
@@ -197,14 +200,26 @@ export function createHud({
 	toneGroup.append(...toneButtons)
 
 	const zoomGroup = group('Zoom')
-	const zoomIn = hudButton('zoom-in', 'Zoom in', icon('plus'), () => {
-		engage(zoomIn, 1)
-		onZoom('in')
-	})
-	const zoomOut = hudButton('zoom-out', 'Zoom out', icon('minus'), () => {
-		engage(zoomOut, 0)
-		onZoom('out')
-	})
+	const zoomIn = hudButton(
+		'zoom-in',
+		'Zoom in',
+		'',
+		() => {
+			engage(zoomIn, 1)
+			onZoom('in')
+		},
+		icon('plus'),
+	)
+	const zoomOut = hudButton(
+		'zoom-out',
+		'Zoom out',
+		'',
+		() => {
+			engage(zoomOut, 0)
+			onZoom('out')
+		},
+		icon('minus'),
+	)
 	// A clicked zoom button stays engaged (its brackets shown) while the zoom
 	// glides to its end, also once the pointer has left it; it lets go there
 	// (at-level takes over), when the zoom turns back or a drag takes the knob.

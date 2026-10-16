@@ -550,6 +550,18 @@ canvas {
 		1px 5px;
 }
 
+/* A symbol over the reticle, in the same place, which keeps its own
+   opacity: the zoom buttons' + and −, plain white in full whatever the
+   reticle's. */
+.hud-symbol {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	color: #fff;
+	opacity: 1;
+}
+
 /* Past an end, its brackets close in on the reticle as the knob stretches
    (--zoom-squeeze, src/ui/hud.js), following the drag at once while they
    are squeezed; dragged back under the end they ease out as usual, and
