@@ -153,6 +153,29 @@ function download(blob, filename) {
 // The glass of the skin buttons: a bevel and a bend scaled to their size.
 const SMALL_GLASS = { ...GLASS, bezel: 10, maxOffset: 7 }
 
+// The frame around the page (style.css): a cross of 1 px arms at each corner
+// and a dotted line along each side, across the whole window: a 1 px dot
+// every FRAME_DOT_SPACING px of an SVG pattern.
+const FRAME_DOT_SPACING = 8
+function frame() {
+	const element = document.createElement('div')
+	element.className = 'frame'
+	element.setAttribute('aria-hidden', 'true')
+	const sides = ['top', 'right', 'bottom', 'left']
+	const corners = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+	element.innerHTML = [
+		...sides.map(
+			(side) =>
+				`<svg class="frame-line frame-${side}"><pattern id="frame-dots-${side}" width="${FRAME_DOT_SPACING}" height="${FRAME_DOT_SPACING}" patternUnits="userSpaceOnUse"><rect width="1" height="1"/></pattern><rect width="100%" height="100%" fill="url(#frame-dots-${side})"/></svg>`,
+		),
+		...corners.map(
+			(corner) =>
+				`<svg class="frame-cross frame-${corner}"><rect x="50%" width="1" height="100%"/><rect y="50%" width="100%" height="1"/></svg>`,
+		),
+	].join('')
+	return element
+}
+
 // A plus (zoom in) or a minus (zoom out).
 function sign(plus) {
 	return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12${plus ? 'M12 6v12' : ''}"/></svg>`
@@ -175,13 +198,17 @@ function glassButton(className, label, content, run) {
 }
 
 if (urlParams.get('gui') !== '0') {
+	// The frame around the page; the rest of the interface stays inside it.
+	document.body.appendChild(frame())
+
 	// Zoom out, zoom in and Random eye, always in view outside the panel:
-	// bottom right, or bottom center on phones and tablets (style.css).
+	// bottom right, or on phones and tablets Random-eyes bottom center and the
+	// zoom buttons stacked bottom right (style.css).
 	const dock = document.createElement('div')
 	dock.className = 'dock'
 	dock.append(
-		glassButton('zoom', 'Zoom out', sign(false), () => zoom('out')),
-		glassButton('zoom', 'Zoom in', sign(true), () => zoom('in')),
+		glassButton('zoom zoom-out', 'Zoom out', sign(false), () => zoom('out')),
+		glassButton('zoom zoom-in', 'Zoom in', sign(true), () => zoom('in')),
 		glassButton('random-eye', 'Random-eyes', 'Random-eyes', () =>
 			console.log('Random-eyes', panelState.ancestry, loadRandomEye()),
 		),

@@ -9,9 +9,15 @@
 }
 
 /* The color of the interface: the dock's labels and icons, the title, the
-   credit line and the frame rate. */
+   credit line and the frame rate. The frame around the page runs
+   --frame-inset inside the window's safe area (8px on phones and tablets,
+   see the end), and the interface stays --frame-gap inside the frame, at
+   --ui-inset from the edges. */
 :root {
 	--ui-color: #ffe4c3;
+	--frame-inset: 24px;
+	--frame-gap: 16px;
+	--ui-inset: calc(var(--frame-inset) + var(--frame-gap));
 }
 
 html,
@@ -28,15 +34,18 @@ canvas {
 }
 
 /* The panel starts below the frame rate (--panel-top), scrolls when its open
-   folders outgrow the viewport, and stops above the dock (84px kept for its
-   buttons). */
+   folders outgrow the viewport, and stops above the dock (--panel-bottom kept
+   for its buttons), inside the frame. */
 .tp-dfwv {
-	--panel-top: 40px;
+	--panel-top: calc(var(--ui-inset) + 28px);
+	--panel-bottom: calc(var(--ui-inset) + 60px);
 	top: calc(var(--panel-top) + env(safe-area-inset-top)) !important;
+	right: calc(var(--ui-inset) + env(safe-area-inset-right)) !important;
 	width: 320px !important;
-	max-height: calc(100vh - var(--panel-top) - 84px);
+	max-height: calc(100vh - var(--panel-top) - var(--panel-bottom));
 	max-height: calc(
-		100dvh - var(--panel-top) - 84px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+		100dvh - var(--panel-top) - var(--panel-bottom) - env(safe-area-inset-top) -
+			env(safe-area-inset-bottom)
 	);
 	overflow-y: auto;
 	overscroll-behavior: contain;
@@ -47,15 +56,126 @@ canvas {
    there. */
 @media (max-width: 640px) {
 	.tp-dfwv {
-		--panel-top: 78px;
+		--panel-top: calc(var(--ui-inset) + 88px);
 	}
 }
 
-/* The dock: Zoom out, Zoom in and Random eye, bottom right. */
+/* The frame: a cross (20% white) at each corner and dotted lines (30%
+   white) along the sides, running across the whole window and cut around
+   each cross (--frame-cut: half the cross and a gap). The 1px lines take the
+   first and last rows and columns of the box; each cross centers its arms
+   on them (the arms are the middle row and column, rounded down). It never
+   takes the pointer. */
+.frame {
+	--frame-top: calc(var(--frame-inset) + env(safe-area-inset-top));
+	--frame-right: calc(var(--frame-inset) + env(safe-area-inset-right));
+	--frame-bottom: calc(var(--frame-inset) + env(safe-area-inset-bottom));
+	--frame-left: calc(var(--frame-inset) + env(safe-area-inset-left));
+	--frame-cross: 14px;
+	--frame-cut: calc(var(--frame-cross) / 2 + 6px);
+	position: fixed;
+	top: var(--frame-top);
+	right: var(--frame-right);
+	bottom: var(--frame-bottom);
+	left: var(--frame-left);
+	z-index: 5;
+	pointer-events: none;
+}
+
+.frame svg {
+	position: absolute;
+	display: block;
+	overflow: visible;
+	fill: #fff;
+}
+
+.frame-line {
+	opacity: 0.3;
+}
+
+.frame-top,
+.frame-bottom {
+	left: calc(-1 * var(--frame-left));
+	width: calc(100% + var(--frame-left) + var(--frame-right));
+	height: 1px;
+	--mask: linear-gradient(
+		to right,
+		#000 calc(var(--frame-left) - var(--frame-cut)),
+		transparent 0 calc(var(--frame-left) + var(--frame-cut)),
+		#000 0 calc(100% - var(--frame-right) - var(--frame-cut)),
+		transparent 0 calc(100% - var(--frame-right) + var(--frame-cut)),
+		#000 0
+	);
+}
+
+.frame-left,
+.frame-right {
+	top: calc(-1 * var(--frame-top));
+	width: 1px;
+	height: calc(100% + var(--frame-top) + var(--frame-bottom));
+	--mask: linear-gradient(
+		to bottom,
+		#000 calc(var(--frame-top) - var(--frame-cut)),
+		transparent 0 calc(var(--frame-top) + var(--frame-cut)),
+		#000 0 calc(100% - var(--frame-bottom) - var(--frame-cut)),
+		transparent 0 calc(100% - var(--frame-bottom) + var(--frame-cut)),
+		#000 0
+	);
+}
+
+.frame-line {
+	-webkit-mask-image: var(--mask);
+	mask-image: var(--mask);
+}
+
+.frame-top {
+	top: 0;
+}
+
+.frame-bottom {
+	bottom: 0;
+}
+
+.frame-left {
+	left: 0;
+}
+
+.frame-right {
+	right: 0;
+}
+
+.frame-cross {
+	width: var(--frame-cross);
+	height: var(--frame-cross);
+	opacity: 0.2;
+}
+
+.frame-top-left,
+.frame-top-right {
+	top: calc(var(--frame-cross) / -2);
+}
+
+.frame-bottom-left,
+.frame-bottom-right {
+	bottom: calc(1px - var(--frame-cross) / 2);
+}
+
+.frame-top-left,
+.frame-bottom-left {
+	left: calc(var(--frame-cross) / -2);
+}
+
+.frame-top-right,
+.frame-bottom-right {
+	right: calc(1px - var(--frame-cross) / 2);
+}
+
+/* The dock: Zoom out, Zoom in and Random eye, bottom right (on phones and
+   tablets, see the end). */
 .dock {
 	position: fixed;
-	right: 24px;
-	bottom: 24px;
+	right: calc(var(--ui-inset) + env(safe-area-inset-right));
+	bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
 	z-index: 10;
 	display: flex;
 	align-items: center;
@@ -148,12 +268,17 @@ canvas {
    ringed. */
 .skin-tones {
 	position: fixed;
-	left: 24px;
-	bottom: 30px;
+	left: calc(var(--ui-inset) + env(safe-area-inset-left));
+	bottom: calc(var(--ui-inset) + 6px + env(safe-area-inset-bottom));
 	z-index: 10;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	pointer-events: none;
+}
+
+.skin-tones button {
+	pointer-events: auto;
 }
 
 .skin {
@@ -193,12 +318,12 @@ canvas {
 }
 
 /* The title and the credit line, top left, and the frame rate, top right:
-   clear of the notch, in JetBrains Mono. Only the credit's link takes the
+   inside the frame, in JetBrains Mono. Only the credit's link takes the
    pointer, so drags across the text still orbit the camera. */
 .masthead,
 .fps {
 	position: fixed;
-	top: calc(12px + env(safe-area-inset-top));
+	top: calc(var(--ui-inset) + env(safe-area-inset-top));
 	z-index: 10;
 	color: var(--ui-color);
 	font:
@@ -214,17 +339,18 @@ canvas {
 
 /* On narrow screens the credit wraps, aligned left, before the frame rate. */
 .masthead {
-	left: 24px;
+	left: calc(var(--ui-inset) + env(safe-area-inset-left));
 	width: max-content;
-	max-width: calc(100vw - 120px);
+	max-width: calc(100vw - 2 * var(--ui-inset) - 72px);
 	text-align: left;
 }
 
 .masthead h1 {
 	margin: 0 0 2px;
-	font-size: 16px;
+	font-size: 32px;
 	font-weight: inherit;
 	line-height: 1.3;
+	color: white;
 }
 
 .credit {
@@ -233,7 +359,7 @@ canvas {
 }
 
 .fps {
-	right: 24px;
+	right: calc(var(--ui-inset) + env(safe-area-inset-right));
 	white-space: nowrap;
 }
 
@@ -244,17 +370,53 @@ canvas {
 	pointer-events: auto;
 }
 
-/* Phones and tablets: the dock bottom center, clear of the home indicator,
-   and the skin tones level with it. */
+/* Phones and tablets: the frame 8px from the edges and the interface 12px
+   inside it. The dock spans the bottom, Random-eyes in the middle and the
+   zoom buttons stacked at the right (+ over −), level with the skin tones at
+   the left. Only its buttons take the pointer, so drags across the rest
+   still orbit the camera. The panel stops above the stack. */
 @media (max-width: 640px), (pointer: coarse) {
-	.dock {
-		right: auto;
-		left: 50%;
-		bottom: calc(20px + env(safe-area-inset-bottom));
-		transform: translateX(-50%);
+	:root {
+		--frame-inset: 8px;
+		--frame-gap: 12px;
 	}
 
-	.skin-tones {
-		bottom: calc(26px + env(safe-area-inset-bottom));
+	.frame {
+		--frame-cross: 12px;
+		--frame-cut: calc(var(--frame-cross) / 2 + 4px);
+	}
+
+	.dock {
+		left: calc(var(--ui-inset) + env(safe-area-inset-left));
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: end;
+		pointer-events: none;
+	}
+
+	.dock button {
+		pointer-events: auto;
+	}
+
+	.zoom {
+		grid-column: 3;
+		justify-self: end;
+	}
+
+	.zoom-in {
+		grid-row: 1;
+	}
+
+	.zoom-out,
+	.random-eye {
+		grid-row: 2;
+	}
+
+	.random-eye {
+		grid-column: 2;
+	}
+
+	.tp-dfwv {
+		--panel-bottom: calc(var(--ui-inset) + 108px);
 	}
 }

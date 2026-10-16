@@ -6,7 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the dock (Zoom out, Zoom in, Random eye), the skin tones, the title and the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the dock (Zoom out, Zoom in, Random eye), the skin tones, the title and the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
