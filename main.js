@@ -37,17 +37,15 @@ if (urlParams.has('view')) setValue(PARAM_SCHEMA, params, 'debug.view', urlParam
 
 // The zoom-in and zoom-out distances of the screen's shape, which also bound
 // the wheel: zoom in is camera.distance; portrait screens are narrow, so their
-// zoom out is farther. Unless the URL sets the scene, landscape screens start
-// zoom.start of the way out, portrait ones zoom.mobileStart (just out of the
-// zoom in).
+// zoom out is farther. Landscape screens start zoom.start of the way out
+// (unless the URL sets the scene); portrait ones zoomed in.
 const startDistance = params.camera.distance
 function zoomDistances(settings) {
 	return [startDistance, portrait() ? settings.mobileOut : settings.out]
 }
-if (!urlParams.has('state') && !urlParams.has('preset')) {
+if (!portrait() && !urlParams.has('state') && !urlParams.has('preset')) {
 	const [near, far] = zoomDistances(params.zoom)
-	const start = portrait() ? params.zoom.mobileStart : params.zoom.start
-	setValue(PARAM_SCHEMA, params, 'camera.distance', near + (far - near) * start)
+	setValue(PARAM_SCHEMA, params, 'camera.distance', near + (far - near) * params.zoom.start)
 }
 
 const setup = new RenderSetup({ params, urlParams })

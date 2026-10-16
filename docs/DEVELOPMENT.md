@@ -86,12 +86,12 @@ pnpm capture        # headless captures, contact sheet, optional bench (docs/QUA
 
 **The dock** holds three buttons outside the panel, always in view: bottom right, or bottom center on phones and tablets (`style.css`). Each blurs itself after a click, so Space still toggles photo mode.
 
-The buttons are liquid glass, clear (a 2px blur) and defined by their edges. `style.css` draws soft specular rims at the top-right and bottom-left edges, a faint dark line inside the edge, and the press. On Chromium, [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) also bends the scene near each rim: it gives every button an SVG filter of its own size as `backdrop-filter` (through `--glass-refraction`), rebuilt when the button resizes. The filter carries the blur too, because Chromium drops the CSS filter functions that follow an SVG one. It is detected through `navigator.userAgentData`, which exists only in secure contexts, so over plain HTTP on the LAN (`pnpm dev --host`) Chromium also keeps the CSS glass.
+The buttons are liquid glass, clear (a 2px blur) and defined by their edges. `style.css` draws a glossy dome of light on the upper half and a faint glow above the bottom edge, soft specular rims at the top-right and bottom-left edges, a faint dark line inside the edge, and the hover and press. On Chromium, [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) also bends the scene near each rim: it gives every button an SVG filter of its own size as `backdrop-filter` (through `--glass-refraction`), rebuilt when the button resizes. The filter carries the blur too, because Chromium drops the CSS filter functions that follow an SVG one. It is detected through `navigator.userAgentData`, which exists only in secure contexts, so over plain HTTP on the LAN (`pnpm dev --host`) Chromium also keeps the CSS glass.
 
 - **Zoom out** and **Zoom in** (− and +) glide `camera.distance` over `zoom.duration`:
   - Zoom out to `zoom.out`, which frames the whole figure; portrait screens (phones held upright), much narrower, to `zoom.mobileOut`.
   - Zoom in to `camera.distance`, on every screen.
-  - Unless the URL sets `?preset=` or `?state=`, landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (half the framing by default), and portrait screens `zoom.mobileStart` of the way (0.06: just out of the zoom in).
+  - Landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (half the framing by default), unless the URL sets `?preset=` or `?state=`; portrait screens start zoomed in.
   - The wheel stays between the zoom-in and zoom-out distances of the screen.
 - Portrait screens start, and load presets, with `camera.targetZ` 0.
 - **Random eye**.

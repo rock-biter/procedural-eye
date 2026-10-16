@@ -8,6 +8,11 @@
 	src: url('./fonts/jetbrains-mono-latin-400.woff2') format('woff2');
 }
 
+/* The color of the interface: the dock's labels and icons, and the credit line. */
+:root {
+	--ui-color: #ffe4c3;
+}
+
 html,
 body {
 	margin: 0;
@@ -43,31 +48,36 @@ canvas {
 	gap: 10px;
 }
 
-/* Liquid glass: clear glass over the eye, defined by soft edges. Specular
-   rims light the top-right and bottom-left edges, each with a faint crescent
-   inside it, and a faint dark line inside the edge gives the glass its
-   thickness. On Chromium an SVG filter replaces the backdrop filter, and the
-   bevel also refracts the scene (--glass-refraction, src/ui/liquidGlass.js).
-   Pressed, the glass swells. */
+/* Liquid glass: clear glass over the eye, defined by soft edges. A glossy
+   dome of light reflects on its upper half and the light it lets through
+   gathers above the bottom edge; specular rims light the top-right and
+   bottom-left edges, each with a faint crescent inside it, and a faint dark
+   line inside the edge gives the glass its thickness. On Chromium an SVG
+   filter replaces the backdrop filter, and the bevel also refracts the scene
+   (--glass-refraction, src/ui/liquidGlass.js). Hovered, the glass tints
+   (--glass-tint); pressed, it swells. */
 .dock button {
+	--glass-tint: rgba(255, 255, 255, 0.04);
 	min-height: 44px;
 	border: none;
 	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.05);
+	background:
+		radial-gradient(70% 55% at 50% 0%, rgba(255, 255, 255, 0.01), transparent),
+		radial-gradient(60% 40% at 50% 100%, rgba(255, 255, 255, 0.03), transparent), var(--glass-tint);
 	box-shadow:
-		inset 1.5px -1.5px 2px -1px rgba(255, 255, 255, 0.4),
-		inset -1.5px 1.5px 2px -1px rgba(255, 255, 255, 0.4),
+		inset 2.5px -2.5px 2px -2.5px rgba(255, 255, 255, 0.7),
+		inset -2.5px 2.5px 2px -1.5px rgba(255, 255, 255, 0.9),
 		inset 5px -5px 4px -5px rgba(255, 255, 255, 0.15),
 		inset -5px 5px 4px -5px rgba(255, 255, 255, 0.15),
 		inset 0 0 3px rgba(0, 0, 0, 0.25),
 		0 4px 12px rgba(0, 0, 0, 0.12);
-	color: #fff;
+	color: var(--ui-color);
 	font:
-		600 14px/1 system-ui,
-		-apple-system,
-		sans-serif;
+		300 12px/1.4 'JetBrains Mono',
+		ui-monospace,
+		monospace;
 	letter-spacing: 0.02em;
-	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+	/* text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); */
 	white-space: nowrap;
 	cursor: pointer;
 	-webkit-backdrop-filter: var(--glass-refraction, blur(2px));
@@ -79,12 +89,12 @@ canvas {
 }
 
 .dock button:hover {
-	background: rgba(255, 255, 255, 0.09);
+	--glass-tint: rgba(255, 255, 255, 0.08);
 }
 
 .dock button:active {
+	--glass-tint: rgba(255, 255, 255, 0.12);
 	transform: scale(1.06);
-	background: rgba(255, 255, 255, 0.13);
 }
 
 .zoom svg {
@@ -92,7 +102,7 @@ canvas {
 }
 
 .dock button:focus-visible {
-	outline: 2px solid #fff;
+	outline: 2px solid var(--ui-color);
 	outline-offset: 2px;
 }
 
@@ -127,7 +137,7 @@ canvas {
 	width: max-content;
 	max-width: calc(100vw - 32px);
 	/* transform: translateX(-50%); */
-	color: #ffe4c3;
+	color: var(--ui-color);
 	font:
 		400 12px/1.4 'JetBrains Mono',
 		ui-monospace,

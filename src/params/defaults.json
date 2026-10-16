@@ -318,7 +318,6 @@
     "out": 480,
     "mobileOut": 720,
     "start": 0.5,
-    "mobileStart": 0.06,
     "duration": 1.2
   },
   "post": {
