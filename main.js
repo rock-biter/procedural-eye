@@ -16,7 +16,7 @@ import { PRESETS } from './src/params/presets'
 import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { createHud } from './src/ui/hud'
-import { zoomDistance, zoomLevel } from './src/ui/hudLayout'
+import { zoomDistance, zoomLevel, zoomProgress } from './src/ui/hudLayout'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
 // #debug), creates the params, the renderer and the app, the HUD unless
@@ -40,15 +40,21 @@ if (urlParams.has('view')) setValue(PARAM_SCHEMA, params, 'debug.view', urlParam
 // The zoom-in and zoom-out distances of the screen's shape, which also bound
 // the wheel: portrait screens are narrow, so they zoom in to camera.distance
 // and out farther; landscape ones zoom in closer, to zoom.in. Landscape
-// screens start zoom.start of the way out (unless the URL sets the scene);
-// portrait ones zoomed in.
+// screens start zoom.start of the way out on the zoom's log scale, the
+// knob's (unless the URL sets the scene): at 0.5 the knob sits on the
+// horizontal; portrait ones zoomed in.
 const startDistance = params.camera.distance
 function zoomDistances(settings) {
 	return portrait() ? [startDistance, settings.mobileOut] : [settings.in, settings.out]
 }
 if (!portrait() && !urlParams.has('state') && !urlParams.has('preset')) {
 	const [near, far] = zoomDistances(params.zoom)
-	setValue(PARAM_SCHEMA, params, 'camera.distance', near + (far - near) * params.zoom.start)
+	setValue(
+		PARAM_SCHEMA,
+		params,
+		'camera.distance',
+		zoomDistance(1 - params.zoom.start, [near, far]),
+	)
 }
 
 const setup = new RenderSetup({ params, urlParams })
@@ -207,6 +213,7 @@ if (urlParams.get('gui') !== '0') {
 		onTone: (name) => skinTone(name),
 		onZoom: (direction, duration) => zoom(direction, duration),
 		onZoomLevel: (level) => setZoomLevel(level),
+		getZoomElasticity: () => app.params.zoom.elasticity,
 		onRandom: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
 	})
 	document.body.appendChild(hud.element)
@@ -218,16 +225,21 @@ if (urlParams.get('gui') !== '0') {
 	})
 	const showZoomLevel = () => {
 		requestAnimationFrame(showZoomLevel)
-		hud.showZoomLevel(getZoomLevel())
+		hud.showZoomLevel(zoomProgress(app.params.camera.distance, zoomLimits()))
 	}
 	showZoomLevel()
 
-	// The title, top left, and the credit line, bottom left; the credit's
-	// link blurs itself after a click, as the HUD buttons do.
+	// The title with a line about the project, top left, and the credit line,
+	// bottom left; the credit's link blurs itself after a click, as the HUD
+	// buttons do. On phones the panel starts below the title, at its height
+	// (--masthead-height, style.css).
 	const masthead = document.createElement('header')
 	masthead.className = 'masthead'
-	masthead.innerHTML = '<h1>Random-eyes</h1>'
+	masthead.innerHTML = `<h1>Random-eyes</h1><p>Your personal digital eye configurator. Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with the eyes.</p>`
 	document.body.appendChild(masthead)
+	new ResizeObserver(() => {
+		document.documentElement.style.setProperty('--masthead-height', `${masthead.offsetHeight}px`)
+	}).observe(masthead)
 	const credit = document.createElement('p')
 	credit.className = 'credit'
 	credit.innerHTML =

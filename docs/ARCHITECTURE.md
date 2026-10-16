@@ -6,7 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom knob, Zoom out and Random eye), the title, the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones, and sets the zoom level; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom knob, Zoom out and Random eye), the title, the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones, and sets the zoom level, including the HUD’s elastic drag, and supplies unclamped progress for its return; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
@@ -63,8 +63,8 @@
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
-| [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye, cut around each button, with flat square reticles, animated selection brackets, two counter-rotating segmented zoom rings and the square zoom marker sliding along it; `main.js` gives it the actions. |
-| [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's circle (inscribed in its box, or smaller until its buttons fit) and every button's angle on it; the knob's track, its angle at a zoom level and back, and the ends a drag snaps to; the zoom level of a camera distance (log scale) and back; the inner and outer segmented rings' fixed radius ratios and their turns at that level. |
+| [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye, cut around each button, with flat square reticles, animated selection brackets, two counter-rotating segmented zoom rings and the square zoom marker sliding along it with resisted overshoot and snap on release; `main.js` gives it the actions. |
+| [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's circle (inscribed in its box, or smaller until its buttons fit) and every button's angle on it; the knob's track, its angle at a zoom level and back, and the endpoints a released drag snaps to and its bounded elastic overshoot; the unclamped camera progress and bounded zoom level of a camera distance (log scale) and back; the inner and outer segmented rings' fixed radius ratios and their turns at that level. |
 | [`src/math.js`](../src/math.js) *, [`src/random.js`](../src/random.js) * | Scalar and vector helpers; seeds, PCG hash twin, weighted picks, Gaussian samples. |
 | [`src/frameStats.js`](../src/frameStats.js), [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | Frame telemetry and the adaptive resolution rules (from the terrain project). |
 

@@ -84,13 +84,14 @@ function place(element, cut, angle, { cx, cy, radius }) {
 }
 
 // `tones`: [{ name, label, color }]; onTone(name), onZoom('in' | 'out',
-// duration), onZoomLevel(level in [0, 1]) and onRandom() run the controls
+// duration), onZoomLevel(level, including elastic overshoot) and onRandom()
+// run the controls; getZoomElasticity() reads the current drag extension.
 // (onZoom without a duration glides over the zoom's own). Returns the
 // element, mount() (once it is in the page), pressTone(color), which presses
 // the tone of `color` (none for another color), and showZoomLevel(level),
 // where the knob goes (at an end, its button shows in full) and the two
 // segmented rings' sizes and turns.
-export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
+export function createHud({ tones, onTone, onZoom, onZoomLevel, getZoomElasticity, onRandom }) {
 	const element = document.createElement('div')
 	element.className = 'hud'
 	element.style.setProperty('--hud-button', `${HUD.button}px`)
@@ -102,11 +103,14 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	const mask = svgElement('mask', { id: 'hud-ring-cuts' })
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
-	// Keep the original Figma SVGs at their intrinsic size; transform their
-	// wrappers about the actual circle centers, not the exported image boxes.
+	// The rings' SVGs at their intrinsic size, centered on their circle (of
+	// `radius` px at `cx`, `cy`): their wrappers turn and scale them about it.
+	// Turned 0, each is symmetric about the horizontal: the inner one two
+	// lines (a tick in, an arc over ±31°, a tick in), the outer one two arcs
+	// over ±33.4° with a tick out from each on the horizontal.
 	const orbitAssets = [
-		{ kind: 'inner', src: innerRingAsset, cx: 855.5, cy: 210, radius: 409 },
-		{ kind: 'outer', src: outerRingAsset, cx: 787.5, cy: 359.5, radius: 652.5 },
+		{ kind: 'inner', src: innerRingAsset, cx: 410, cy: 410, radius: 409 },
+		{ kind: 'outer', src: outerRingAsset, cx: 729.5, cy: 729.5, radius: 652.5 },
 	].map((asset) => {
 		const wrapper = document.createElement('div')
 		wrapper.className = `hud-orbit hud-orbit-${asset.kind}`
@@ -141,6 +145,7 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	const zoomOut = hudButton('zoom-out', 'Zoom out', icon('minus'), () => onZoom('out'))
 	const knob = zoomKnob({
 		onZoomLevel,
+		getZoomElasticity,
 		onSnap: (end) => onZoom(end === 1 ? 'in' : 'out', SNAP_GLIDE),
 		cut: cut(),
 	})
@@ -179,6 +184,20 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 		}
 	}
 
+	// Fade by arc distance so the approach feels the same on every screen,
+	// also when the elastic drag crosses a button from the other side.
+	const placeZoomSymbols = () => {
+		if (!placed || knob.level === null) return
+		const arc = placed.radius * Math.abs(placed.track[1] - placed.track[0])
+		for (const [button, end] of [
+			[zoomIn, 1],
+			[zoomOut, 0],
+		]) {
+			const t = clamp01((Math.abs(knob.level - end) * arc) / HUD.button)
+			button.style.setProperty('--zoom-symbol-visibility', t * t * (3 - 2 * t))
+		}
+	}
+
 	const layout = () => {
 		const { clientWidth: width, clientHeight: height } = element
 		const fit = hudLayout(width, height, tones.length)
@@ -196,6 +215,7 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 		knob.setTrack({ ...circle, track: angles.track })
 		placed = { ...circle, track: angles.track }
 		placeOrbit()
+		placeZoomSymbols()
 	}
 	new ResizeObserver(layout).observe(element)
 
@@ -217,6 +237,7 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 			if (level !== null && Math.abs(shown - level) < 1e-4) return
 			level = shown
 			placeOrbit()
+			placeZoomSymbols()
 		},
 	}
 }
@@ -224,7 +245,7 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 // The zoom knob: a small square marker that slides along the circle
 // from zoom out (level 0) to zoom in (level 1), over the two buttons, so the
 // pointer always reaches it.
-function zoomKnob({ onZoomLevel, onSnap, cut }) {
+function zoomKnob({ onZoomLevel, onSnap, getZoomElasticity = () => 0, cut }) {
 	const element = document.createElement('div')
 	element.className = 'hud-button zoom-level'
 	element.innerHTML = '<span class="zoom-marker"></span>'
@@ -243,8 +264,6 @@ function zoomKnob({ onZoomLevel, onSnap, cut }) {
 		if (circle && shown !== null) place(element, cut, knobAngle(shown, circle.track), circle)
 	}
 	const set = (level) => onZoomLevel(clamp01(level))
-	// The end the knob sits at, or null.
-	const atEnd = () => (shown === null ? null : endOf(shown))
 
 	// The pointer's angle about the circle's center, near the track.
 	const pointerAngle = (event) => {
@@ -252,7 +271,7 @@ function zoomKnob({ onZoomLevel, onSnap, cut }) {
 		const dx = event.clientX - box.left - circle.cx
 		const dy = event.clientY - box.top - circle.cy
 		const [zoomIn, zoomOut] = circle.track
-		return near(Math.atan2(dy, dx), (zoomIn + zoomOut) / 2)
+		return near(Math.atan2(dy, dx), drag?.angle ?? (zoomIn + zoomOut) / 2)
 	}
 
 	// A click briefly pulses the square marker.
@@ -265,15 +284,21 @@ function zoomKnob({ onZoomLevel, onSnap, cut }) {
 		if (event.animationName === 'zoom-bounce') element.classList.remove('pulse')
 	})
 
-	// A drag keeps the knob where it was grabbed, under the pointer; within
-	// HUD.zoom.snap px of an end it snaps there, the camera gliding.
+	// The camera and marker share the resisted level; no snap interrupts a
+	// held drag. Recovery follows the camera back from outside the track.
 	let drag = null
+	let recovering = false
 	element.addEventListener('pointerdown', (event) => {
-		if (!circle) return
+		if (!circle || drag || event.button !== 0) return
 		element.setPointerCapture(event.pointerId)
 		const { pointerId: id, clientX: x, clientY: y } = event
-		const offset = pointerAngle(event) - knobAngle(shown ?? 0, circle.track)
-		drag = { id, x, y, offset, moved: false, snapped: atEnd() }
+		const angle = pointerAngle(event)
+		const level = shown ?? 0
+		const offset = angle - knobAngle(level, circle.track)
+		drag = { id, x, y, offset, angle, level, moved: false }
+		recovering = false
+		// Grabbing a returning marker stops its camera glide at this point.
+		onZoomLevel(level)
 	})
 	element.addEventListener('pointermove', (event) => {
 		if (drag?.id !== event.pointerId) return
@@ -281,21 +306,27 @@ function zoomKnob({ onZoomLevel, onSnap, cut }) {
 		if (!drag.moved && distance < CLICK_SLOP) return
 		drag.moved = true
 		element.classList.add('dragging')
-		const angle = pointerAngle(event) - drag.offset
-		const end = knobSnap(angle, circle.track, circle.radius)
-		if (end === null) set(trackLevel(angle, circle.track))
-		else if (end !== drag.snapped) onSnap(end)
-		drag.snapped = end
+		drag.angle = pointerAngle(event)
+		drag.level = trackLevel(drag.angle - drag.offset, circle.track, getZoomElasticity())
+		onZoomLevel(drag.level)
 	})
 	const release = (event, click) => {
 		if (drag?.id !== event.pointerId) return
-		if (click && !drag.moved) pulse()
+		const { moved, level } = drag
 		drag = null
 		element.classList.remove('dragging')
+		if (moved || level < 0 || level > 1) {
+			const end = knobSnap(knobAngle(level, circle.track), circle.track, circle.radius)
+			if (end !== null) {
+				recovering = level < 0 || level > 1
+				onSnap(end)
+			}
+		} else if (click) pulse()
 		element.blur()
 	}
 	element.addEventListener('pointerup', (event) => release(event, true))
 	element.addEventListener('pointercancel', (event) => release(event, false))
+	element.addEventListener('lostpointercapture', (event) => release(event, false))
 	element.addEventListener(
 		'wheel',
 		(event) => {
@@ -314,14 +345,20 @@ function zoomKnob({ onZoomLevel, onSnap, cut }) {
 
 	return {
 		element,
+		get level() {
+			return shown
+		},
 		setTrack(value) {
+			if (drag) release({ pointerId: drag.id }, false)
 			circle = value
 			update()
 		},
 		show(level) {
+			if (level >= 0 && level <= 1) recovering = false
+			if (!drag && !recovering) level = clamp01(level)
 			if (shown !== null && Math.abs(level - shown) < 1e-4) return
 			shown = level
-			element.setAttribute('aria-valuenow', String(Math.round(level * 100)))
+			element.setAttribute('aria-valuenow', String(Math.round(clamp01(level) * 100)))
 			update()
 		},
 	}

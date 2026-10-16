@@ -323,7 +323,7 @@
     "in": 180,
     "out": 480,
     "mobileOut": 720,
-    "start": 0.35,
+    "start": 0.5,
     "duration": 1.2
   },
   "controls": {

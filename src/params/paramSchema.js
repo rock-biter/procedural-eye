@@ -390,13 +390,14 @@ export const BASE_PARAM_SCHEMA = {
 	// (desktop) screens zoom in to `in`, closer than portrait (mobile) ones,
 	// which zoom in to camera.distance and, much narrower, out farther.
 	// Landscape screens start `start` of the way from their zoom in to their
-	// zoom out (0.5 would be half the framing).
+	// zoom out on the zoom's log scale (0.5: the knob on the horizontal).
 	zoom: {
 		in: num(180, 60, 1000, 0.5, 'mm', 'uniform', 'desktop zoom in distance'),
 		out: num(480, 60, 1000, 0.5, 'mm', 'uniform', 'zoom out distance'),
 		mobileOut: num(720, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom out distance'),
-		start: num(0.35, 0, 1, 0.01, '', 'uniform', 'desktop start (zoom in → out)'),
+		start: num(0.5, 0, 1, 0.01, '', 'uniform', 'desktop start (zoom in → out, log)'),
 		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),
+		elasticity: num(0.12, 0, 0.25, 0.01, '', 'uniform', 'zoom drag overshoot'),
 	},
 	// The pointer controls (src/camera/cameraControls.js): how far the mouse
 	// turns the view toward itself at the window's edge, zoomed in and zoomed

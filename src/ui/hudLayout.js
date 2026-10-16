@@ -26,15 +26,18 @@ export const HUD = Object.freeze({
 	tones: Object.freeze({ center: 140 * DEGREE, spacing: 60 }),
 	// Zoom in and zoom out around `center`, zoom in higher, `span` apart, or
 	// `minArc` px on a small circle. The knob slides from under one to under
-	// the other, and a drag snaps it to either end within `snap` px of it
-	// (overlapping the button a little).
+	// the other; releasing a drag within `snap` px of an end or past it
+	// snaps there. During the drag the track can stretch past either end.
 	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20 }),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
 	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
 	// Ratios keep the inner arcs inside and the outer arcs outside even on
-	// phones, fixed at the former zoom-out sizes throughout the zoom.
-	inner: Object.freeze({ radiusRatio: 0.88, turn: 22.5 * DEGREE, start: -20 * DEGREE }),
-	outer: Object.freeze({ radiusRatio: 1.42, turn: -45 * DEGREE, start: 9.37 * DEGREE }),
+	// phones, fixed at the former zoom-out sizes throughout the zoom. Level
+	// with the horizontal at the middle of the zoom, they turn `turn` by
+	// either end, the inner one clockwise as the zoom goes in, the outer one
+	// the other way.
+	inner: Object.freeze({ radiusRatio: 0.88, turn: 45 * DEGREE }),
+	outer: Object.freeze({ radiusRatio: 1.42, turn: -30 * DEGREE }),
 })
 
 // The angle of every button on a circle of `radius` px, with `toneCount`
@@ -86,17 +89,27 @@ export function hudLayout(width, height, toneCount, hud = HUD) {
 	return null
 }
 
-// The knob's angle on its track at a zoom level, and the level at an angle
-// (clamped to the track).
+// The knob's angle on its track at a zoom level, including elastic overshoot.
 export function knobAngle(level, [zoomIn, zoomOut]) {
 	return zoomOut + (zoomIn - zoomOut) * level
 }
 
-export function trackLevel(angle, [zoomIn, zoomOut]) {
-	return Math.min(Math.max((zoomOut - angle) / (zoomOut - zoomIn), 0), 1)
+// A bounded spring-like extension: continuous with unit slope at either
+// endpoint, then progressively harder to pull, approaching `elasticity`.
+export function elasticZoomLevel(level, elasticity = 0) {
+	const end = Math.min(Math.max(level, 0), 1)
+	const excess = level - end
+	if (excess === 0 || elasticity <= 0) return end
+	return end + (elasticity * excess) / (elasticity + Math.abs(excess))
 }
 
-// The end a dragged knob at `angle` snaps to on a circle of `radius` px: 1
+// With no elasticity this clamps to the track; a drag can opt into overshoot.
+export function trackLevel(angle, [zoomIn, zoomOut], elasticity = 0) {
+	if (zoomIn === zoomOut) return 1
+	return elasticZoomLevel((zoomOut - angle) / (zoomOut - zoomIn), elasticity)
+}
+
+// The end a released knob at `angle` snaps to on a circle of `radius` px: 1
 // (zoom in) or 0 (zoom out) within `snap` px of it or past it, else null.
 export function knobSnap(angle, [zoomIn, zoomOut], radius, hud = HUD) {
 	const snap = hud.zoom.snap / radius
@@ -105,23 +118,29 @@ export function knobSnap(angle, [zoomIn, zoomOut], radius, hud = HUD) {
 	return null
 }
 
-// The zoom level of a camera distance between the zoom-in and zoom-out
-// distances `[near, far]`: 0 zoomed out, 1 zoomed in, on a log scale (each
-// wheel step multiplies the distance), clamped to [0, 1].
-export function zoomLevel(distance, [near, far]) {
+// Unclamped camera progress lets the HUD follow the physical overshoot
+// during a drag and its return. Ordinary consumers keep the bounded level.
+export function zoomProgress(distance, [near, far]) {
 	if (!(far > near)) return 1
-	const level = Math.log(far / distance) / Math.log(far / near)
-	return Math.min(Math.max(level, 0), 1)
+	return Math.log(far / distance) / Math.log(far / near)
 }
 
-// The segmented rings keep their zoom-out size and counter-rotate.
-// Their ratios preserve strict separation from the central ring at any size.
+// Zoomed out is 0, zoomed in 1, on the wheel's logarithmic distance scale.
+export function zoomLevel(distance, limits) {
+	return Math.min(Math.max(zoomProgress(distance, limits), 0), 1)
+}
+
+// The segmented rings keep their zoom-out size and counter-rotate: level
+// with the horizontal at the middle of the zoom (where the desktop start
+// framing and the knob sit), turned `turn` (radians, clockwise) zoomed in and
+// as much the other way zoomed out. Their ratios preserve strict separation
+// from the central ring at any size.
 export function orbitRing(radius, level, kind, hud = HUD) {
 	const orbit = hud[kind]
 	const zoom = Math.min(Math.max(level, 0), 1)
 	return {
 		radius: radius * orbit.radiusRatio,
-		turn: orbit.start + orbit.turn * (zoom - 0.65),
+		turn: orbit.turn * (2 * zoom - 1),
 	}
 }
 

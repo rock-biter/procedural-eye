@@ -1,11 +1,20 @@
-/* JetBrains Mono from Google Fonts (SIL OFL 1.1, fonts/OFL.txt), served with
-   the app rather than from a CDN: the latin subset of weight 400. */
+/* JetBrains Mono and, for the title, Kode Mono, from Google Fonts (SIL OFL
+   1.1, fonts/OFL.txt and fonts/kode-mono-OFL.txt), served with the app
+   rather than from a CDN: their latin subsets of weight 400. */
 @font-face {
 	font-family: 'JetBrains Mono';
 	font-style: normal;
 	font-weight: 400;
 	font-display: swap;
 	src: url('./fonts/jetbrains-mono-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Kode Mono';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('./fonts/kode-mono-latin-400.woff2') format('woff2');
 }
 
 /* The color of the interface: the HUD's icons, the title, the credit line
@@ -53,11 +62,11 @@ canvas {
 	scrollbar-width: thin;
 }
 
-/* Phones: below the title too, and above the credit line, which wraps to two
-   lines there. */
+/* Phones: below the title too (its height, with the line under it, set by
+   main.js), and above the credit line, which wraps to two lines there. */
 @media (max-width: 640px) {
 	.tp-dfwv {
-		--panel-top: calc(var(--ui-inset) + 52px);
+		--panel-top: calc(var(--ui-inset) + var(--masthead-height, 44px) + 8px);
 		--panel-bottom: calc(var(--ui-inset) + 44px);
 	}
 }
@@ -402,6 +411,11 @@ canvas {
 .zoom-out .icon {
 	width: 18px;
 	height: 18px;
+	scale: var(--zoom-symbol-visibility, 1);
+	opacity: var(--zoom-symbol-visibility, 1);
+	transition:
+		scale 0.1s ease-out,
+		opacity 0.1s ease-out;
 }
 
 .zoom-in .hud-bracket,
@@ -445,14 +459,15 @@ canvas {
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.hud * {
+	.hud *,
+	.hud .icon {
 		transition: none;
 		animation: none;
 	}
 }
 
 /* The title, top left, the credit line, bottom left, and the frame rate, top
-   right: inside the frame, in JetBrains Mono. Only the credit's link takes
+   right: inside the frame, in JetBrains Mono, the title in Kode Mono. Only the credit's link takes
    the pointer, so drags across the text still orbit the camera. */
 .masthead,
 .credit,
@@ -478,10 +493,18 @@ canvas {
 
 .masthead h1 {
 	margin: 0;
-	font-size: 32px;
+	font-family: 'Kode Mono', 'JetBrains Mono', ui-monospace, monospace;
+	font-size: 46px;
 	font-weight: inherit;
-	line-height: 1.3;
+	line-height: 0.8;
 	color: white;
+}
+
+/* Under the title, the project in a few lines. */
+.masthead p {
+	max-width: 46ch;
+	margin: 12px 0 0;
+	text-wrap: pretty;
 }
 
 /* On narrow screens the credit wraps, aligned left. */

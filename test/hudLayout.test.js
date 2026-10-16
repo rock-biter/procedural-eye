@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
 	HUD,
+	elasticZoomLevel,
 	hudLayout,
 	knobAngle,
 	knobSnap,
@@ -9,6 +10,7 @@ import {
 	trackLevel,
 	zoomDistance,
 	zoomLevel,
+	zoomProgress,
 } from '../src/ui/hudLayout'
 
 // The HUD's box on a desktop window (1600 × 1000), on a phone held upright
@@ -129,6 +131,58 @@ test('the two zoom rings keep their zoom-out sizes and counter-rotate inside and
 	for (const kind of ['inner', 'outer']) {
 		assert.deepEqual(orbitRing(450, -1, kind), orbitRing(450, 0, kind))
 		assert.deepEqual(orbitRing(450, 2, kind), orbitRing(450, 1, kind))
+		// Level at the middle of the zoom, turned as much either way by the ends.
+		assert.ok(near(orbitRing(450, 0.5, kind).turn, 0))
+		assert.ok(near(orbitRing(450, 0, kind).turn, -orbitRing(450, 1, kind).turn))
+	}
+	assert.ok(near(orbitRing(450, 1, 'inner').turn, 45 * DEGREE))
+	assert.ok(near(orbitRing(450, 1, 'outer').turn, -30 * DEGREE))
+})
+
+test('the knob sits on the horizontal at the middle of the zoom, the ends symmetric about it', () => {
+	for (const [width, height] of Object.values(SCREENS)) {
+		const { angles } = hudLayout(width, height, TONES)
+		assert.ok(near(knobAngle(0.5, angles.track), 0))
+		assert.ok(near(angles.zoomIn, -angles.zoomOut))
+	}
+	// The start framing sits there: halfway on the zoom's log scale.
+	assert.ok(near(zoomLevel(zoomDistance(0.5, [180, 480]), [180, 480]), 0.5))
+})
+
+test('drag overshoot is continuous, symmetric, bounded and increasingly resistant', () => {
+	const limit = 0.12
+	for (const level of [0, 0.1, 0.5, 0.9, 1]) assert.equal(elasticZoomLevel(level, limit), level)
+	let previous = 0
+	let previousSlope = 1
+	for (const excess of [0.001, 0.01, 0.05, 0.1, 0.5, 2, 100]) {
+		const low = elasticZoomLevel(-excess, limit)
+		const high = elasticZoomLevel(1 + excess, limit)
+		assert.ok(low < 0 && low > -limit)
+		assert.ok(high > 1 && high < 1 + limit)
+		assert.ok(near(low, 1 - high))
+		assert.ok(high > previous)
+		const h = 1e-7
+		const slope = (elasticZoomLevel(1 + excess + h, limit) - high) / h
+		assert.ok(slope >= 0 && slope < previousSlope)
+		previous = high
+		previousSlope = slope
+	}
+	const h = 1e-7
+	assert.ok(near((elasticZoomLevel(1 + h, limit) - 1) / h, 1, 1e-5))
+	assert.equal(elasticZoomLevel(-1, 0), 0)
+	assert.equal(elasticZoomLevel(2, 0), 1)
+	const track = [-0.2, 0.2]
+	assert.ok(trackLevel(-0.3, track, limit) > 1)
+	assert.ok(trackLevel(0.3, track, limit) < 0)
+	assert.equal(trackLevel(0, track, limit), 0.5, 'returning inside loses the resistance')
+})
+
+test('elastic camera progress round-trips beyond the stops while the public zoom level stays bounded', () => {
+	const limits = [180, 480]
+	for (const level of [-0.12, -0.05, 0, 0.5, 1, 1.05, 1.12]) {
+		const distance = zoomDistance(level, limits)
+		assert.ok(near(zoomProgress(distance, limits), level))
+		assert.ok(near(zoomLevel(distance, limits), Math.min(Math.max(level, 0), 1)))
 	}
 })
 

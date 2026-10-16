@@ -1,18 +1,4 @@
-<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="1726" height="427" viewBox="0 0 1726 427" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="zoom ring inner">
-<mask id="mask0_0_14" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="1726" height="427">
-<rect id="Rectangle 9" width="1726" height="427" fill="#D9D9D9"/>
-</mask>
-<g mask="url(#mask0_0_14)">
-<ellipse id="Ellipse 4" cx="855.5" cy="210" rx="408.5" ry="409" stroke="white" stroke-opacity="0.3" stroke-dasharray="3 4"/>
-<g id="Group 22">
-<path id="Vector 6" opacity="0.4" d="M1026.55 -250.604L1027.27 -252.545M1046.73 -304.964L1046.01 -303.022M1028.71 -256.428L1030.15 -260.311M1031.59 -264.194L1033.04 -268.077M1034.48 -271.96L1035.92 -275.842M1037.36 -279.725L1038.8 -283.608M1040.24 -287.491L1041.69 -291.374M1043.13 -295.257L1044.57 -299.139" stroke="white"/>
-<path id="Vector 8" opacity="0.4" d="M663.95 725.82L664.671 723.879M684.137 671.46L683.416 673.402M666.113 719.996L667.555 716.113M668.997 712.23L670.439 708.347M671.881 704.464L673.323 700.582M674.765 696.699L676.207 692.816M677.648 688.933L679.09 685.05M680.532 681.167L681.974 677.284" stroke="white"/>
-</g>
-<path id="Vector 10" opacity="0.4" d="M506.585 423.78L508.668 422.809M523.248 416.011L521.165 416.982M512.834 420.867L516.999 418.924" stroke="white"/>
-<path id="Vector 13" opacity="0.4" d="M1191.05 10.9857L1193.13 10.0145M1207.71 3.216L1205.63 4.18722M1197.3 8.07208L1201.46 6.12965" stroke="white"/>
-<path id="Vector 11" opacity="0.4" d="M503.549 2.32491L505.485 3.56227M519.041 12.2238L517.104 10.9864M509.358 6.037L513.231 8.51172" stroke="white"/>
-<path id="Vector 12" opacity="0.4" d="M1188.28 413.302L1190.22 414.539M1203.77 423.201L1201.84 421.964M1194.09 417.014L1197.96 419.489" stroke="white"/>
-</g>
-</g>
+<svg width="820" height="820" viewBox="0 0 820 820" fill="none" xmlns="http://www.w3.org/2000/svg">
+	<path d="M745.15 208.62L760.58 199.35A409 409 0 0 1 760.58 620.65L745.15 611.38" stroke="white" stroke-opacity="0.35" stroke-dasharray="3 3.99"/>
+	<path d="M74.85 611.38L59.42 620.65A409 409 0 0 1 59.42 199.35L74.85 208.62" stroke="white" stroke-opacity="0.35" stroke-dasharray="3 3.99"/>
 </svg>
