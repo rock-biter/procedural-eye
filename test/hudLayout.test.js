@@ -10,6 +10,7 @@ import {
 	orbitRing,
 	pullLevel,
 	spinRing,
+	swayTurn,
 	toneArcs,
 	trackLevel,
 	zoomDistance,
@@ -154,6 +155,22 @@ test('the knob sits on the horizontal at the middle of the zoom, the ends symmet
 	}
 	// The start framing sits there: halfway on the zoom's log scale.
 	assert.ok(near(zoomLevel(zoomDistance(0.5, [180, 480]), [180, 480]), 0.5))
+})
+
+test('the layers sway with the mouse, alternating ways, the inner ones the most', () => {
+	const { arcs, inner, spin, outer } = HUD.sway
+	// From the innermost layer out.
+	const layers = [...arcs, inner, spin, outer]
+	for (const layer of layers) {
+		assert.ok(near(swayTurn(layer, { x: 0, y: 0 }), 0))
+		assert.ok(near(swayTurn(layer, { x: 1, y: 1 }), layer.turn))
+		assert.ok(near(swayTurn(layer, { x: -1, y: -1 }), -layer.turn))
+		assert.ok(layer.lag > 0 && Math.abs(layer.turn) <= 8 * DEGREE, 'slight')
+	}
+	for (let i = 1; i < layers.length; i++) {
+		assert.ok(Math.sign(layers[i].turn) !== Math.sign(layers[i - 1].turn), 'alternating')
+		assert.ok(Math.abs(layers[i].turn) <= Math.abs(layers[i - 1].turn), 'outer layers less')
+	}
 })
 
 test('three arcs inside the inner ring take the places of each skin tone', () => {

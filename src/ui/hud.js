@@ -10,9 +10,11 @@ import {
 	orbitRing,
 	pullLevel,
 	spinRing,
+	swayTurn,
 	toneArcs,
 	trackLevel,
 } from './hudLayout'
+import { follow } from '../camera/orbitMotion'
 import bracketAsset from './assets/bracket.svg?url'
 import innerRingAsset from './assets/zoom-ring-inner.svg?url'
 import outerRingAsset from './assets/zoom-ring-outer.svg?url'
@@ -153,7 +155,10 @@ export function createHud({
 	const arcs = [0, 1, 2].map(() => svgElement('circle', { class: 'hud-line hud-arc' }))
 	let arcTone = 0
 	let arcsPlaced = false
-	ring.append(mask, line, spin, spinTeeth, ...arcs)
+	// The spinning circle and its teeth sway together.
+	const spinGroup = svgElement('g')
+	spinGroup.append(spin, spinTeeth)
+	ring.append(mask, line, spinGroup, ...arcs)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -278,6 +283,50 @@ export function createHud({
 		}
 	}
 
+	// Every layer but the central circle sways a little with the mouse, each
+	// its own way and pace (HUD.sway, swayTurn()): the rings in their
+	// wrappers' turn, the spinning circle and the arcs by a rotation about the
+	// center, apart from the turns their dash offsets ease. Touch does not
+	// move them, a mouse leaving the window lets them settle back, and with
+	// reduced motion they stay still.
+	const mouse = { x: 0, y: 0 }
+	window.addEventListener('pointermove', (event) => {
+		if (event.pointerType !== 'mouse') return
+		mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+		mouse.y = 1 - (event.clientY / window.innerHeight) * 2
+	})
+	document.addEventListener('mouseout', (event) => {
+		if (event.relatedTarget === null) mouse.x = mouse.y = 0
+	})
+	const still = window.matchMedia('(prefers-reduced-motion: reduce)')
+	const sway = { inner: 0, outer: 0, spin: 0, arcs: [0, 0, 0] }
+	const rotate = (element, turn) => {
+		if (!placed) return
+		const degrees = (turn * 180) / Math.PI
+		element.setAttribute('transform', `rotate(${degrees} ${placed.cx} ${placed.cy})`)
+	}
+	let swayTime = null
+	const stepSway = (time) => {
+		requestAnimationFrame(stepSway)
+		const dt = swayTime === null ? 0 : Math.min((time - swayTime) / 1000, 0.1)
+		swayTime = time
+		const toward = (current, layer) =>
+			follow(current, still.matches ? 0 : swayTurn(layer, mouse), dt, layer.lag, 1e-5)
+		let rings = false
+		for (const kind of ['inner', 'outer']) {
+			const turn = toward(sway[kind], HUD.sway[kind])
+			if (turn !== sway[kind]) rings = true
+			sway[kind] = turn
+		}
+		if (rings) placeOrbit()
+		const spinTurn = toward(sway.spin, HUD.sway.spin)
+		if (spinTurn !== sway.spin) rotate(spinGroup, (sway.spin = spinTurn))
+		arcs.forEach((arc, i) => {
+			const turn = toward(sway.arcs[i], HUD.sway.arcs[i])
+			if (turn !== sway.arcs[i]) rotate(arc, (sway.arcs[i] = turn))
+		})
+	}
+
 	// Both segmented rings for the current layout and zoom level.
 	let placed = null
 	let level = null
@@ -288,7 +337,8 @@ export function createHud({
 			const ring = orbitRing(radius, level, asset.kind, stretching)
 			asset.wrapper.style.left = `${cx}px`
 			asset.wrapper.style.top = `${cy}px`
-			asset.wrapper.style.transform = `rotate(${ring.turn}rad) scale(${ring.radius / asset.radius})`
+			const turn = ring.turn + sway[asset.kind]
+			asset.wrapper.style.transform = `rotate(${turn}rad) scale(${ring.radius / asset.radius})`
 		}
 	}
 
@@ -337,6 +387,9 @@ export function createHud({
 		placed = { ...circle, track: angles.track }
 		placeSpin()
 		placeArcs()
+		// The sway turns about the center, which moved with the layout.
+		rotate(spinGroup, sway.spin)
+		arcs.forEach((arc, i) => rotate(arc, sway.arcs[i]))
 		placeOrbit()
 		placeZoomSymbols()
 	}
@@ -346,6 +399,7 @@ export function createHud({
 		element,
 		mount() {
 			layout()
+			requestAnimationFrame(stepSway)
 		},
 		pressTone(color) {
 			toneButtons.forEach((button, i) =>

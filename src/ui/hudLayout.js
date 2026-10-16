@@ -71,6 +71,20 @@ export const HUD = Object.freeze({
 			].map((centers) => Object.freeze(centers.map((center) => center * DEGREE))),
 		),
 	}),
+	// How far each layer but the central circle turns with the mouse (radians
+	// with the mouse at the window's edge; alternating ways, the inner layers
+	// the most) and how slowly it follows (a time constant, s): each arc of
+	// the tones, the inner zoom ring, the spinning circle, the outer zoom ring.
+	sway: Object.freeze({
+		arcs: Object.freeze([
+			Object.freeze({ turn: 7 * DEGREE, lag: 0.5 }),
+			Object.freeze({ turn: -5.5 * DEGREE, lag: 0.65 }),
+			Object.freeze({ turn: 4 * DEGREE, lag: 0.8 }),
+		]),
+		inner: Object.freeze({ turn: -4 * DEGREE, lag: 0.45 }),
+		spin: Object.freeze({ turn: 3 * DEGREE, lag: 0.6 }),
+		outer: Object.freeze({ turn: -2 * DEGREE, lag: 0.9 }),
+	}),
 })
 
 // The angle of every button on a circle of `radius` px, with `toneCount`
@@ -243,6 +257,14 @@ export function toneArcs(radius, tone, hud = HUD) {
 		dashArray: [length, 2 * Math.PI * ring - length],
 		dashOffset: -(center - span / 2) * ring,
 	}))
+}
+
+// The turn (radians, clockwise) a swaying layer (`HUD.sway`) heads for with
+// the mouse at `mouse` ([-1, 1] across the window, x right, y up): its
+// horizontal place and, half as much, its vertical one, as far as the layer's
+// `turn` at a corner.
+export function swayTurn(layer, mouse) {
+	return (layer.turn * (mouse.x + mouse.y / 2)) / 1.5
 }
 
 // The camera distance of a zoom level: the inverse of zoomLevel().
