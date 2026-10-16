@@ -3,8 +3,11 @@
 // posterior margins, in the crease. The skin, the conjunctiva and the globe are
 // drawn into a height field seen from the front; each vertex then looks for
 // the horizon in a few directions over that field (horizon-based ambient
-// occlusion, Bavoil 2008), within OCCLUSION.radius. The lids are at rest: the
-// gaze moves them only a little.
+// occlusion, Bavoil 2008), within OCCLUSION.radius. A surface that hangs
+// into the conjunctival sac behind the margins (the palpebral conjunctiva) is
+// a wall the field sees only edge-on: it darkens with its depth below the
+// margin instead, over OCCLUSION.sac mm. The lids are at rest: the gaze moves
+// them only a little.
 import { smoothstep } from '../math'
 
 export const OCCLUSION = Object.freeze({
@@ -16,6 +19,8 @@ export const OCCLUSION = Object.freeze({
 	directions: 8,
 	steps: 14,
 	radius: 3,
+	// The fall-off (mm) of the light into the sac.
+	sac: 0.8,
 })
 
 // The front height field: the highest z of the triangles over each cell, and
@@ -93,8 +98,9 @@ export function vertexNormals(positions, indices) {
 }
 
 // Ambient occlusion of the vertices of `meshes` (each { positions, indices,
-// and optionally `bakes(v)`, which vertices to bake; the others stay open),
-// 1 open to 0 closed, in the meshes' order.
+// and optionally `bakes(v)`, which vertices to bake, the others staying open,
+// and `depth`, the vertices' depths into the sac }), 1 open to 0 closed, in
+// the meshes' order.
 export function bakeLidOcclusion(meshes, eye, settings = OCCLUSION) {
 	const { field, width, height } = heightField(meshes, eye, settings)
 	const { halfWidth, halfHeight, cell, directions, steps, radius } = settings
@@ -113,7 +119,7 @@ export function bakeLidOcclusion(meshes, eye, settings = OCCLUSION) {
 	const falloff = reach.map((r) => 1 - smoothstep(0.3 * radius, radius, r))
 	const sine = (slope) => slope / Math.sqrt(1 + slope * slope)
 	const result = []
-	for (const { positions, indices, bakes } of meshes) {
+	for (const { positions, indices, bakes, depth } of meshes) {
 		const normals = vertexNormals(positions, indices)
 		const ao = new Float32Array(positions.length / 3).fill(1)
 		for (let v = 0; v < ao.length; v++) {
@@ -143,6 +149,7 @@ export function bakeLidOcclusion(meshes, eye, settings = OCCLUSION) {
 				occlusion += Math.min(1, sine(horizon) - sine(tangent)) * weight
 			}
 			ao[v] = 1 - occlusion / directions
+			if (depth) ao[v] *= Math.exp(-depth[v] / settings.sac)
 		}
 		result.push(ao)
 	}

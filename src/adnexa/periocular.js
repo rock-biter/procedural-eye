@@ -8,7 +8,8 @@
 //   about 4.5 mm behind the apex, the lateral one about 8.5, Liu 2023 and
 //   Gao 2025 by 3D photogrammetry).
 // - The conjunctiva behind them: the globe, past its outline turning back into
-//   the fornix, and the caruncle in the medial canthus.
+//   the fornix; in the medial canthus the floor of the lacus lacrimalis, a
+//   little behind the margins, with the caruncle on it and the plica.
 // - The face around the orbit: a thin-plate spline through anatomical
 //   landmarks (brow, nasion and nasal dorsum, infraorbital rim and cheek,
 //   lateral orbital rim and temple).
@@ -18,12 +19,20 @@ import { smoothstep, vec3 } from '../math'
 export const FORNIX_START = 0.96
 // How far (mm) the fornix eases off past it: deep laterally, shallow medially.
 const FORNIX_EASE = { lateral: 1.6, medial: 0.9 }
+// The lacus lacrimalis, the floor of the medial canthus that the caruncle and
+// the plica fill: `behind` mm behind the posterior margins at the canthus, it
+// falls toward the globe past `start` mm from the canthus by `slope`, and
+// recedes above and below the chord (`curve`). It meets the globe just
+// lateral of the plica, so the pocket behind the medial canthus is shallow
+// instead of a moat around the caruncle down to the fornix.
+const LACUS = { behind: 1.2, start: 1.3, slope: 2.2, curve: 0.15, blend: 0.6 }
 // The caruncle (about 5 mm high and 3 wide, Levy 2009): center from the medial
 // canthus (mm along the chord), semi-axes along and across the chord, depth of
-// its top behind the posterior margins there and its fall-off; lateral of it
-// the plica semilunaris, a crescent fold about 2 mm wide (`at` mm from the
-// canthus, its height, width, half its length and its curvature).
-const CARUNCLE = { inset: 1.3, length: 1.15, height: 1.7, behind: 0.45, bulge: 1.2 }
+// its top behind the posterior margins there and its fall-off, down to the
+// lacus at its outline; lateral of it the plica semilunaris, a crescent fold
+// about 2 mm wide (`at` mm from the canthus, its height, width, half its
+// length and its curvature).
+const CARUNCLE = { inset: 1.3, length: 1.15, height: 1.7, behind: 0.45, bulge: 0.75 }
 const PLICA = { at: 2.9, height: 0.3, width: 0.5, length: 2.6, bend: 0.08 }
 // The support surface through the canthi recedes above and below the chord.
 const CANTHAL_CURVATURE = 0.012
@@ -79,14 +88,19 @@ function lidGlobe(eye, r) {
 	return Math.max(eye.surfaceZ(r), smoothMax(eye.scleraZ(r), cornea, LIMBUS_BRIDGE))
 }
 
+// Depth of the posterior margins at the medial canthus: set back from the
+// measured depth of the canthus by part of the margin's thickness, so the skin
+// at the canthi lies at the measured depths.
+function medialMarginZ(eye, lids) {
+	return eye.apexZ - lids.medialDepth - 0.6 * lids.marginThickness
+}
+
 // Height of the margins' support at (x, y).
 export function supportZ(eye, lids, fissure, x, y) {
 	const { s, v } = chordFrame(fissure, x, y)
-	// Through the canthi, set back by part of the margin's thickness, so the
-	// skin at the canthi lies at the measured depths.
-	const back = 0.6 * lids.marginThickness
-	const medial = eye.apexZ - lids.medialDepth - back
-	const lateral = eye.apexZ - lids.lateralDepth - back
+	// Through the canthi.
+	const medial = medialMarginZ(eye, lids)
+	const lateral = eye.apexZ - lids.lateralDepth - 0.6 * lids.marginThickness
 	const canthal = medial + (lateral - medial) * s - CANTHAL_CURVATURE * v * v
 	return smoothMax(lidGlobe(eye, Math.hypot(x, y)), canthal, SUPPORT_BLEND)
 }
@@ -114,8 +128,8 @@ export function supportLift(eye, lids, fissure, x, y) {
 }
 
 // Height of the conjunctiva at (x, y): the globe, continued past FORNIX_START
-// by the fornix, whose slope eases off over a few millimeters, and the
-// caruncle in the medial canthus.
+// by the fornix, whose slope eases off over a few millimeters; in the medial
+// canthus the lacus with the plica and the caruncle.
 export function conjunctivaZ(eye, lids, fissure, x, y) {
 	const r = Math.hypot(x, y)
 	const nasal = (eye.nasalSign * x) / Math.max(r, 1e-6)
@@ -124,15 +138,22 @@ export function conjunctivaZ(eye, lids, fissure, x, y) {
 	const globe = easedGlobe(eye, r, FORNIX_START, ease)
 	const { s, v } = chordFrame(fissure, x, y)
 	const fromCanthus = s * fissure.chord.length
-	// The plica: a fold over the globe, its crescent open toward the nose.
+	const margins = medialMarginZ(eye, lids)
+	const lacus =
+		margins -
+		LACUS.behind -
+		LACUS.slope * Math.max(0, fromCanthus - LACUS.start) -
+		LACUS.curve * v * v
+	// The plica: a fold over the globe and the lacus, its crescent open toward
+	// the nose.
 	const plica =
 		PLICA.height *
 		Math.exp(-(((fromCanthus - PLICA.at + PLICA.bend * v * v) / PLICA.width) ** 2)) *
 		Math.exp(-((v / PLICA.length) ** 2))
 	const u = (fromCanthus - CARUNCLE.inset) / CARUNCLE.length
 	const w = v / CARUNCLE.height
-	const top = eye.apexZ - lids.medialDepth - 0.6 * lids.marginThickness - CARUNCLE.behind
-	return smoothMax(globe + plica, top - CARUNCLE.bulge * (u * u + w * w), 1)
+	const caruncle = margins - CARUNCLE.behind - CARUNCLE.bulge * (u * u + w * w)
+	return smoothMax(smoothMax(globe, lacus, LACUS.blend) + plica, caruncle, 1)
 }
 
 // The face's landmarks: (nasal, up, depth in front of the apex), mm from the

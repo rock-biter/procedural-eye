@@ -61,8 +61,8 @@ app.controls.distanceLimits = () => zoomDistances(app.targetParams.zoom)
 const panelState = { ancestry: 'european', transition: TRANSITION.duration }
 
 // The groups a random eye resets to their defaults before applying its sample.
-// The lashes are not among them: a random eye keeps them.
-const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera', 'skin']
+// The lashes and the skin are not among them: a random eye keeps them.
+const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera']
 
 // Glides to the preset `name`: its overrides on the defaults.
 function loadPreset(name, duration = panelState.transition) {

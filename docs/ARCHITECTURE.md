@@ -159,7 +159,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - Within its color class, a shade (`SHADES`: pale or deep blue, green, grey, hazel, light brown, amber, brown, chestnut, black) sets ranges for the whole layer model of the color and its `saturation` (`SHADE_COLORS`), not only the melanin; the shades and their shares are approximations ([`docs/RESEARCH.md`](RESEARCH.md#color)).
   - Larsson's peripupillary ring is added to 91% of green, hazel and light brown eyes.
   - A tenth of the eyes, of any ancestry (`MAKO_SHARE`), take the fantasy **mako** shade instead: the glowing green-blue of the mako eyes of Final Fantasy VII, a deep blue stroma tinted between green and cyan at full saturation with `irisColor.glow`, without a ring or pigment spots. It is drawn last, so the other eyes of a seed do not change.
-  - The result maps onto the age, the pupil, the iris structure and color, the sclera and the skin color. The lashes stay as they are.
+  - The result maps onto the age, the pupil, the iris structure and color, and the sclera. The lashes and the skin stay as they are.
   - `main.js` resets those groups to their defaults before applying it, and glides to the result.
 - **State**: `encodeState()` writes the non-default values as base64url JSON. **Copy state URL** puts it in `?state=`; **Save PNG** stores it in a `tEXt` chunk named `eye-state` ([`src/render/pngMetadata.js`](../src/render/pngMetadata.js)).
 

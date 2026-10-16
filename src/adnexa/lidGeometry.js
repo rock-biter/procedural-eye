@@ -552,6 +552,25 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across =
 	return { positions, lid, relief, follow, indices, fissure }
 }
 
+// How far out (mm) the conjunctiva mesh reaches in the direction whose X is
+// `cx`: to just past the canthi (further medially), where the lids cover it.
+function fornixReach(nasalSign, cx) {
+	return 15 + 1.5 * smoothstep(-0.3, 0.6, nasalSign * cx)
+}
+
+// Height of the conjunctiva mesh at (x, y): conjunctivaZ(), under the globe
+// where the conjunctiva is the globe (0.06 mm, for a clean seam), and falling
+// back behind the skin toward its reach.
+function fornixZ(lids, eye, fissure, nasalSign, x, y) {
+	const r = Math.hypot(x, y)
+	const z = conjunctivaZ(eye, lids, fissure, x, y)
+	const globe = r < eye.scleraRadius ? eye.surfaceZ(r) : -Infinity
+	const reach = fornixReach(nasalSign, x / Math.max(r, 1e-6))
+	return (
+		z - 0.06 * (1 - smoothstep(0, 0.15, z - globe)) - 1.5 * Math.max(0, r - reach + 1.5) ** 2
+	)
+}
+
 // The conjunctiva in the canthi: where the lids pass in front of the receding
 // globe, the opening shows the conjunctiva turning into the fornix and the
 // caruncle, not the background. An annulus on conjunctivaZ() from inside the
@@ -575,19 +594,13 @@ export function createConjunctivaMesh(
 		const angle = (i / around) * Math.PI * 2
 		const cx = Math.cos(angle)
 		const cy = Math.sin(angle)
-		// Out to just past the canthi (further medially), where the lids cover it.
-		const reach = 15 + 1.5 * smoothstep(-0.3, 0.6, nasalSign * cx)
+		const reach = fornixReach(nasalSign, cx)
 		for (let j = 0; j < across; j++) {
 			const r = inner + (reach - inner) * (j / (across - 1)) ** 1.5
 			const x = cx * r
 			const y = cy * r
-			const z = conjunctivaZ(eye, lids, fissure, x, y)
-			// Under the globe where the conjunctiva is the globe.
-			const globe = r < eye.scleraRadius ? eye.surfaceZ(r) : -Infinity
-			const dip =
-				0.06 * (1 - smoothstep(0, 0.15, z - globe)) + 1.5 * Math.max(0, r - reach + 1.5) ** 2
 			const index = i * across + j
-			positions.set([x, y, z - dip], index * 3)
+			positions.set([x, y, fornixZ(lids, eye, fissure, nasalSign, x, y)], index * 3)
 			lid.set([i / around, 0, r - inner, cy > 0 ? 1 : 0], index * 4)
 			relief.set([cx, cy, 0, 0], index * 4)
 			follow.set([cy > 0 ? 1 : 0, 0], index * 2)
@@ -607,6 +620,68 @@ export function createConjunctivaMesh(
 		}
 	}
 	return { positions, lid, relief, follow, indices }
+}
+
+// The palpebral conjunctiva: a curtain hanging from each posterior margin
+// straight back, to CURTAIN_BELOW mm under the conjunctiva or the globe,
+// whichever is lower. Straight, not slanting out under the lid: a line of
+// sight running out of the pocket meets it at the margin's outline. Every line of sight that
+// passes between a margin and the eye, into the pocket behind the canthi or
+// along the globe's outline, ends on it, on the conjunctiva or on the globe,
+// from any side. Where the margin rests on the globe it stays inside it. It
+// is part of the lid: it follows the gaze with its margin, and shows where
+// the margin stands off the globe. `around` must be the lid mesh's, so its
+// top row is the lid's posterior margin; its rows are denser near the
+// margin, the part the opening shows. `depth`: each vertex's depth below its
+// margin (mm), for the occlusion. The skin program shades it as the margin's
+// posterior border (`lid` s = 0). Front faces toward the opening.
+const CURTAIN_BELOW = 1.5
+export function createPalpebralMesh(lids, eye, nasalSign = 1, { around = 560, rows = 12 } = {}) {
+	const fissure = createFissure(lids, nasalSign)
+	const context = lidContext(lids, eye, fissure)
+	const columns = loopColumns(context.open, nasalSign, around)
+	const positions = new Float32Array(around * rows * 3)
+	const lid = new Float32Array(around * rows * 4)
+	const relief = new Float32Array(around * rows * 4)
+	const follow = new Float32Array(around * rows * 2)
+	const depths = new Float32Array(around * rows)
+	for (let i = 0; i < around; i++) {
+		const data = columnAt(context, columns[i])
+		const { column, profile } = data
+		const top = pointOn(context, data, 0)
+		const [x, y, z] = top.position
+		const r = Math.hypot(x, y)
+		const floor = Math.min(
+			eye.surfaceZ(Math.min(r, eye.scleraRadius)),
+			fornixZ(lids, eye, fissure, nasalSign, x, y),
+		)
+		const depth = Math.max(0, z - floor + CURTAIN_BELOW)
+		const [ox, oy] = column.direction
+		for (let j = 0; j < rows; j++) {
+			const index = i * rows + j
+			depths[index] = depth * (j / (rows - 1)) ** 1.5
+			positions.set([x, y, z - depths[index]], index * 3)
+			lid.set([profile.t, 0, top.a, profile.share], index * 4)
+			relief.set([ox, oy, 0, profile.along], index * 4)
+			follow.set([profile.share, followWeight(top.a, profile.band)], index * 2)
+		}
+	}
+	const indices = new Uint32Array(around * (rows - 1) * 6)
+	let k = 0
+	for (let i = 0; i < around; i++) {
+		const next = (i + 1) % around
+		for (let j = 0; j < rows - 1; j++) {
+			const a = i * rows + j
+			const b = next * rows + j
+			const c = next * rows + j + 1
+			const d = i * rows + j + 1
+			// The rows run down from the margin, the lid's run up its strip: the
+			// other winding faces the opening.
+			indices.set(nasalSign > 0 ? [a, b, c, a, c, d] : [a, c, b, a, d, c], k)
+			k += 6
+		}
+	}
+	return { positions, lid, relief, follow, indices, depth: depths }
 }
 
 // The tear meniscus: a concave water fillet in the corner between the lid's

@@ -330,7 +330,6 @@ export function randomEye(ancestry = 'european', seed = Math.floor(Math.random()
 	const spots = [0, 1 + Math.floor(random() * 2), 3 + Math.floor(random() * 6)][f.spotGrade]
 	const furrowCount = [0, 1 + Math.floor(random() * 2), 2 + Math.floor(random() * 3)][f.furrowGrade]
 	const age = Math.round(between(random, 18, 72))
-	const skin = { european: '#d39b7c', 'east-asian': '#c9966f', 'south-asian': '#9c6a4a' }[ancestry]
 	const eye = {
 		features: { ...f, shade },
 		params: {
@@ -374,7 +373,6 @@ export function randomEye(ancestry = 'european', seed = Math.floor(Math.random()
 				vessels: { seed: 1 + Math.floor(random() * 9998) },
 				yellowing: Math.min(1, (age - 18) / 70),
 			},
-			skin: { color: skin },
 		},
 	}
 	// Drawn last, so every other eye of a seed stays as it was.

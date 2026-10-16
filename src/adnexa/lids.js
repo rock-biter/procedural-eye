@@ -17,7 +17,12 @@ import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
-import { createConjunctivaMesh, createLidMesh, LID_PROFILE } from './lidGeometry'
+import {
+	createConjunctivaMesh,
+	createLidMesh,
+	createPalpebralMesh,
+	LID_PROFILE,
+} from './lidGeometry'
 import { bakeLidOcclusion } from './lidOcclusion'
 import SkinPattern from './skinPattern'
 
@@ -58,38 +63,40 @@ export default class Lids {
 	// `renderer` bakes the skin patterns over the new mesh.
 	rebuild(params, eye, renderer) {
 		const data = createLidMesh(params.lids, eye, eye.nasalSign)
-		// The conjunctiva fills the canthi beyond the globe's outline (same program).
+		// The conjunctiva fills the canthi beyond the globe's outline, and the
+		// palpebral conjunctiva hangs from the margins behind them (same program).
 		const fornix = createConjunctivaMesh(params.lids, eye, eye.nasalSign)
-		const join = (a, b) => {
-			const out = new a.constructor(a.length + b.length)
-			out.set(a)
-			out.set(b, a.length)
+		const curtain = createPalpebralMesh(params.lids, eye, eye.nasalSign)
+		const parts = [data, fornix, curtain]
+		const join = (arrays) => {
+			const out = new arrays[0].constructor(arrays.reduce((sum, a) => sum + a.length, 0))
+			let offset = 0
+			for (const a of arrays) {
+				out.set(a, offset)
+				offset += a.length
+			}
 			return out
 		}
-		const offset = data.positions.length / 3
+		const merged = (name) => join(parts.map((part) => part[name]))
 		const geometry = new BufferGeometry()
-		geometry.setAttribute(
-			'position',
-			new BufferAttribute(join(data.positions, fornix.positions), 3),
-		)
-		geometry.setAttribute('lid', new BufferAttribute(join(data.lid, fornix.lid), 4))
-		geometry.setAttribute('relief', new BufferAttribute(join(data.relief, fornix.relief), 4))
-		geometry.setAttribute('follow', new BufferAttribute(join(data.follow, fornix.follow), 2))
-		// Ambient occlusion, baked at rest over the lid band and the conjunctiva.
-		const [lidOcclusion, fornixOcclusion] = bakeLidOcclusion(
-			[{ ...data, bakes: (v) => data.lid[v * 4 + 2] < 10 }, fornix],
+		geometry.setAttribute('position', new BufferAttribute(merged('positions'), 3))
+		geometry.setAttribute('lid', new BufferAttribute(merged('lid'), 4))
+		geometry.setAttribute('relief', new BufferAttribute(merged('relief'), 4))
+		geometry.setAttribute('follow', new BufferAttribute(merged('follow'), 2))
+		// Ambient occlusion, baked at rest over the lid band, the conjunctiva and
+		// the palpebral conjunctiva.
+		const occlusion = bakeLidOcclusion(
+			[{ ...data, bakes: (v) => data.lid[v * 4 + 2] < 10 }, fornix, curtain],
 			eye,
 		)
-		geometry.setAttribute('ao', new BufferAttribute(join(lidOcclusion, fornixOcclusion), 1))
-		geometry.setIndex(
-			new BufferAttribute(
-				join(
-					data.indices,
-					fornix.indices.map((index) => index + offset),
-				),
-				1,
-			),
-		)
+		geometry.setAttribute('ao', new BufferAttribute(join(occlusion), 1))
+		let first = 0
+		const indices = parts.map((part) => {
+			const shifted = part.indices.map((index) => index + first)
+			first += part.positions.length / 3
+			return shifted
+		})
+		geometry.setIndex(new BufferAttribute(join(indices), 1))
 		geometry.computeVertexNormals()
 		geometry.computeBoundingSphere()
 		geometry.computeBoundingBox()
