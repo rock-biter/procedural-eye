@@ -5,24 +5,39 @@
 //
 // From the patch's edge (the lid mesh's outer row, on the ellipse LID_PATCH in
 // the front plane) a flat band runs straight back `shell.band` mm: the cut edge
-// of the patch. From the band's back edge a dome bulges behind the edge's
-// membrane, the smoothest surface through the edge (harmonic in the ellipse's
-// normalized coordinates). The dome's profile is a spherical cap that leaves
-// the band at an angle, so the band keeps an edge on both sides. It is as
-// deep as it must be to pass `shell.clearance` behind everything it encloses:
-// the globe, whose mesh reaches past the equator and turns with the gaze (so
-// its whole back), and the lids, the conjunctiva and the palpebral
-// conjunctiva, the parts that follow the gaze at either end of their travel.
+// of the patch. From the band's back edge the dome follows the face the lids
+// turn into (lidGeometry.js' `face`, smoothed, which bridges the eye), set
+// back by a thickness that grows from nothing at the band toward the middle
+// as a spherical cap: it leaves the band at an angle, so the band keeps an
+// edge on both sides. The thickness is the least that keeps `shell.clearance`
+// behind what can show: the lids, also as they follow the gaze, and the globe
+// in front of its cut (GLOBE_CUT). What lies further back and never shows is
+// cut or brought inside instead: the globe behind the cut (in its program),
+// the conjunctiva's fornix and the palpebral conjunctiva's deep end
+// (keepInside()).
 import { LID_PATCH } from './lidGeometry'
 
-// Half-angle of the dome's spherical cap: it leaves the band this far off the
-// front plane, steeper with the depth.
+// The plane behind which the globe is not drawn (eyeball-sclera-fragment.glsl),
+// in front of its center by this share of its radius (2.4 mm by default),
+// world z. The globe turns with the gaze, so its mesh reaches past the
+// equator; behind the plane it lies under the conjunctiva, which leaves it at
+// 0.96 of its radius (0.28 of it in front of the center), and never shows
+// through the opening.
+export const GLOBE_CUT = 0.2
+// Half-angle of the thickness' spherical cap: the dome leaves the band this
+// far off the face, more with the thickness.
 const CAP_ANGLE = (50 * Math.PI) / 180
 // The gaze pitch (degrees) at either end of the lids' follow
-// (src/animation/animator.js: 0.9 of it on the upper lid, 0.35 on the lower).
+// (src/animation/animator.js: 0.9 of it on the upper lid, 0.35 on the lower):
+// the wandering eye's range and its look-around.
 const FOLLOW_PITCH = 35
 // Lid vertices nearer the edge than this normalized radius stand on the band.
 const EDGE_ZONE = 0.95
+// The face is sampled on a grid this fine (mm), read bilinearly, and smoothed
+// by a Gaussian this wide (mm): the dome follows the face's shape, not its
+// every bump.
+const FACE_STEP = 0.5
+const FACE_SMOOTHING = 6
 // Tessellation: rings from the edge to the pole, and columns of the inner
 // rings (the edge ring keeps the lid mesh's columns).
 const RINGS = 40
@@ -40,62 +55,6 @@ function cap(rho) {
 	return (Math.sqrt(1 - s * s * rho * rho) - c) / (1 - c)
 }
 
-// The membrane through the edge: heights `z` at angles `theta` (normalized
-// coordinates) extended inward as a harmonic function, a Fourier series in
-// the angle whose terms fade as ρⁿ, corrected to the exact heights at the edge
-// (the correction fades as ρ¹⁶).
-function edgeMembrane(theta, z, harmonics = 32) {
-	const order = theta.map((_, i) => i).sort((i, j) => theta[i] - theta[j])
-	const angles = order.map((i) => theta[i])
-	const heights = order.map((i) => z[i])
-	const n = angles.length
-	// The edge height at any angle, linear between the samples (cyclic).
-	const edge = (angle) => {
-		const t = angles[0] + ((((angle - angles[0]) % TAU) + TAU) % TAU)
-		let lo = 0
-		let hi = n
-		while (hi - lo > 1) {
-			const mid = (lo + hi) >> 1
-			if (angles[mid] <= t) lo = mid
-			else hi = mid
-		}
-		const a0 = angles[lo]
-		const a1 = lo + 1 < n ? angles[lo + 1] : angles[0] + TAU
-		const f = a1 > a0 ? (t - a0) / (a1 - a0) : 0
-		return heights[lo] + (heights[(lo + 1) % n] - heights[lo]) * f
-	}
-	const samples = 512
-	const cosines = new Float64Array(harmonics + 1)
-	const sines = new Float64Array(harmonics + 1)
-	for (let k = 0; k < samples; k++) {
-		const angle = (k / samples) * TAU
-		const height = edge(angle)
-		for (let m = 0; m <= harmonics; m++) {
-			cosines[m] += (2 / samples) * height * Math.cos(m * angle)
-			sines[m] += (2 / samples) * height * Math.sin(m * angle)
-		}
-	}
-	return (rho, angle) => {
-		const c1 = Math.cos(angle)
-		const s1 = Math.sin(angle)
-		let cm = 1
-		let sm = 0
-		let power = 1
-		let inside = cosines[0] / 2
-		let atEdge = inside
-		for (let m = 1; m <= harmonics; m++) {
-			const c = cm * c1 - sm * s1
-			sm = sm * c1 + cm * s1
-			cm = c
-			power *= rho
-			const term = cosines[m] * cm + sines[m] * sm
-			inside += power * term
-			atEdge += term
-		}
-		return inside + rho ** 16 * (edge(angle) - atEdge)
-	}
-}
-
 // Normalized radius and angle of (x, y) in the patch's ellipse.
 function polar(x, y) {
 	const u = x / LID_PATCH.width
@@ -103,62 +62,137 @@ function polar(x, y) {
 	return [Math.hypot(u, v), Math.atan2(v, u)]
 }
 
-// The shell's dome for the patch's edge `rim` (points in loop order), the eye,
-// the shell settings and the `parts` it encloses ({ positions, follow }: the
-// lid meshes' data; `follow` = (upper share, follow weight), or none). Returns
-// `depth`, how far (mm) the dome bulges behind the band, `point(rho, angle)`
-// on it and `heightAt(x, y)`.
-export function backShellSurface(rim, eye, shell, parts = []) {
+// The edge's height at any angle (normalized coordinates), linear between
+// the points of `rim` (cyclic).
+function edgeHeight(rim) {
 	const count = rim.length / 3
-	const theta = []
-	const z = []
+	const samples = []
 	for (let i = 0; i < count; i++) {
-		theta.push(polar(rim[i * 3], rim[i * 3 + 1])[1])
-		z.push(rim[i * 3 + 2])
+		samples.push([polar(rim[i * 3], rim[i * 3 + 1])[1], rim[i * 3 + 2]])
 	}
-	const membrane = edgeMembrane(theta, z)
-	// The depth that keeps each point `clearance` in front of the dome.
-	let depth = 0
-	const enclose = (x, y, pz, clearance, zone = 1) => {
-		const [rho, angle] = polar(x, y)
-		if (rho >= zone) return
-		const needed = (membrane(rho, angle) - shell.band - pz + clearance) / cap(rho)
-		if (needed > depth) depth = needed
-	}
-	// The globe's back, at any gaze.
-	const R = eye.scleraRadius
-	for (let r = 0; r < R; r += 0.5) {
-		for (let k = 0; k < 64; k++) {
-			const angle = (k / 64) * TAU
-			enclose(r * Math.cos(angle), r * Math.sin(angle), -Math.sqrt(R * R - r * r), shell.clearance)
+	samples.sort((a, b) => a[0] - b[0])
+	const first = samples[0][0]
+	return (angle) => {
+		const t = first + ((((angle - first) % TAU) + TAU) % TAU)
+		let lo = 0
+		let hi = count
+		while (hi - lo > 1) {
+			const mid = (lo + hi) >> 1
+			if (samples[mid][0] <= t) lo = mid
+			else hi = mid
 		}
+		const [a0, z0] = samples[lo]
+		const [a1, z1] = lo + 1 < count ? samples[lo + 1] : [first + TAU, samples[0][1]]
+		return z0 + ((z1 - z0) * (t - a0)) / (a1 - a0 || 1)
 	}
-	// The lid meshes, those vertices that follow the gaze also at either end
-	// of their travel (lid-follow.glsl). The lids' skin near the edge stands on
-	// the band.
-	const pitch = (FOLLOW_PITCH * Math.PI) / 180
-	for (const { positions, follow } of parts) {
-		for (let v = 0; v < positions.length / 3; v++) {
-			const [x, y, pz] = positions.subarray(v * 3, v * 3 + 3)
-			enclose(x, y, pz, shell.clearance, EDGE_ZONE)
-			const weight = follow ? follow[v * 2 + 1] : 0
-			if (weight === 0) continue
-			const share = follow[v * 2]
-			for (const sign of [-1, 1]) {
-				const angle = -sign * pitch * (0.35 + 0.55 * share) * weight
-				const c = Math.cos(angle)
-				const s = Math.sin(angle)
-				enclose(x, c * y - s * pz, s * y + c * pz, shell.clearance, EDGE_ZONE)
+}
+
+// The face over the patch, sampled on a grid, smoothed (a separable Gaussian)
+// and read bilinearly.
+function smoothedFace(face) {
+	const { width, height } = LID_PATCH
+	const columns = Math.ceil((2 * width) / FACE_STEP) + 3
+	const rows = Math.ceil((2 * height) / FACE_STEP) + 3
+	const x0 = -width - FACE_STEP
+	const y0 = -height - FACE_STEP
+	let grid = new Float64Array(columns * rows)
+	for (let j = 0; j < rows; j++) {
+		for (let i = 0; i < columns; i++)
+			grid[j * columns + i] = face(x0 + i * FACE_STEP, y0 + j * FACE_STEP)
+	}
+	const radius = Math.ceil((3 * FACE_SMOOTHING) / FACE_STEP)
+	const kernel = []
+	for (let k = -radius; k <= radius; k++) {
+		kernel.push(Math.exp(-0.5 * ((k * FACE_STEP) / FACE_SMOOTHING) ** 2))
+	}
+	const total = kernel.reduce((sum, w) => sum + w, 0)
+	// Clamped at the grid's border, which lies past the patch's edge.
+	const blur = (source, di, dj) => {
+		const out = new Float64Array(source.length)
+		for (let j = 0; j < rows; j++) {
+			for (let i = 0; i < columns; i++) {
+				let sum = 0
+				for (let k = -radius; k <= radius; k++) {
+					const ii = Math.min(Math.max(i + k * di, 0), columns - 1)
+					const jj = Math.min(Math.max(j + k * dj, 0), rows - 1)
+					sum += kernel[k + radius] * source[jj * columns + ii]
+				}
+				out[j * columns + i] = sum / total
 			}
 		}
+		return out
 	}
-	const point = (rho, angle) => [
-		rho * LID_PATCH.width * Math.cos(angle),
-		rho * LID_PATCH.height * Math.sin(angle),
-		membrane(rho, angle) - shell.band - depth * cap(rho),
-	]
+	grid = blur(blur(grid, 1, 0), 0, 1)
+	return (x, y) => {
+		const fx = Math.min(Math.max((x - x0) / FACE_STEP, 0), columns - 1.000001)
+		const fy = Math.min(Math.max((y - y0) / FACE_STEP, 0), rows - 1.000001)
+		const i = Math.floor(fx)
+		const j = Math.floor(fy)
+		const u = fx - i
+		const v = fy - j
+		const at = (di, dj) => grid[(j + dj) * columns + i + di]
+		return (at(0, 0) * (1 - u) + at(1, 0) * u) * (1 - v) + (at(0, 1) * (1 - u) + at(1, 1) * u) * v
+	}
+}
+
+// The shell's dome for the lid mesh's data `lid` ({ rim, face, positions,
+// follow }: the patch's edge, points in loop order, the face, and the mesh),
+// the eye and the shell settings. Returns `thickness`, the largest (mm)
+// behind the face past the band, `point(rho, angle)` on the dome and
+// `heightAt(x, y)`.
+export function backShellSurface(lid, eye, shell) {
+	const { width, height } = LID_PATCH
+	const edge = edgeHeight(lid.rim)
+	const face = smoothedFace(lid.face)
+	// The smoothed face, brought to the edge (the skin there is the face, but
+	// for its fine relief and the smoothing).
+	const base = (x, y, rho, angle) =>
+		face(x, y) + rho ** 6 * (edge(angle) - face(width * Math.cos(angle), height * Math.sin(angle)))
+	// The thickness that keeps each point `clearance` in front of the dome.
+	let thickness = 0
+	const enclose = (x, y, z, zone = 1) => {
+		const [rho, angle] = polar(x, y)
+		if (rho >= zone) return
+		const needed = (base(x, y, rho, angle) - shell.band - z + shell.clearance) / cap(rho)
+		if (needed > thickness) thickness = needed
+	}
+	// The globe in front of its cut, at any gaze (it turns about its center):
+	// its lowest is the disk of the cut, densest along its rim, where the dome
+	// comes nearest.
+	const R = eye.scleraRadius
+	const cut = GLOBE_CUT * R
+	const disk = Math.sqrt(R * R - cut * cut)
+	for (let r = 0; r <= disk; r = r < disk - 0.5 ? r + 0.5 : r === disk ? Infinity : disk) {
+		const count = r === disk ? 512 : 64
+		for (let k = 0; k < count; k++) {
+			const angle = (k / count) * TAU
+			enclose(r * Math.cos(angle), r * Math.sin(angle), cut)
+		}
+	}
+	// The lids, the vertices that follow the gaze also at either end of their
+	// travel (lid-follow.glsl). Their skin near the edge stands on the band.
+	const pitch = (FOLLOW_PITCH * Math.PI) / 180
+	const { positions, follow } = lid
+	for (let v = 0; v < positions.length / 3; v++) {
+		const [x, y, z] = positions.subarray(v * 3, v * 3 + 3)
+		enclose(x, y, z, EDGE_ZONE)
+		const weight = follow[v * 2 + 1]
+		if (weight === 0) continue
+		const share = follow[v * 2]
+		for (const sign of [-1, 1]) {
+			const angle = -sign * pitch * (0.35 + 0.55 * share) * weight
+			const c = Math.cos(angle)
+			const s = Math.sin(angle)
+			enclose(x, c * y - s * z, s * y + c * z, EDGE_ZONE)
+		}
+	}
+	const point = (rho, angle) => {
+		const x = rho * width * Math.cos(angle)
+		const y = rho * height * Math.sin(angle)
+		return [x, y, base(x, y, rho, angle) - shell.band - thickness * cap(rho)]
+	}
 	return {
-		depth,
+		thickness,
 		point,
 		// The dome's height under (x, y), inside the patch.
 		heightAt: (x, y) => {
@@ -166,6 +200,23 @@ export function backShellSurface(rim, eye, shell, parts = []) {
 			return point(Math.min(rho, 1), angle)[2]
 		},
 	}
+}
+
+// Brings a hidden part (the conjunctiva's or the palpebral conjunctiva's mesh
+// data, { positions, depth? }) inside the shell `surface`: every vertex at
+// least `clearance` in front of the dome. Only what lies under the lids moves:
+// the fornix past the globe's outline and the palpebral conjunctiva's deep
+// end. `depth` (into the sac) shrinks with the rise. In place; returns `part`.
+export function keepInside(part, surface, clearance) {
+	const { positions, depth } = part
+	for (let v = 0; v < positions.length / 3; v++) {
+		const floor = surface.heightAt(positions[v * 3], positions[v * 3 + 1]) + clearance
+		const rise = floor - positions[v * 3 + 2]
+		if (rise <= 0) continue
+		positions[v * 3 + 2] = floor
+		if (depth) depth[v] = Math.max(0, depth[v] - rise)
+	}
+	return part
 }
 
 // Inward unit normal of the patch's ellipse at (x, y) on it.
@@ -177,9 +228,8 @@ function inward(x, y) {
 	return [nx / length, ny / length]
 }
 
-// Mesh data of the back shell: the band from the patch's edge `rim` (the lid
-// mesh's `rim`) and the dome around `parts` (backShellSurface()), front faces
-// outward. Attributes as the lid mesh's (src/adnexa/lidGeometry.js), for the
+// Mesh data of the back shell: the band from the patch's edge (the lid mesh's
+// `rim`) and the dome `surface` (backShellSurface()), front faces outward. Attributes as the lid mesh's (src/adnexa/lidGeometry.js), for the
 // skin program: `lid` = (0, 1, SHELL_MARGIN_DISTANCE, 0), `relief` = (the
 // outward direction in the front plane, no grooves, mid-margin), `follow` = 0
 // (it stays put), `ao` = 1; and `coords`, the skin's pattern coordinates
@@ -187,8 +237,8 @@ function inward(x, y) {
 // arc length along its meridians, so the pattern is not stretched where they
 // turn away from the front, continuous from the patch's edge over the band and
 // onto the dome.
-export function createBackShell(rim, eye, shell, parts = []) {
-	const surface = backShellSurface(rim, eye, shell, parts)
+export function createBackShell(lid, surface, shell) {
+	const { rim } = lid
 	const count = rim.length / 3
 	// The edge's columns by angle, counter-clockwise seen from the front.
 	const edge = []
@@ -282,17 +332,17 @@ export function createBackShell(rim, eye, shell, parts = []) {
 	const last = rings[RINGS - 1]
 	for (let j = 0; j < COLUMNS; j++) dome(last[j], last[(j + 1) % COLUMNS], pole)
 
-	const lid = new Float32Array(vertices * 4)
-	for (let i = 0; i < vertices; i++) lid.set([0, 1, SHELL_MARGIN_DISTANCE, 0], i * 4)
+	const profile = new Float32Array(vertices * 4)
+	for (let i = 0; i < vertices; i++) profile.set([0, 1, SHELL_MARGIN_DISTANCE, 0], i * 4)
 	return {
 		positions,
 		coords,
-		lid,
+		lid: profile,
 		relief,
 		follow: new Float32Array(vertices * 2),
 		ao: new Float32Array(vertices).fill(1),
 		indices: new Uint32Array(triangles),
-		depth: surface.depth,
+		thickness: surface.thickness,
 		heightAt: surface.heightAt,
 	}
 }

@@ -10,6 +10,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
      - Group 0, the cornea and limbus cap, uses `eyeball-cap-fragment.glsl`: tear-film reflection, two-surface refraction, the iris trace and shading, the limbus and the limbal ring.
      - Group 1, the sclera beyond the cap, uses `eyeball-sclera-fragment.glsl`: the exact sphere point, then a wet, broken-up reflection over the vessel-mapped diffuse white.
    - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi and the palpebral conjunctiva that closes the sac behind them. Its pigment patterns come from a texture baked with the lid mesh ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)).
+   - **Back shell**: the skin program compiled with `SKIN_SHELL`, closing the skin patch behind ([`docs/ADNEXA.md`](ADNEXA.md#back-shell)). It draws after the lids (a later material), so from the front the depth test skips it; it is not on the shadow layer.
    - **Lashes**: tubes with the lash program.
    - **Tear meniscus and bubbles**: the water program; the bubbles are an `InstancedMesh`.
 3. **Accumulation** ([`src/render/accumulationPass.js`](../src/render/accumulationPass.js)):
@@ -27,7 +28,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
 
 The canvas has no depth, alpha or MSAA: everything reaches it through the composer.
 
-**Backdrop**: past the skin's outer edge the scene shows the clear color, set every frame by `EyeApp`: the tone of the lit skin (its albedo raised to 1.3, as saturated as the subsurface shading makes it, times the rig's luminance), `skin.backdrop` as bright, so it blends with the skin a little darker. **Photo mode** is the same pipeline with the eye frozen: samples accumulate until `quality.photoSamples`, then rendering stops.
+**Backdrop**: past the skin and the back shell the scene shows the clear color, set every frame by `EyeApp`: the tone of the lit skin (its albedo raised to 1.3, as saturated as the subsurface shading makes it, times the rig's luminance), `skin.backdrop` as bright, so it blends with the skin a little darker. **Photo mode** is the same pipeline with the eye frozen: samples accumulate until `quality.photoSamples`, then rendering stops.
 
 ## Alpha Contract
 
@@ -100,6 +101,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uCanthi`, `uMarginLength`, `uDefocus` | The medial and lateral canthi in the front plane at rest; the upper and lower margin lengths; the camera's aperture diameter and focus distance, which widen the footprint of the skin's fine relief by the blur circle ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). |
 | `uOcclusion` | How strongly the skin applies its baked ambient occlusion (the `ao` attribute, [`docs/ADNEXA.md`](ADNEXA.md#baked-occlusion)). |
 | `uSkinPattern`, `uSkinPatternBox` | The baked pigment patterns and the front-plane box they cover ([`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js)). |
+| `uShellTone` | The back shell's albedo, a share of the skin's (`shell.tone`); its program shares the skin's other uniforms. |
 | `uLashColor`, `uLashShine` | Lash fiber color and cuticle shine. |
 | `uTearTint` | What the water shows of what lies behind. |
 
@@ -107,6 +109,7 @@ Defines:
 - `MAX_EMITTERS` and `EMITTER_VEC4S` (from `envRig.js`);
 - `IRIS_ATLAS_HEIGHT` and `IRIS_LUT_MELANIN`, `IRIS_LUT_EUMELANIN`, `IRIS_LUT_STROMA`;
 - `PIGMENT_PASS` (atlas bake);
+- `SKIN_SHELL`: the back shell's variant of the skin program (its own pattern coordinates, no margin, freckles or veins);
 - `DEBUG_VIEW`, from `params.debug.view` and numbered in `src/debug/debugViews.js` and `debug-views.glsl`.
 
 ## Shader Files

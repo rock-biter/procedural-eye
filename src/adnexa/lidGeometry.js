@@ -514,7 +514,8 @@ export function lidPoint(t, s, fissure, eye, lids) {
 // Attributes `lid` = (t, s, a, upper share), `relief` = (row direction x, y,
 // groove depth (mm, ≤ 0), share of the way along the margin from the medial
 // canthus) and `follow` = (upper share, follow weight). `rim`: the outer row,
-// the patch's edge, column by column.
+// the patch's edge, column by column; `face`: the face the lids turn into
+// (lidFace()), height at (x, y).
 export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across = 150 } = {}) {
 	const fissure = createFissure(lids, nasalSign)
 	const context = lidContext(lids, eye, fissure)
@@ -553,7 +554,7 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across =
 			k += 6
 		}
 	}
-	return { positions, lid, relief, follow, indices, fissure, rim }
+	return { positions, lid, relief, follow, indices, fissure, rim, face: context.face }
 }
 
 // How far out (mm) the conjunctiva mesh reaches in the direction whose X is

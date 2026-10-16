@@ -1,6 +1,6 @@
 # Adnexa and Sclera
 
-The eyelids, their skin and lashes, the visible tear film and the scleral vessels. They live in world space, except the vessels, which are drawn on the eyeball in eye space. They do not turn with the gaze, but the lids follow its vertical component ([`docs/ANIMATION.md`](ANIMATION.md#lid-follow)). Every generator is pure and seeded; the data behind the defaults is in [`docs/RESEARCH.md`](RESEARCH.md).
+The eyelids, their skin and lashes, the visible tear film, the back shell that closes the skin patch behind, and the scleral vessels. They live in world space, except the vessels, which are drawn on the eyeball in eye space. They do not turn with the gaze, but the lids follow its vertical component ([`docs/ANIMATION.md`](ANIMATION.md#lid-follow)). Every generator is pure and seeded; the data behind the defaults is in [`docs/RESEARCH.md`](RESEARCH.md).
 
 ## Fissure
 
@@ -38,7 +38,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 - **Columns**:
   - They are laid out on the open fissure, spaced by their length along the loop plus 3 mm per radian of turning, so the corners get enough columns.
   - The canthi are rounded as the columns go round them, by a cubic Bézier tangent to both margins: the medial angle into a U around the caruncle (1 mm radius), the lateral one into an acute corner (0.5 mm).
-- **Rows**: each column is traced outward in the front plane to the edge of the patch, an ellipse about 65 × 68 mm centered on the pupil.
+- **Rows**: each column is traced outward in the front plane to the edge of the patch, an ellipse about 65 × 68 mm centered on the pupil (`LID_PATCH`). The outer row is returned as `rim`, the patch's edge, where the [back shell](#back-shell) starts.
   - Near the margin a row follows the margin's normal; far out it follows a ray from the fissure's center, so rows never cross.
   - The trace ends exactly at the patch's edge, so neighboring rows stay even.
   - `a` is the distance traveled, in mm.
@@ -125,6 +125,23 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
   - a mirror reflection of the rig where it is wet: the margin, fading out within half a millimeter onto the skin (`skin.wetness`). Further out the moisture follows the relief and reflects as the GGX lobe; a mirror there showed the emitters as pale blots in the canthi's folds, where the skin turns grazing;
   - ambient and specular occlusion in the folds and grooves, and the baked occlusion (`ao`, scaled by `skin.occlusion`);
   - the key-light shadow.
+
+## Back Shell
+
+`createBackShell()` ([`src/adnexa/backShell.js`](../src/adnexa/backShell.js)) closes the skin patch behind. Seen from the side or from below, the posterior structures (the globe past the lids, the conjunctiva and the palpebral conjunctiva, which reach up to about 28 mm behind the corneal apex) would show behind the face; the shell hides them. Nothing is removed: from the front the image is unchanged.
+
+- **Band**: from the patch's edge (the lid mesh's `rim`), a flat band runs straight back `shell.band` mm (2 by default), the cut edge of the patch.
+- **Dome**: from the band's back edge, a spherical cap (50° half-angle) bulges behind the edge's membrane, the smoothest surface through the edge: harmonic in the ellipse's normalized coordinates (a Fourier series in the angle damped by ρⁿ, exact at the edge). It leaves the band at an angle, so the band keeps an edge on both sides.
+- **Depth**: the dome is as deep as it must be for everything inside to stand `shell.clearance` (1.5 mm) in front of it:
+  - the whole back of the globe: its mesh reaches 125° from the axis and turns with the gaze;
+  - the lid mesh (except near the edge, where the skin stands on the band), the conjunctiva and the palpebral conjunctiva, the vertices that follow the gaze also turned to either end of their travel (60° of pitch, the camera's elevation limit for an eye that looks at it).
+
+  By default it bulges about 24 mm behind the band, held back by the globe and by the conjunctiva beside the caruncle, and its deepest point lies about 28 mm behind the apex. A deeper face (a prominent nose raises the edge on the nasal side) makes it deeper.
+- **Mesh**: the band and the dome's edge ring keep the lid mesh's columns; the inner rings have 128 columns over 40 rings, zipped to the edge ring by angle. The band's edges have their own vertices, so they stay sharp. It is rebuilt (about 70 ms) when the lids, the eye or `shell.clearance` and `shell.band` change, after the lid mesh. It stays put (no lid follow) and casts no key-light shadow: it lies behind the skin the light falls on.
+- **Shading**: the skin program compiled with `SKIN_SHELL`.
+  - Its pattern coordinates (`coords`) are the band and the dome unrolled into the front plane, the dome by arc length along its meridians, so the patterns do not stretch where it turns away. They run on from the patch's edge over the band onto the dome and stay inside the patch, where the patterns are baked.
+  - It is skin far from the lids (`lid` a = 60 mm): the baked mottling, the furrows, the fine network and the pores. Its tension lines wander over about a centimeter: along the edge they streaked where the shell turns away, and furrows all as shallow crossed into a regular lattice. The relief's gradient is carried onto the surface by the gradients of the coordinates themselves, because the band stands edge-on to the front plane.
+  - No freckles, veins, canthi or margin; the albedo is `shell.tone` (0.6) of the skin's, so it is darker.
 
 ## Lashes
 

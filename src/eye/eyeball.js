@@ -6,6 +6,7 @@ import { apertureRadius } from '../camera/cameraOptics'
 import { debugViewDefine } from '../debug/debugViews'
 import { IRIS_ATLAS_SIZE } from '../iris/irisAtlas'
 import { IRIS_COLOR_LUT } from '../iris/irisColor'
+import { GLOBE_CUT } from '../adnexa/backShell'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import capFragmentShader from '../shaders/eyeball-cap-fragment.glsl'
 import scleraFragmentShader from '../shaders/eyeball-sclera-fragment.glsl'
@@ -50,6 +51,7 @@ export default class Eyeball {
 			uEyeToWorld: new Uniform(new Matrix4()),
 			uFissureMap: new Uniform(fissure.texture),
 			uSclera: new Uniform(new Vector4()),
+			uGlobeCut: new Uniform(0),
 			uLidReflection: new Uniform(new Vector4()),
 			uLidRadiance: new Uniform(new Vector3()),
 			uLashRadiance: new Uniform(new Vector3()),
@@ -141,6 +143,9 @@ export default class Eyeball {
 		)
 		u.uLimbusOverlap.value = limbus.verticalOverlap
 		u.uScleraColor.value.set(params.sclera.color)
+		// Behind this world plane the globe is cut: the back shell closes in
+		// front of what lies further back (src/adnexa/backShell.js).
+		u.uGlobeCut.value = GLOBE_CUT * eye.scleraRadius
 		u.uSclera.value.set(
 			params.sclera.redness,
 			params.sclera.yellowing,

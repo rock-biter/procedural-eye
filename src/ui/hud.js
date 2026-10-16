@@ -1,13 +1,14 @@
 // The HUD around the eye: a dashed circle centered on the page with every
 // button on it, round glass of one size (src/ui/hudLayout.js places them).
-// The skin tones in the bottom-left quadrant; in the bottom-right one zoom
-// in, the zoom level and zoom out, then Random eye below them. The zoom level
-// is a gauge and a slider: drag it toward + or −, or use the wheel or the
-// arrow keys over it; a click pulses it. The circle's line stops short of
-// each button, and only the buttons take the pointer, so drags across the
-// rest still orbit the camera.
-import { HUD, hudAngles, hudRadius } from './hudLayout'
-import { liquidGlass } from './liquidGlass'
+// The skin tones in the bottom-left quadrant; at the right zoom in and zoom
+// out, with the zoom knob between them, then Random eye below. The knob is a
+// slider along the circle, from zoom out to zoom in, over them: it shows
+// the zoom level, and dragging it along the arc, the wheel or the arrow keys
+// over it zoom; a click pulses it. The circle's line stops short of each
+// button and of the knob, and only they take the pointer, so drags across
+// the rest still orbit the camera.
+import { HUD, hudLayout, knobAngle, knobSnap, trackLevel } from './hudLayout'
+import { GLASS, liquidGlass } from './liquidGlass'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -20,12 +21,8 @@ const ICONS = {
 const icon = (name) =>
 	`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`
 
-// The level's gauge: a 270° arc open at the bottom, filled clockwise from
-// its lower left end (pathLength 100: the arc is GAUGE long), with a knob at
-// the end of the fill.
-const GAUGE = 75
-const GAUGE_RADIUS = 12
-const GAUGE_ARC = `cx="22" cy="22" r="${GAUGE_RADIUS}" pathLength="100" transform="rotate(135 22 22)"`
+// The knob's glass: a bevel and a bend scaled to its size.
+const KNOB_GLASS = { ...GLASS, bezel: 6, maxOffset: 4 }
 
 // The level's steps for the arrow keys and Page Up / Page Down, and per
 // wheel unit.
@@ -34,8 +31,13 @@ const PAGE_STEPS = { PageUp: 0.25, PageDown: -0.25 }
 const LEVEL_PER_WHEEL_UNIT = 0.0012
 // A press that moves less than this (px) is a click.
 const CLICK_SLOP = 4
+// How long (s) the camera glides when a dragged knob snaps to an end.
+const SNAP_GLIDE = 0.25
 
 const clamp01 = (value) => Math.min(Math.max(value, 0), 1)
+// An angle within π of `center`.
+const near = (angle, center) =>
+	center + ((((angle - center + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI
 
 function svgElement(name, attributes = {}) {
 	const element = document.createElementNS(SVG_NS, name)
@@ -67,14 +69,27 @@ function group(label) {
 	return element
 }
 
-// `tones`: [{ name, label, color }]; onTone(name), onZoom('in' | 'out'),
-// onZoomLevel(level in [0, 1]) and onRandom() run the buttons. Returns the
-// element, pressTone(color), which presses the tone of `color` (none for
-// another color), and showZoomLevel(level), which the gauge shows.
+// Centers `element` and its cut in the circle's line at `angle` on a circle.
+function place(element, cut, angle, { cx, cy, radius }) {
+	const x = cx + radius * Math.cos(angle)
+	const y = cy + radius * Math.sin(angle)
+	element.style.left = `${x}px`
+	element.style.top = `${y}px`
+	cut.setAttribute('cx', x)
+	cut.setAttribute('cy', y)
+}
+
+// `tones`: [{ name, label, color }]; onTone(name), onZoom('in' | 'out',
+// duration), onZoomLevel(level in [0, 1]) and onRandom() run the controls
+// (onZoom without a duration glides over the zoom's own). Returns the
+// element, mount() (once it is in the page), pressTone(color), which presses
+// the tone of `color` (none for another color), and showZoomLevel(level),
+// where the knob goes.
 export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	const element = document.createElement('div')
 	element.className = 'hud'
 	element.style.setProperty('--hud-button', `${HUD.button}px`)
+	element.style.setProperty('--hud-knob', `${HUD.knob}px`)
 	element.style.setProperty('--tone-scale', HUD.toneScale)
 
 	// The circle, cut around each button by a mask.
@@ -83,6 +98,11 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
 	ring.append(mask, line)
+	const cut = () => {
+		const circle = svgElement('circle', { class: 'hud-cut' })
+		mask.append(circle)
+		return circle
+	}
 
 	const toneGroup = group('Skin tone')
 	const toneButtons = tones.map((tone) => {
@@ -97,73 +117,58 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 	const zoomGroup = group('Zoom')
 	const zoomIn = glassButton('zoom-in', 'Zoom in', icon('plus'), () => onZoom('in'))
 	const zoomOut = glassButton('zoom-out', 'Zoom out', icon('minus'), () => onZoom('out'))
-	const level = zoomSlider(onZoomLevel)
-	zoomGroup.append(zoomIn, level.element, zoomOut)
+	const knob = zoomKnob({
+		onZoomLevel,
+		onSnap: (end) => onZoom(end === 1 ? 'in' : 'out', SNAP_GLIDE),
+		cut: cut(),
+	})
+	zoomGroup.append(zoomIn, knob.element, zoomOut)
 
 	const random = glassButton('random-eye', 'Random eye', icon('shuffle'), onRandom)
 
 	element.append(ring, toneGroup, zoomGroup, random)
 
-	// Each button with its angle on the circle and its scale; the mask holds
-	// a cut for each.
+	// Each button with its angle on the circle and its cut in the line.
 	const items = [
 		...toneButtons.map((button, i) => ({ button, angle: (angles) => angles.tones[i] })),
 		{ button: zoomIn, angle: (angles) => angles.zoomIn },
-		{ button: level.element, angle: (angles) => angles.zoomLevel },
 		{ button: zoomOut, angle: (angles) => angles.zoomOut },
 		{ button: random, angle: (angles) => angles.random },
 	]
-	for (const item of items) {
-		item.cut = svgElement('circle', { class: 'hud-cut' })
-		mask.append(item.cut)
-	}
-	const scaleOf = (button) =>
-		button.classList.contains('skin') && button.getAttribute('aria-pressed') !== 'true'
-			? HUD.toneScale
-			: 1
+	for (const item of items) item.cut = cut()
 	const cutRadius = (item) => {
-		item.cut.style.r = `${(HUD.button / 2) * scaleOf(item.button) + HUD.gap}px`
+		const pressed = item.button.getAttribute('aria-pressed') === 'true'
+		const scale = item.button.classList.contains('skin') && !pressed ? HUD.toneScale : 1
+		item.cut.style.r = `${(HUD.button / 2) * scale + HUD.gap}px`
 	}
 
 	const layout = () => {
 		const { clientWidth: width, clientHeight: height } = element
-		const radius = hudRadius(width, height)
-		if (radius <= 0) return
-		const angles = hudAngles(radius, tones.length)
-		const [cx, cy] = [width / 2, height / 2]
-		line.setAttribute('cx', cx)
-		line.setAttribute('cy', cy)
+		const fit = hudLayout(width, height, tones.length)
+		if (!fit) return
+		const { radius, angles } = fit
+		const circle = { cx: width / 2, cy: height / 2, radius }
+		line.setAttribute('cx', circle.cx)
+		line.setAttribute('cy', circle.cy)
 		line.setAttribute('r', radius)
 		// A whole number of dash periods around the circle, so it has no seam.
 		const circumference = 2 * Math.PI * radius
 		const period = circumference / Math.max(1, Math.round(circumference / HUD.dashPeriod))
 		line.setAttribute('stroke-dasharray', `${HUD.dash} ${period - HUD.dash}`)
-		const places = new Map()
 		for (const item of items) {
-			const angle = item.angle(angles)
-			const x = cx + radius * Math.cos(angle)
-			const y = cy + radius * Math.sin(angle)
-			places.set(item.button, { x, y })
-			item.button.style.left = `${x}px`
-			item.button.style.top = `${y}px`
-			item.cut.setAttribute('cx', x)
-			item.cut.setAttribute('cy', y)
+			place(item.button, item.cut, item.angle(angles), circle)
 			cutRadius(item)
 		}
-		// The slider's axis points from zoom out to zoom in.
-		const from = places.get(zoomOut)
-		const to = places.get(zoomIn)
-		const length = Math.hypot(to.x - from.x, to.y - from.y)
-		level.axis = { x: (to.x - from.x) / length, y: (to.y - from.y) / length }
+		knob.setTrack({ ...circle, track: angles.track })
 	}
 	new ResizeObserver(layout).observe(element)
 
 	return {
 		element,
-		// Call once the element is in the page.
 		mount() {
 			layout()
 			liquidGlass(items.map((item) => item.button))
+			liquidGlass([knob.element], KNOB_GLASS)
 		},
 		pressTone(color) {
 			toneButtons.forEach((button, i) =>
@@ -171,12 +176,14 @@ export function createHud({ tones, onTone, onZoom, onZoomLevel, onRandom }) {
 			)
 			for (const item of items) cutRadius(item)
 		},
-		showZoomLevel: (value) => level.show(value),
+		showZoomLevel: (level) => knob.show(level),
 	}
 }
 
-// The zoom level: a glass gauge that is also a slider along the circle.
-function zoomSlider(onZoomLevel) {
+// The zoom knob: a small empty glass button that slides along the circle
+// from zoom out (level 0) to zoom in (level 1), over the two buttons, so the
+// pointer always reaches it.
+function zoomKnob({ onZoomLevel, onSnap, cut }) {
 	const element = document.createElement('div')
 	element.className = 'glass hud-button zoom-level'
 	element.tabIndex = 0
@@ -185,28 +192,28 @@ function zoomSlider(onZoomLevel) {
 	element.setAttribute('aria-label', 'Zoom level')
 	element.setAttribute('aria-valuemin', '0')
 	element.setAttribute('aria-valuemax', '100')
-	element.innerHTML = `<svg viewBox="0 0 44 44" aria-hidden="true"><circle class="zoom-track" ${GAUGE_ARC} stroke-dasharray="${GAUGE} 100"/><circle class="zoom-value" ${GAUGE_ARC}/><circle class="zoom-knob" r="2.75"/></svg>`
-	const value = element.querySelector('.zoom-value')
-	const knob = element.querySelector('.zoom-knob')
+	cut.style.r = `${HUD.knob / 2 + HUD.gap}px`
 
-	const slider = {
-		element,
-		// The unit vector of the drag that zooms in (set by the layout).
-		axis: { x: 0, y: -1 },
-		level: null,
-		show(level) {
-			if (slider.level !== null && Math.abs(level - slider.level) < 1e-4) return
-			slider.level = level
-			value.setAttribute('stroke-dasharray', `${GAUGE * level} 100`)
-			const angle = ((135 + (GAUGE / 100) * 360 * level) * Math.PI) / 180
-			knob.setAttribute('cx', 22 + GAUGE_RADIUS * Math.cos(angle))
-			knob.setAttribute('cy', 22 + GAUGE_RADIUS * Math.sin(angle))
-			element.setAttribute('aria-valuenow', String(Math.round(level * 100)))
-		},
+	// The circle and the track on it (set by the layout), and the level shown.
+	let circle = null
+	let shown = null
+	const update = () => {
+		if (circle && shown !== null) place(element, cut, knobAngle(shown, circle.track), circle)
 	}
 	const set = (level) => onZoomLevel(clamp01(level))
+	// The end the knob sits at, 1 (zoom in) or 0 (zoom out), or null.
+	const atEnd = () => (shown === null ? null : shown >= 0.999 ? 1 : shown <= 0.001 ? 0 : null)
 
-	// A click: the glass swells and a ring spreads from it.
+	// The pointer's angle about the circle's center, near the track.
+	const pointerAngle = (event) => {
+		const box = element.parentElement.getBoundingClientRect()
+		const dx = event.clientX - box.left - circle.cx
+		const dy = event.clientY - box.top - circle.cy
+		const [zoomIn, zoomOut] = circle.track
+		return near(Math.atan2(dy, dx), (zoomIn + zoomOut) / 2)
+	}
+
+	// A click: the glass bounces and a ring spreads from it.
 	const pulse = () => {
 		element.classList.remove('pulse')
 		void element.offsetWidth
@@ -216,21 +223,27 @@ function zoomSlider(onZoomLevel) {
 		if (event.target === element) element.classList.remove('pulse')
 	})
 
+	// A drag keeps the knob where it was grabbed, under the pointer; within
+	// HUD.zoom.snap px of an end it snaps there, the camera gliding.
 	let drag = null
 	element.addEventListener('pointerdown', (event) => {
+		if (!circle) return
 		element.setPointerCapture(event.pointerId)
 		const { pointerId: id, clientX: x, clientY: y } = event
-		drag = { id, x, y, level: slider.level ?? 0, moved: false }
-		element.classList.add('dragging')
+		const offset = pointerAngle(event) - knobAngle(shown ?? 0, circle.track)
+		drag = { id, x, y, offset, moved: false, snapped: atEnd() }
 	})
 	element.addEventListener('pointermove', (event) => {
 		if (drag?.id !== event.pointerId) return
-		const dx = event.clientX - drag.x
-		const dy = event.clientY - drag.y
-		if (!drag.moved && Math.hypot(dx, dy) < CLICK_SLOP) return
+		const distance = Math.hypot(event.clientX - drag.x, event.clientY - drag.y)
+		if (!drag.moved && distance < CLICK_SLOP) return
 		drag.moved = true
-		const along = dx * slider.axis.x + dy * slider.axis.y
-		set(drag.level + along / HUD.zoomTravel)
+		element.classList.add('dragging')
+		const angle = pointerAngle(event) - drag.offset
+		const end = knobSnap(angle, circle.track, circle.radius)
+		if (end === null) set(trackLevel(angle, circle.track))
+		else if (end !== drag.snapped) onSnap(end)
+		drag.snapped = end
 	})
 	const release = (event, click) => {
 		if (drag?.id !== event.pointerId) return
@@ -245,17 +258,31 @@ function zoomSlider(onZoomLevel) {
 		'wheel',
 		(event) => {
 			event.preventDefault()
-			set((slider.level ?? 0) - event.deltaY * LEVEL_PER_WHEEL_UNIT)
+			set((shown ?? 0) - event.deltaY * LEVEL_PER_WHEEL_UNIT)
 		},
 		{ passive: false },
 	)
 	element.addEventListener('keydown', (event) => {
 		const step = KEY_STEPS[event.key] ?? PAGE_STEPS[event.key]
-		const to =
-			event.key === 'Home' ? 0 : event.key === 'End' ? 1 : step && (slider.level ?? 0) + step
+		const to = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : step && (shown ?? 0) + step
 		if (to === undefined) return
 		event.preventDefault()
 		set(to)
 	})
-	return slider
+
+	return {
+		element,
+		setTrack(value) {
+			circle = value
+			update()
+		},
+		show(level) {
+			if (shown !== null && Math.abs(level - shown) < 1e-4) return
+			shown = level
+			element.setAttribute('aria-valuenow', String(Math.round(level * 100)))
+			// At either end, over + or −, its glass lightens.
+			element.classList.toggle('at-end', atEnd() !== null)
+			update()
+		},
+	}
 }

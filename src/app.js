@@ -71,10 +71,9 @@ export default class EyeApp {
 			if (event.code === 'Space' && event.target === document.body) this.toggleFrozen()
 		})
 		this.irisSpace = null
-		// The lids and eye the lid mesh and the fissure map were built for, and
-		// those and the shell settings the back shell was.
+		// The lids, the back shell's shape and the eye the lid mesh, the back
+		// shell and the fissure map were built for.
 		this.lidKey = null
-		this.backKey = null
 		this.dirty = new Set(['rebuild', 'bake', 'define'])
 		this.listeners = new Set()
 		this.lastTime = null
@@ -210,9 +209,11 @@ export default class EyeApp {
 		// The camera aims at the apparent pupil plane (entrance pupil).
 		this.focusDepth = entrancePupil(this.eye).depth
 		this.eyeball.rebuild(this.eye)
-		// The lid mesh and the fissure map take about half a second: they are
-		// rebuilt only when the lids or the eye change, not for a new lash seed.
-		const lidKey = JSON.stringify([this.params.lids, this.eye])
+		// The lid mesh, the back shell and the fissure map take about half a
+		// second: they are rebuilt only when the lids, the shell's shape or the eye
+		// change, not for a new lash seed.
+		const { clearance, band } = this.params.shell
+		const lidKey = JSON.stringify([this.params.lids, clearance, band, this.eye])
 		if (lidKey !== this.lidKey) {
 			this.lidKey = lidKey
 			this.lids.rebuild(this.params, this.eye, this.setup.renderer)
@@ -220,12 +221,6 @@ export default class EyeApp {
 			const data = this.fissureMap.image.data
 			for (let i = 0; i < distances.length; i++) data[i] = DataUtils.toHalfFloat(distances[i])
 			this.fissureMap.needsUpdate = true
-		}
-		const { clearance, band } = this.params.shell
-		const backKey = JSON.stringify([lidKey, clearance, band])
-		if (backKey !== this.backKey) {
-			this.backKey = backKey
-			this.lids.rebuildBack(this.params, this.eye)
 		}
 		this.lashes.rebuild(this.params, this.eye)
 		this.tearFilm.rebuild(this.params, this.eye)

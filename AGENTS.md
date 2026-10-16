@@ -53,7 +53,7 @@ pnpm brand
 - [`src/params/`](src/params/): the parameter schema, its default values (`defaults.json`), the params helpers, the presets and the population priors of the random eye.
 - [`src/eye/`](src/eye/): the eye geometry and optics twins, the eyeball mesh and materials, and the eye rig (gaze transform).
 - [`src/iris/`](src/iris/): rest space, seeded features and the spectral color model, plus the GPU atlas bake and the color lookup texture.
-- [`src/adnexa/`](src/adnexa/): the fissure, the surfaces around the eye (support, conjunctiva, face), lid geometry, the lash generator and the fissure map, plus the lid, lash and tear-film meshes.
+- [`src/adnexa/`](src/adnexa/): the fissure, the surfaces around the eye (support, conjunctiva, face), lid geometry, the back shell closing the skin patch, the lash generator and the fissure map, plus the lid, lash and tear-film meshes.
 - [`src/sclera/`](src/sclera/): the vessel generator and the polar vessel map.
 - [`src/animation/`](src/animation/): pupil dynamics, eye movements and the animator.
 - [`src/lighting/`](src/lighting/): the analytic light rig, color temperature, the rig uniforms and the key-light shadow map.

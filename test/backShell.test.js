@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createBackShell } from '../src/adnexa/backShell'
+import { backShellSurface, createBackShell, GLOBE_CUT, keepInside } from '../src/adnexa/backShell'
 import {
 	createConjunctivaMesh,
 	createLidMesh,
@@ -20,13 +20,29 @@ const eyeOf = (side) =>
 // Coarser lid meshes than the app's: the tests only need their extent.
 const SIZE = { around: 160, across: 60 }
 
+// As src/adnexa/lids.js builds them: the lids, the shell, and the conjunctiva
+// and the palpebral conjunctiva kept inside it (`raw`: as they were).
 function build(lids = params.lids, side = 1, shell = params.shell) {
 	const eye = eyeOf(side)
 	const lid = createLidMesh(lids, eye, side, SIZE)
-	const fornix = createConjunctivaMesh(lids, eye, side)
-	const curtain = createPalpebralMesh(lids, eye, side, { around: SIZE.around })
-	const parts = [lid, fornix, curtain]
-	return { eye, lid, parts, back: createBackShell(lid.rim, eye, shell, parts) }
+	const surface = backShellSurface(lid, eye, shell)
+	const raw = [
+		createConjunctivaMesh(lids, eye, side),
+		createPalpebralMesh(lids, eye, side, { around: SIZE.around }),
+	]
+	const copy = (part) => ({
+		...part,
+		positions: part.positions.slice(),
+		depth: part.depth?.slice(),
+	})
+	const [fornix, curtain] = raw.map((part) => keepInside(copy(part), surface, shell.clearance))
+	return {
+		eye,
+		lid,
+		raw,
+		parts: [lid, fornix, curtain],
+		back: createBackShell(lid, surface, shell),
+	}
 }
 
 const point = (positions, v) => [positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]]
@@ -113,7 +129,7 @@ test('front faces out: the band away from the patch, the dome backward', () => {
 	assert.equal(band, (2 * lid.rim.length) / 3)
 })
 
-test('the shell passes the clearance behind the globe and the lids, at any gaze', () => {
+test('the shell passes the clearance behind the globe and the lids, the hidden parts inside it', () => {
 	const shapes = [
 		[params.lids, 1],
 		[params.lids, -1],
@@ -129,29 +145,33 @@ test('the shell passes the clearance behind the globe and the lids, at any gaze'
 			const margin = z - back.heightAt(x, y)
 			assert.ok(margin > shell.clearance - 0.05, `${label} ${margin} at ${x}, ${y}, ${z}`)
 		}
-		// The globe's whole back: it turns with the gaze.
+		// The globe in front of its cut: it turns with the gaze, about its center.
 		const R = eye.scleraRadius
 		for (let r = 0; r < R; r += 0.25) {
 			for (let k = 0; k < 48; k++) {
 				const angle = (k / 48) * Math.PI * 2
-				behind(r * Math.cos(angle), r * Math.sin(angle), -Math.sqrt(R * R - r * r), 'globe')
+				const z = Math.max(GLOBE_CUT * R, -Math.sqrt(R * R - r * r))
+				behind(r * Math.cos(angle), r * Math.sin(angle), z, 'globe')
 			}
 		}
-		// The lids, the conjunctiva and the curtain, those that follow the gaze
-		// also turned with it (lid-follow.glsl) up to 30° of pitch.
-		for (const { positions, follow } of parts) {
+		// The lids, the conjunctiva and the curtain; the lids and the curtain
+		// follow the gaze (lid-follow.glsl), the lids keep the clearance up to 35°
+		// of pitch, the curtain's deep end stays inside.
+		for (const [index, { positions, follow }] of parts.entries()) {
 			for (let v = 0; v < positions.length / 3; v++) {
 				const [x, y, z] = point(positions, v)
 				if (Math.hypot(x / LID_PATCH.width, y / LID_PATCH.height) > 0.95) continue
-				behind(x, y, z, 'lid')
+				behind(x, y, z, `part ${index}`)
 				const weight = follow[v * 2 + 1]
 				if (weight === 0) continue
-				for (const pitch of [-30, 30]) {
+				for (const pitch of [-35, -20, 20, 35]) {
 					const turn = (pitch * Math.PI) / 180
 					const angle = -turn * (0.35 + 0.55 * follow[v * 2]) * weight
 					const c = Math.cos(angle)
 					const s = Math.sin(angle)
-					behind(x, c * y - s * z, s * y + c * z, `lid at ${pitch}°`)
+					const [ty, tz] = [c * y - s * z, s * y + c * z]
+					if (index === 0) behind(x, ty, tz, `lid at ${pitch}°`)
+					else assert.ok(tz > back.heightAt(x, ty), `curtain at ${pitch}°: ${x}, ${ty}, ${tz}`)
 				}
 			}
 		}
@@ -165,11 +185,42 @@ test('the shell passes the clearance behind the globe and the lids, at any gaze'
 	}
 })
 
+test('only the hidden parts move inside: the fornix past the globe, the curtain under its margin', () => {
+	for (const side of [1, -1]) {
+		const { eye, raw, parts } = build(params.lids, side)
+		const [fornix, curtain] = parts.slice(1)
+		let moved = 0
+		for (let v = 0; v < fornix.positions.length / 3; v++) {
+			const before = point(raw[0].positions, v)
+			const after = point(fornix.positions, v)
+			if (after[2] === before[2]) continue
+			moved++
+			assert.ok(after[2] > before[2], 'it only rises')
+			// Past the conjunctiva's start, where it no longer lies on the globe.
+			const r = Math.hypot(before[0], before[1])
+			assert.ok(r > 0.96 * eye.scleraRadius, `fornix moved at ${r}`)
+		}
+		assert.ok(moved > 0, 'the upper fornix reached past the shell')
+		// The curtain keeps its top row, on the posterior margin, and its depth
+		// into the sac shrinks with its rise.
+		const rows = curtain.positions.length / 3 / SIZE.around
+		for (let i = 0; i < SIZE.around; i++) {
+			const v = i * rows
+			assert.deepEqual(point(curtain.positions, v), point(raw[1].positions, v))
+			for (let j = 1; j < rows; j++) {
+				const rise = curtain.positions[(v + j) * 3 + 2] - raw[1].positions[(v + j) * 3 + 2]
+				const shrink = raw[1].depth[v + j] - curtain.depth[v + j]
+				assert.ok(Math.abs(Math.min(rise, raw[1].depth[v + j]) - shrink) < 1e-4)
+			}
+		}
+	}
+})
+
 test('a larger clearance or band pushes the dome back', () => {
 	const near = build(params.lids, 1, { ...params.shell, clearance: 1 })
 	const far = build(params.lids, 1, { ...params.shell, clearance: 6 })
 	const wide = build(params.lids, 1, { ...params.shell, clearance: 1, band: 4 })
-	assert.ok(far.back.depth > near.back.depth)
+	assert.ok(far.back.thickness > near.back.thickness)
 	assert.ok(far.back.heightAt(0, 0) < near.back.heightAt(0, 0) - 4)
 	assert.ok(wide.back.heightAt(20, 20) < near.back.heightAt(20, 20))
 	// Deterministic.

@@ -86,17 +86,17 @@ function loadRandomEye(ancestry = panelState.ancestry, seed, duration = panelSta
 }
 
 // Glides the camera back to its start ('in') or out to the whole figure
-// ('out', by the screen's shape), over zoom.duration. The rest keeps the
-// values a running transition is heading for.
-function zoom(direction) {
-	const settings = app.targetParams.zoom
-	const [near, far] = zoomDistances(settings)
+// ('out', by the screen's shape), over zoom.duration (or `duration` s: the
+// HUD's knob snapping to an end). The rest keeps the values a running
+// transition is heading for.
+function zoom(direction, duration = app.targetParams.zoom.duration) {
+	const [near, far] = zoomDistances(app.targetParams.zoom)
 	const target = cloneParams(app.targetParams)
 	setValue(PARAM_SCHEMA, target, 'camera.distance', direction === 'in' ? near : far)
-	app.transitionTo(target, settings.duration)
+	app.transitionTo(target, duration)
 }
 
-// The zoom level of the HUD's gauge, 0 out to 1 in, between the screen's
+// The zoom level of the HUD's knob, 0 out to 1 in, between the screen's
 // zoom distances (src/ui/hudLayout.js); setting it moves the camera at once,
 // as the wheel does, and stops a zoom gliding.
 const zoomLimits = () => zoomDistances(app.targetParams.zoom)
@@ -201,11 +201,11 @@ if (urlParams.get('gui') !== '0') {
 	// The HUD around the eye (src/ui/hud.js): the skin tones, the zoom and
 	// Random eye on a dashed circle. The tone of the color the params are
 	// heading for is pressed, also after the panel or a preset changes it; the
-	// zoom gauge follows the camera every frame, gliding or not.
+	// zoom knob follows the camera every frame, gliding or not.
 	const hud = createHud({
 		tones: SKIN_TONES,
 		onTone: (name) => skinTone(name),
-		onZoom: (direction) => zoom(direction),
+		onZoom: (direction, duration) => zoom(direction, duration),
 		onZoomLevel: (level) => setZoomLevel(level),
 		onRandom: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
 	})
@@ -220,7 +220,7 @@ if (urlParams.get('gui') !== '0') {
 		requestAnimationFrame(showZoomLevel)
 		hud.showZoomLevel(getZoomLevel())
 	}
-	requestAnimationFrame(showZoomLevel)
+	showZoomLevel()
 
 	// The title, top left, and the credit line, bottom left; the credit's
 	// link blurs itself after a click, as the glass buttons do.

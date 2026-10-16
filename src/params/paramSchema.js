@@ -281,7 +281,7 @@ export const BASE_PARAM_SCHEMA = {
 	// the flat band along the patch's edge, and its skin's tone.
 	shell: {
 		clearance: num(1.5, 0.5, 15, 0.1, 'mm', 'rebuild', 'clearance behind the eye'),
-		band: num(2, 0.5, 6, 0.1, 'mm', 'rebuild', 'edge band'),
+		band: num(1, 0.3, 4, 0.1, 'mm', 'rebuild', 'edge band'),
 		tone: num(0.6, 0.1, 1, 0.01, '', 'uniform', 'tone (× skin albedo)'),
 	},
 	sclera: {

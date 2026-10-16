@@ -6,7 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom level, Zoom out and Random eye), the title, the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones, and sets the zoom level; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom knob, Zoom out and Random eye), the title, the credit line, the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones, and sets the zoom level; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
@@ -32,11 +32,12 @@
 | **Adnexa and sclera** ([`docs/ADNEXA.md`](ADNEXA.md)) | |
 | [`src/adnexa/fissure.js`](../src/adnexa/fissure.js) * | The palpebral fissure: the margins between the canthi, their closure. |
 | [`src/adnexa/periocular.js`](../src/adnexa/periocular.js) * | The margins' support, the conjunctiva with the lacus, caruncle and plica, the face around the orbit (thin-plate spline). |
-| [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | The lid ring (columns, profile, shell turning into the face), the conjunctiva, palpebral conjunctiva and meniscus meshes. |
+| [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | The lid ring (columns, profile, shell turning into the face) and the patch's edge, the conjunctiva, palpebral conjunctiva and meniscus meshes. |
+| [`src/adnexa/backShell.js`](../src/adnexa/backShell.js) * | The back shell closing the skin patch: the flat band along its edge and the dome behind, as deep as the globe and the lids need. |
 | [`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js) * | Ambient occlusion baked into the lid and conjunctiva vertices (horizon-based, over a front height field; by depth into the sac). |
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
-| [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, lash, meniscus and bubble meshes with their materials. |
+| [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, back shell, lash, meniscus and bubble meshes with their materials. |
 | [`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js) | The skin's pigment patterns baked on the GPU over the lid mesh at rest. |
 | [`src/sclera/vesselGenerator.js`](../src/sclera/vesselGenerator.js) * | Seeded episcleral and conjunctival vessel network. |
 | [`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) | The network rasterized into the polar vessel map, when its parameters or the globe change. |
@@ -62,8 +63,8 @@
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
-| [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye, cut around each button, with the round glass buttons on it and the zoom level's dial and slider; `main.js` gives it the actions. |
-| [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's radius and every button's angle on the circle (groups spaced in pixels along it); the zoom level of a camera distance (log scale) and back. |
+| [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye, cut around each button, with the round glass buttons on it and the zoom knob sliding along it; `main.js` gives it the actions. |
+| [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's circle (inscribed in its box, or smaller until its buttons fit) and every button's angle on it; the knob's track, its angle at a zoom level and back, and the ends a drag snaps to; the zoom level of a camera distance (log scale) and back. |
 | [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) | The glass refraction of the HUD's buttons on Chromium: a displacement map per button (a convex bevel refracting by Snell's law), in an SVG filter that also holds the blur of its backdrop. |
 | [`src/math.js`](../src/math.js) *, [`src/random.js`](../src/random.js) * | Scalar and vector helpers; seeds, PCG hash twin, weighted picks, Gaussian samples. |
 | [`src/frameStats.js`](../src/frameStats.js), [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | Frame telemetry and the adaptive resolution rules (from the terrain project). |
@@ -79,6 +80,7 @@
      - the entrance-pupil depth the camera aims at;
      - the eyeball mesh;
      - the lid mesh, its skin patterns (baked on the GPU) and the fissure map (baked in JS into a half-float texture), only when the lids or the eye geometry changed: together they take about half a second;
+     - the back shell around them (about 70 ms), only when they or `shell.clearance` and `shell.band` changed;
      - the lashes and the tear film.
 
      A rebuild always bakes too.
@@ -87,7 +89,7 @@
      - the structure and pigment atlases (GPU, under a millisecond);
      - the color lookup (spectral model in JS, about 35 ms), only when the layer model changed, and not while it crossfades;
      - the scleral vessel map, only when its parameters or the globe changed.
-   - `define`: the debug view define of the eyeball, lid and lash materials. The tone-mapping mode is set by the post-processing every frame; `postprocessing` recompiles it.
+   - `define`: the debug view define of the eyeball, lid, back shell and lash materials. The tone-mapping mode is set by the post-processing every frame; `postprocessing` recompiles it.
 3. **Controls**: `CameraControls.update()` steps a coasting orbit (which restarts the accumulation as a drag does) and the mouse parallax, which restarts it while it moves ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
 4. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
    - A living eye steps the animator and restarts the accumulation.
@@ -139,7 +141,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `eye`, `animation`;
   - `globe`, `cornea`, `chamber`, `limbus`;
   - `iris`, `irisStructure`, `irisColor`;
-  - `lids`, `lashes`, `skin`, `sclera`;
+  - `lids`, `lashes`, `skin`, `shell` (the back shell), `sclera`;
   - `lighting`, `camera`, `zoom` (the HUD's zoom distances and duration), `controls` (the mouse parallax and the orbit's inertia), `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
 - **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.

@@ -96,12 +96,12 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 
 **The frame** runs around the page, 24 px inside the window's safe area (8 px on phones and tablets): a cross of 1 px arms at each corner (14 px, 12 px on phones and tablets; white at 25%) and a dashed line along each side (an SVG pattern of `FRAME_DASH` px dashes every `FRAME_DASH_PERIOD` px, in `main.js`: 3 every 8; white at 15%). The lines run across the whole window, past the crosses, and are cut `--frame-cut` (14 px) to either side of each cross. Each side is two lines, from either window edge to the middle, the second mirrored, so the four corners look the same; the dashes are centered every 8 px from the edge and the insets are multiples of 8, so the cuts fall between dashes. On phones and tablets nothing is left beyond the crosses. It is an overlay that never takes the pointer. The rest of the interface stays inside it, 16 px in (12 px on phones and tablets): `--frame-inset`, `--frame-gap` and `--ui-inset` in `style.css` place everything, the panel included.
 
-**The HUD** ([`src/ui/hud.js`](../src/ui/hud.js)) puts every button on a dashed circle around the eye, centered in the frame. Its radius is half the smaller side of the box inside the frame, less half a button and an 8 px margin (`hudRadius()` in [`src/ui/hudLayout.js`](../src/ui/hudLayout.js)). The buttons are round glass of one size (44 px):
+**The HUD** ([`src/ui/hud.js`](../src/ui/hud.js)) puts every button on a dashed circle around the eye, centered in the frame. The circle is inscribed in the box inside the frame (460 px on a 1600 × 1000 window), or smaller where its buttons would not fit in that box, as on phones (`hudLayout()` in [`src/ui/hudLayout.js`](../src/ui/hudLayout.js)). The buttons are round glass of one size (44 px), the zoom knob half of it (22 px). Angles run clockwise from the right (`HUD` in `hudLayout.js`):
 
-- The five skin tones in the bottom-left quadrant, fair highest.
-- In the bottom-right quadrant, from the top: **Zoom in** (+), the zoom level, **Zoom out** (−) and, lower, **Random eye** (a shuffle icon).
-- Each group is centered at a fixed angle and keeps its spacing in pixels along the circle (`HUD` in `hudLayout.js`): the tones 48 px apart around 135°, the zoom 56 px apart around 25°, Random eye at 50° or 60 px past Zoom out. On a small circle the groups therefore spread over a wider angle without overlapping. Phones and tablets keep this layout on a smaller circle.
-- The circle's line has the frame's dashes (3 px every 8 px, adjusted to a whole number around; white at 30%) and stops 6 px short of each button, through an SVG mask that follows the tones as they grow and shrink.
+- The five skin tones in the bottom-left quadrant, fair highest, 48 px apart around 135°.
+- At the right, around 5°: **Zoom in** (+) above **Zoom out** (−), 30° apart (or 160 px, on a small circle), with the zoom knob on the arc between them; below, **Random eye** (a shuffle icon) at 50°, or 60 px past Zoom out.
+- On a small circle the tones and Random eye therefore spread over a wider angle without overlapping. Phones and tablets keep this layout on a smaller circle.
+- The circle's line has the frame's dashes (3 px every 8 px, adjusted to a whole number around; white at 30%) and stops 6 px short of each button and of the knob, through an SVG mask that follows the tones as they grow and shrink and the knob as it slides.
 - Only the buttons take the pointer, so drags across the rest still orbit the camera. Each blurs itself after a click, so Space still toggles photo mode.
 
 The buttons are liquid glass (the `glass` class), clear (a 2px blur) and defined by their edges. `style.css` draws a glossy dome of light on the upper half and a faint glow above the bottom edge, soft specular rims at the top-right and bottom-left edges, a faint dark line inside the edge, and the hover and press. On Chromium, [`src/ui/liquidGlass.js`](../src/ui/liquidGlass.js) also bends the scene near each rim: it gives every button an SVG filter of its own size, with a unique id, as `backdrop-filter` (through `--glass-refraction`), rebuilt when the button resizes. The filter carries the blur too, because Chromium drops the CSS filter functions that follow an SVG one. It is detected through `navigator.userAgentData`, which exists only in secure contexts, so over plain HTTP on the LAN (`pnpm dev --host`) Chromium also keeps the CSS glass.
@@ -111,10 +111,10 @@ The buttons are liquid glass (the `glass` class), clear (a 2px blur) and defined
   - Zoom in to `zoom.in` (180 mm by default); portrait screens to the start-up `camera.distance`, where they start.
   - Landscape (desktop) screens start `zoom.start` of the way from the zoom-in to the zoom-out distance (0.35 by default, 285 mm), unless the URL sets `?preset=` or `?state=`; portrait screens start zoomed in.
   - The wheel stays between the zoom-in and zoom-out distances of the screen.
-- **The zoom level**, between them, shows where `camera.distance` lies between the screen's zoom-out (0) and zoom-in (1) distances, on a log scale as the wheel steps (`zoomLevel()` in `hudLayout.js`):
-  - A dial of 270°, open at the bottom, filled clockwise as the camera zooms in, with a knob at the end of the fill. It follows the camera every frame, during a glide too.
-  - It is also a slider (`role="slider"`): drag it toward + or − (160 px cover the whole range, `HUD.zoomTravel`), scroll over it, or use the arrow keys (a tenth), Page Up and Page Down (a quarter), Home and End. It moves the camera at once, as the wheel does, and stops a zoom gliding.
-  - Dragged, its glass swells; clicked, it bounces and a ring spreads from it.
+- **The zoom knob**, a small empty glass button, slides along the circle from − (zoomed out, level 0) to + (zoomed in, level 1), over them, so the pointer always reaches it. Its place is the zoom level: where `camera.distance` lies between the screen's zoom-out and zoom-in distances, on a log scale as the wheel steps (`zoomLevel()` in `hudLayout.js`). It follows the camera every frame, during a glide too.
+  - It is a slider (`role="slider"`): drag it along the arc, scroll over it, or use the arrow keys (a tenth), Page Up and Page Down (a quarter), Home and End. It moves the camera at once, as the wheel does, and stops a zoom gliding.
+  - Dragged within `HUD.zoom.snap` (28 px) of + or − (overlapping it a little) or past it, it snaps there: the camera glides to that end in 0.25 s. Dragged back out, it follows the pointer again.
+  - At either end, over + or −, its glass is lighter. Dragged, it swells; clicked, it bounces and a ring spreads from it.
 - Portrait screens start, and load presets, with `camera.targetZ` 0.
 - **Random eye**.
 
@@ -148,8 +148,8 @@ The panel shows only while the URL ends in `#debug`, and starts collapsed, below
 | `getEyeGeometry()` | `{ apexZ, focusDepth }`. |
 | `getPresetNames()`, `getPresetInfo(name)` | Preset names, labels and reference photographs. |
 | `loadPreset(name, duration)`, `randomEye(ancestry, seed, duration)` | Glide to a preset or to a random eye, as the panel does; `randomEye` returns the sampled features and the color shade. |
-| `zoom('in' \| 'out')` | Glide the camera as the HUD's zoom buttons do. |
-| `getZoomLevel()`, `setZoomLevel(level)` | The zoom level of the HUD's dial (0 zoomed out, 1 in); setting it moves the camera at once, as dragging the dial does. |
+| `zoom('in' \| 'out', duration)` | Glide the camera as the HUD's zoom buttons do, over `zoom.duration` unless given. |
+| `getZoomLevel()`, `setZoomLevel(level)` | The zoom level of the HUD's knob (0 zoomed out, 1 in); setting it moves the camera at once, as dragging the knob does. |
 | `skinTone(name, duration)` | Glide `skin.color` to a tone of `src/params/skinTones.js`, as the HUD's skin tones do; `false` for an unknown name. |
 
 ## Debugging Notes

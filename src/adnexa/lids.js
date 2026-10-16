@@ -19,7 +19,7 @@ import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
-import { createBackShell } from './backShell'
+import { backShellSurface, createBackShell, keepInside } from './backShell'
 import {
 	createConjunctivaMesh,
 	createLidMesh,
@@ -73,18 +73,29 @@ export default class Lids {
 		this.backMaterial.name = 'BackShell'
 		this.back = new Mesh(new BufferGeometry(), this.backMaterial)
 		this.back.name = 'BackShell'
-		// The patch's edge and the meshes the back shell closes around.
-		this.rim = null
-		this.enclosed = []
 	}
 
+	// The lids and the back shell, for params.lids and params.shell.
 	// `renderer` bakes the skin patterns over the new mesh.
 	rebuild(params, eye, renderer) {
 		const data = createLidMesh(params.lids, eye, eye.nasalSign)
+		// The back shell closes the patch behind the lids.
+		const back = backShellSurface(data, eye, params.shell)
 		// The conjunctiva fills the canthi beyond the globe's outline, and the
-		// palpebral conjunctiva hangs from the margins behind them (same program).
-		const fornix = createConjunctivaMesh(params.lids, eye, eye.nasalSign)
-		const curtain = createPalpebralMesh(params.lids, eye, eye.nasalSign)
+		// palpebral conjunctiva hangs from the margins behind them (same
+		// program); where they reach under the lids past the shell, they keep
+		// inside it.
+		const { clearance } = params.shell
+		const fornix = keepInside(
+			createConjunctivaMesh(params.lids, eye, eye.nasalSign),
+			back,
+			clearance,
+		)
+		const curtain = keepInside(
+			createPalpebralMesh(params.lids, eye, eye.nasalSign),
+			back,
+			clearance,
+		)
 		const parts = [data, fornix, curtain]
 		const join = (arrays) => {
 			const out = new arrays[0].constructor(arrays.reduce((sum, a) => sum + a.length, 0))
@@ -128,17 +139,14 @@ export default class Lids {
 			params.lids.seed,
 		)
 		this.fissure = data.fissure
-		this.rim = data.rim
-		this.enclosed = parts
 		const { medial, lateral, lengths } = data.fissure
 		this.uniforms.uCanthi.value.set(medial[0], medial[1], lateral[0], lateral[1])
 		this.uniforms.uMarginLength.value.fromArray(lengths)
+		this.rebuildBack(createBackShell(data, back, params.shell))
 	}
 
-	// The back shell around the last lids (after rebuild()), for
-	// params.shell.
-	rebuildBack(params, eye) {
-		const shell = createBackShell(this.rim, eye, params.shell, this.enclosed)
+	// The back shell's mesh from its data (src/adnexa/backShell.js).
+	rebuildBack(shell) {
 		const geometry = new BufferGeometry()
 		geometry.setAttribute('position', new BufferAttribute(shell.positions, 3))
 		geometry.setAttribute('coords', new BufferAttribute(shell.coords, 2))

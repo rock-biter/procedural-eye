@@ -192,7 +192,8 @@ canvas {
 /* The HUD (src/ui/hud.js): a dashed circle (white at 30%) inside the frame,
    centered on the page, with every button on it; src/ui/hudLayout.js sets
    the circle and each button's center (left, top). The mask cuts the line
-   around each button and follows the tones as they grow and shrink. Only the
+   around each button and the knob, and follows the tones as they grow and
+   shrink. Only the
    buttons take the pointer, so drags across the rest still orbit the
    camera. */
 .hud {
@@ -345,55 +346,27 @@ canvas {
 	outline-color: var(--ui-color);
 }
 
-/* The zoom level: a dial of 270°, open at the bottom, filled clockwise as
-   the camera zooms in, with a knob at the end of the fill. Dragged, the
-   glass swells and the fill brightens; clicked, it bounces and a ring
-   spreads from it. */
+/* The zoom knob: a small empty glass button that slides along the circle
+   from − to + (src/ui/hud.js places it), over them, so the pointer always
+   reaches it. At either end, over + or −, its glass lightens. Dragged, the
+   glass swells; clicked, it bounces and a ring spreads from it. */
 .zoom-level {
+	width: var(--hud-knob);
+	min-height: var(--hud-knob);
+	height: var(--hud-knob);
+	z-index: 1;
 	cursor: grab;
 	touch-action: none;
-}
-
-.zoom-level svg {
-	width: 100%;
-	height: 100%;
-	fill: none;
-	stroke: currentColor;
-	stroke-linecap: round;
-	overflow: visible;
-}
-
-.zoom-track {
-	stroke: #fff;
-	stroke-width: 2;
-	opacity: 0.2;
-}
-
-.zoom-value,
-.zoom-knob {
-	stroke: #fff;
-	opacity: 0.6;
-	transition: opacity 0.2s;
-}
-
-.zoom-value {
-	stroke-width: 2;
-}
-
-.zoom-knob {
-	fill: #fff;
-	stroke-width: 1;
-	filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
 }
 
 .zoom-level.dragging {
 	--glass-tint: rgba(255, 255, 255, 0.12);
 	cursor: grabbing;
-	transform: scale(1.12);
+	transform: scale(1.3);
 }
 
-.zoom-level.dragging :is(.zoom-value, .zoom-knob) {
-	opacity: 1;
+.zoom-level.at-end {
+	--glass-tint: rgba(255, 255, 255, 0.3);
 }
 
 .zoom-level::after {
@@ -414,13 +387,9 @@ canvas {
 	animation: zoom-ripple 0.7s ease-out;
 }
 
-.zoom-level.pulse :is(.zoom-value, .zoom-knob) {
-	animation: zoom-flash 0.7s ease-out;
-}
-
 @keyframes zoom-bounce {
 	35% {
-		transform: scale(1.2);
+		transform: scale(1.4);
 	}
 }
 
@@ -431,13 +400,7 @@ canvas {
 	}
 	to {
 		opacity: 0;
-		transform: scale(1.9);
-	}
-}
-
-@keyframes zoom-flash {
-	20% {
-		opacity: 1;
+		transform: scale(2.6);
 	}
 }
 
