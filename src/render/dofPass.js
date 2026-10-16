@@ -2,8 +2,10 @@
 // gather at half resolution (dof-gather-fragment.glsl) over the color and
 // blur radius prepared at that resolution (dof-prepare-fragment.glsl),
 // composited over the sharp accumulated mean with an opaque alpha for the
-// effects. Accumulated frames get their depth of field from the lens samples
-// instead, so the gather fades out over the first samples.
+// effects. The largest blur radius per tile, spread over the neighboring
+// tiles (dof-tiles-fragment.glsl, dof-dilate-fragment.glsl), bounds each
+// pixel's spiral. Accumulated frames get their depth of field from the lens
+// samples instead, so the gather fades out over the first samples.
 import { Pass } from 'postprocessing'
 import {
 	HalfFloatType,
@@ -16,9 +18,18 @@ import {
 	WebGLRenderTarget,
 } from 'three'
 import compositeShader from '../shaders/dof-composite-fragment.glsl'
+import dilateShader from '../shaders/dof-dilate-fragment.glsl'
 import gatherShader from '../shaders/dof-gather-fragment.glsl'
 import prepareShader from '../shaders/dof-prepare-fragment.glsl'
+import tilesShader from '../shaders/dof-tiles-fragment.glsl'
 import vertexShader from '../shaders/fullscreen-vertex.glsl'
+import { FOCUS_AT_INFINITY } from '../renderSetup'
+
+// Half-resolution texels per tile side: 20 full-resolution pixels, more than
+// the gather's largest radius (MAX_RADIUS in dof-gather-fragment.glsl), so the
+// tile and its neighbors hold every tap of its pixels. Even, so a 2×2 quad of
+// fragments never straddles two tiles.
+const TILE = 10
 
 function createHalfTarget(filter) {
 	return new WebGLRenderTarget(1, 1, {
@@ -37,6 +48,9 @@ export default class DofPass extends Pass {
 		// Half resolution: the color and signed blur radius, then the gather.
 		this.prepared = createHalfTarget(NearestFilter)
 		this.target = createHalfTarget(LinearFilter)
+		// The largest blur radius per tile, then over its neighbors.
+		this.tiles = createHalfTarget(NearestFilter)
+		this.tileMax = createHalfTarget(NearestFilter)
 		this.prepare = new ShaderMaterial({
 			uniforms: {
 				uSource: new Uniform(null),
@@ -47,11 +61,32 @@ export default class DofPass extends Pass {
 			depthTest: false,
 			depthWrite: false,
 		})
+		this.tileReduce = new ShaderMaterial({
+			uniforms: {
+				uZero: new Uniform(0),
+				uPrepared: new Uniform(this.prepared.texture),
+				uBackdropRadius: new Uniform(Infinity),
+			},
+			defines: { DOF_TILE: TILE },
+			vertexShader,
+			fragmentShader: tilesShader,
+			depthTest: false,
+			depthWrite: false,
+		})
+		this.dilate = new ShaderMaterial({
+			uniforms: { uTiles: new Uniform(this.tiles.texture) },
+			vertexShader,
+			fragmentShader: dilateShader,
+			depthTest: false,
+			depthWrite: false,
+		})
 		this.gather = new ShaderMaterial({
 			uniforms: {
 				uPrepared: new Uniform(this.prepared.texture),
+				uTileMax: new Uniform(this.tileMax.texture),
 				uTexel: new Uniform(new Vector2()),
 			},
+			defines: { DOF_TILE: TILE },
 			vertexShader,
 			fragmentShader: gatherShader,
 			depthTest: false,
@@ -74,12 +109,17 @@ export default class DofPass extends Pass {
 	// Lens of the current frame: focal length, f-number, focus distance (mm),
 	// sensor height (mm) and the drawing-buffer height (px).
 	setLens({ focalLength, fNumber, focusDistance, sensorHeight, heightPx }) {
-		this.prepare.uniforms.uLens.value.set(
+		const lens = this.prepare.uniforms.uLens.value.set(
 			(focalLength * focalLength) / fNumber,
 			focusDistance,
 			focusDistance - focalLength,
 			heightPx / sensorHeight,
 		)
+		// The radius dof-prepare-fragment.glsl gives a point halfway to the
+		// backdrop's distance: only the backdrop lies farther.
+		const distance = FOCUS_AT_INFINITY / 2
+		this.tileReduce.uniforms.uBackdropRadius.value =
+			(0.5 * lens.x * (distance - lens.y) * lens.w) / (distance * lens.z)
 	}
 
 	render(renderer, inputBuffer, outputBuffer) {
@@ -90,6 +130,12 @@ export default class DofPass extends Pass {
 			this.prepare.uniforms.uSource.value = mean
 			this.fullscreenMaterial = this.prepare
 			renderer.setRenderTarget(this.prepared)
+			renderer.render(this.scene, this.camera)
+			this.fullscreenMaterial = this.tileReduce
+			renderer.setRenderTarget(this.tiles)
+			renderer.render(this.scene, this.camera)
+			this.fullscreenMaterial = this.dilate
+			renderer.setRenderTarget(this.tileMax)
 			renderer.render(this.scene, this.camera)
 			this.fullscreenMaterial = this.gather
 			renderer.setRenderTarget(this.target)
@@ -106,6 +152,9 @@ export default class DofPass extends Pass {
 		const half = [Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(height / 2))]
 		this.prepared.setSize(...half)
 		this.target.setSize(...half)
+		const tiles = half.map((size) => Math.ceil(size / TILE))
+		this.tiles.setSize(...tiles)
+		this.tileMax.setSize(...tiles)
 		this.gather.uniforms.uTexel.value.set(1 / width, 1 / height)
 	}
 
@@ -113,7 +162,11 @@ export default class DofPass extends Pass {
 		super.dispose()
 		this.prepared.dispose()
 		this.target.dispose()
+		this.tiles.dispose()
+		this.tileMax.dispose()
 		this.prepare.dispose()
+		this.tileReduce.dispose()
+		this.dilate.dispose()
 		this.gather.dispose()
 		this.composite.dispose()
 	}

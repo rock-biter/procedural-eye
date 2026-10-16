@@ -114,7 +114,7 @@ The panel shows only while the URL ends in `#debug`, and starts collapsed. When 
 | `setParams(overrides)` | Ends a running transition, applies a deep partial override at once, rebuilds, and returns the unknown paths. |
 | `transitionTo(params, duration)` | Glides to a full params object over `duration` seconds ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#transitions)). |
 | `getTargetParams()`, `isTransitioning()` | The params a running transition is heading for (the current ones otherwise); whether one runs. |
-| `capture()` | The current accumulated image as a PNG data URL. |
+| `capture()` | The current accumulated image as a PNG data URL (a living eye keeps no frame: it renders one first). |
 | `toggleFrozen()`, `isFrozen()` | Photo mode. |
 | `measure(frames)` | Interactive frames back to back; resolves with frame statistics. |
 | `measureSync(frames)` | The same, each frame finished with a synchronous read; returns mean, median, minimum and maximum ms. |
@@ -130,6 +130,6 @@ The panel shows only while the URL ends in `#debug`, and starts collapsed. When 
 - A uniformly grey or black image usually means a NaN or an alpha problem.
   - Check the raw scene with `?view=normals`.
   - Then read pixels through `window.__EYE_APP__`; the accumulation history is `app.post.accumulation.history`.
-- A living eye restarts the accumulation every frame. Press Space, or turn `animation.enabled` off, to let the image converge.
+- A living eye restarts the accumulation every frame and keeps none of them in the history. Press Space, or turn `animation.enabled` off, to let the image converge.
 - Once `quality.photoSamples` samples are accumulated, the loop stops rendering and the canvas keeps the last image. Any change restarts it.
 - `?view=iris-steps` shows the march cost per pixel: red where it hits the step limit. The other `iris-*` views isolate the field, its normals, AO and atlas.

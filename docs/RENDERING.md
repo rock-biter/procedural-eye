@@ -16,6 +16,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    - Each frame is blended into an RGBA32F history at weight 1/(n+1), read with `texelFetch`. The first frame (weight 1) replaces the history without reading it.
    - A frame with NaN or Inf keeps the history.
    - The pass writes no output buffer (`needsSwap` false): the next pass reads the mean from `history`.
+   - A fresh frame that the next one restarts anyway (a living eye, a running transition: `EyeApp.restartsEveryFrame`) passes through: the history is not written, `history` is the scene buffer itself, and the samples stay at 0. The full-resolution float copy of every living frame is saved.
 4. **Depth of field** ([`src/render/dofPass.js`](../src/render/dofPass.js)): the interactive gather, faded out as lens samples accumulate, composited over the mean with an opaque alpha (see [Depth of Field](#depth-of-field)).
 5. **Effect pass**, in order:
    1. color grade: white balance from `camera.whiteBalance`, saturation and contrast, in linear light;
@@ -43,7 +44,8 @@ The accumulation history keeps the alpha for the depth of field. The effects rec
 - **Accumulated samples**: their lens positions give the exact depth of field ([`docs/OPTICS.md`](OPTICS.md#physical-camera)).
 - **Fresh interactive frames**: Gustafsson's single-pass bokeh gather at half resolution.
   - **Prepare** (`dof-prepare-fragment.glsl`): each half-resolution texel (RGBA16F, nearest) holds the mean color of its 2×2 texels of the history and the signed blur radius of the last of them (the texel a nearest lookup at its center reads). The radius is the thin lens's blur circle from the focus distance in alpha, c = (f²/N)·(d − s) / (d·(s − f)), in sensor millimeters converted to pixels, negative in front of the focus plane: it grows with the distance, so comparing radii compares distances.
-  - **Gather** (`dof-gather-fragment.glsl`): it walks a golden-angle spiral (maximum radius 18 px, step 1.6), turned by a constant rotation, with one texel read per tap.
+  - **Tiles** (`dof-tiles-fragment.glsl`, `dof-dilate-fragment.glsl`): per tile of 10×10 half-resolution texels (20 px, more than the gather's reach), the largest blur radius and whether every texel is the backdrop (a radius past the one halfway to `FOCUS_AT_INFINITY`); then the largest radius and the backdrop flag over the tile and its eight neighbors.
+  - **Gather** (`dof-gather-fragment.glsl`): it walks a golden-angle spiral (maximum radius 18 px, step 1.6), turned by a constant rotation, with one texel read per tap. The spiral stops past the largest radius around the pixel's tile, where no tap could reach it any more, and a pixel whose neighboring tiles are all backdrop keeps its own color: both leave the result as the full spiral gives it, and skip most taps in focus and over the backdrop.
 - **Composite** (`dof-composite-fragment.glsl`):
   - It reads the sharp mean from the history and writes an opaque alpha for the effects.
   - It keeps the sharp frame where the blur is under a pixel and shows the gather in full from 2.5 px of blur radius on.
@@ -116,7 +118,7 @@ Defines:
 | `skin-pattern-fragment.glsl` | Bake of the pigment patterns that depend only on the rest position (mottling, veins, oily patches). |
 | `debug-views.glsl` | Debug view numbering. |
 | `eyeball-*.glsl`, `skin-*.glsl`, `lash-*.glsl`, `tear-*.glsl`, `shadow-depth-*.glsl` | Scene program entry points. |
-| `fullscreen-vertex.glsl`, `accumulate-fragment.glsl`, `dof-prepare-fragment.glsl`, `dof-gather-fragment.glsl`, `dof-composite-fragment.glsl`, `color-grade-fragment.glsl`, `film-grain-fragment.glsl` | Pass and effect programs. |
+| `fullscreen-vertex.glsl`, `accumulate-fragment.glsl`, `dof-prepare-fragment.glsl`, `dof-tiles-fragment.glsl`, `dof-dilate-fragment.glsl`, `dof-gather-fragment.glsl`, `dof-composite-fragment.glsl`, `color-grade-fragment.glsl`, `film-grain-fragment.glsl` | Pass and effect programs. |
 
 ## Debug Views
 

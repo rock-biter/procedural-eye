@@ -154,22 +154,24 @@ export default class EyeApp {
 	// reliable, a forced completion is. Returns { meanMs, minMs, maxMs, samples }.
 	measureSync(frames = 30) {
 		const renderer = this.setup.renderer
-		const pixel = new Float32Array(4)
 		const times = []
-		// Reading the canvas would wait for the display; the float accumulation
-		// target is offscreen and written after the scene.
+		// Reading the canvas would wait for the display; the scene buffer is
+		// offscreen and written every frame, kept or not.
+		const pixel = new Uint16Array(4)
 		const finish = () => {
-			const { accumulation } = this.post
-			renderer.readRenderTargetPixels(accumulation.targets[accumulation.index], 0, 0, 1, 1, pixel)
+			renderer.readRenderTargetPixels(this.post.composer.inputBuffer, 0, 0, 1, 1, pixel)
 		}
-		this.invalidate()
-		this.renderSample(null)
-		finish()
+		const render = () => {
+			this.invalidate()
+			this.post.accumulation.passthrough = this.restartsEveryFrame
+			this.renderSample(null)
+			this.post.accumulation.passthrough = false
+			finish()
+		}
+		render()
 		for (let i = 0; i < frames; i++) {
 			const start = performance.now()
-			this.invalidate()
-			this.renderSample(null)
-			finish()
+			render()
 			times.push(performance.now() - start)
 		}
 		times.sort((a, b) => a - b)
@@ -413,15 +415,25 @@ export default class EyeApp {
 		const stats = this.setup.frameStats
 		stats.beginFrame(time)
 		const fresh = this.samples === 0
+		// A living eye or a transition restarts the image on the next frame:
+		// this one is shown without being kept.
+		this.post.accumulation.passthrough = fresh && this.restartsEveryFrame
 		this.renderSample(fresh ? null : accumulationSample(this.samples))
+		this.post.accumulation.passthrough = false
 		stats.endFrame()
+	}
+
+	get restartsEveryFrame() {
+		return (this.params.animation.enabled && !this.frozen) || this.transition !== null
 	}
 
 	measureFrame(time) {
 		const stats = this.setup.frameStats
 		stats.beginFrame(time)
 		this.invalidate()
+		this.post.accumulation.passthrough = this.restartsEveryFrame
 		this.renderSample(null)
+		this.post.accumulation.passthrough = false
 		stats.endFrame()
 		if (--this.benchmark.remaining <= 0) {
 			const { resolve } = this.benchmark
@@ -497,6 +509,8 @@ export default class EyeApp {
 	// in the same task so the drawing buffer is still intact.
 	capture() {
 		const { renderPass, accumulation } = this.post
+		// A living eye keeps no frame: keep this one.
+		if (this.samples === 0) this.renderSample(null)
 		renderPass.enabled = false
 		accumulation.displayOnly = true
 		this.post.render()

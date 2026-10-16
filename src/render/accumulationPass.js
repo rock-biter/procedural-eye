@@ -3,7 +3,9 @@
 // mean. The next pass (src/render/dofPass.js) reads the mean from `history`,
 // whose alpha keeps the focus distance, so this pass writes no output buffer.
 // reset() restarts it; the app resets on any change and stops rendering once
-// the target sample count is reached.
+// the target sample count is reached. A `passthrough` frame, which the next
+// one restarts anyway (a living eye), is not kept: `history` is the frame
+// itself, and the samples stay at 0.
 import { Pass } from 'postprocessing'
 import {
 	FloatType,
@@ -48,6 +50,9 @@ export default class AccumulationPass extends Pass {
 		this.samples = 0
 		// Keeps the current mean without adding a frame (captures).
 		this.displayOnly = false
+		// Shows the frame without keeping it (set by the app per frame).
+		this.passthrough = false
+		this.frame = null
 		// The output buffer is left as it is: the next pass reads `history`.
 		this.needsSwap = false
 	}
@@ -56,13 +61,18 @@ export default class AccumulationPass extends Pass {
 		this.samples = 0
 	}
 
-	// The latest mean (alpha: focus distance).
+	// The latest mean (alpha: focus distance), or the passthrough frame.
 	get history() {
-		return this.targets[this.index].texture
+		return this.frame ?? this.targets[this.index].texture
 	}
 
 	render(renderer, inputBuffer) {
+		this.frame = null
 		if (this.displayOnly) return
+		if (this.passthrough) {
+			this.frame = inputBuffer.texture
+			return
+		}
 		const read = this.targets[this.index]
 		const write = this.targets[1 - this.index]
 		const uniforms = this.blendMaterial.uniforms
