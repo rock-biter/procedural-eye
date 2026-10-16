@@ -118,6 +118,13 @@ export default class EyeApp {
 		setup.scene.add(this.tearFilm.meniscus, this.tearFilm.bubbles)
 		this.physicalCamera = new PhysicalCamera()
 		this.post = new PostProcessing(setup.renderer, setup.scene, this.physicalCamera.camera)
+		// The radians per pixel of this frame; the half-resolution share of a
+		// split frame doubles them (src/render/scenePass.js).
+		this.pixelAngle = 0.001
+		this.post.renderPass.setPixelScale = (scale) => {
+			this.eyeball.uniforms.uPixelAngle.value = this.pixelAngle * scale
+			this.lids.uniforms.uPixelAngle.value = this.pixelAngle * scale
+		}
 		// Orbiting takes the camera over from a transition.
 		this.controls = new CameraControls(setup.renderer.domElement, PARAM_SCHEMA, params, () => {
 			this.transition?.cancel('camera')
@@ -465,6 +472,7 @@ export default class EyeApp {
 		this.eyeRig.toEye(this.physicalCamera.camera.position, this.cameraEye)
 		const camera = this.physicalCamera.camera
 		const pixelAngle = (camera.fov * Math.PI) / 180 / size.height
+		this.pixelAngle = pixelAngle
 		this.eyeball.update(
 			this.params,
 			this.pupilDiameter,
@@ -481,6 +489,7 @@ export default class EyeApp {
 		this.lids.update(this.params, pixelAngle)
 		this.lashes.update(this.params)
 		const lens = this.params.camera
+		this.post.splitShading = this.params.quality.splitShading
 		this.post.update(this.params, size, {
 			focalLength: lens.focalLength,
 			fNumber: lens.fNumber,

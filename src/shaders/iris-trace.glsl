@@ -105,11 +105,13 @@ IrisHit traceIris(vec3 roEye, vec3 rd, float coneOrigin, float coneSpread) {
 	return hit;
 }
 
-vec3 irisNormal(vec3 p, float eps) {
+// Forward differences from `f0`, the field at `p`, which the shading has
+// evaluated anyway: three evaluations instead of a tetrahedron's four.
+vec3 irisNormal(vec3 p, float eps, float f0) {
 	vec3 n = vec3(0.0);
-	for (int i = ZERO; i < 4; i++) {
-		vec3 e = 0.5773 * (2.0 * vec3(float(((i + 3) >> 1) & 1), float((i >> 1) & 1), float(i & 1)) - 1.0);
-		n += e * irisField(p + e * eps);
+	for (int i = ZERO; i < 3; i++) {
+		vec3 e = vec3(i == 0, i == 1, i == 2);
+		n += e * (irisField(p + e * eps) - f0);
 	}
 	return normalize(n);
 }

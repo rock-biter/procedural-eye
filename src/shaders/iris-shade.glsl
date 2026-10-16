@@ -85,9 +85,9 @@ vec3 shadeIris(IrisHit hit) {
 	vec3 p = hit.p;
 	vec3 pEye = p + vec3(uPupil.xy, 0.0);
 	setIrisFootprint(hit.footprint);
-	vec3 n = irisNormal(p, max(0.5 * hit.footprint, 0.002));
-	float ao = irisAmbientOcclusion(p, n);
 	IrisParts parts = irisParts(p);
+	vec3 n = irisNormal(p, max(0.5 * hit.footprint, 0.002), irisCombine(parts));
+	float ao = irisAmbientOcclusion(p, n);
 	vec4 weights = irisMaterialWeights(parts);
 	vec3 albedo = irisAlbedo(parts, weights);
 	float rho = parts.rho;

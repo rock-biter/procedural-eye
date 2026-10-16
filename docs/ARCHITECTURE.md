@@ -19,7 +19,7 @@
 | **Eye** | |
 | [`src/eye/eyeProfile.js`](../src/eye/eyeProfile.js) * | Eye geometry in eye space (profile, chamber, lens, iris shell) and its uniform packing. |
 | [`src/eye/cornealOptics.js`](../src/eye/cornealOptics.js) * | Snell, Fresnel, ray–surface intersections, two-surface corneal trace, entrance pupil. |
-| [`src/eye/eyeballGeometry.js`](../src/eye/eyeballGeometry.js) | The eyeball mesh with its cap and sclera groups. |
+| [`src/eye/eyeballGeometry.js`](../src/eye/eyeballGeometry.js) | The eyeball mesh with its cap and sclera groups, coarse on purpose (the shaders refine the surface). |
 | [`src/eye/eyeball.js`](../src/eye/eyeball.js) | The eyeball mesh, its two `ShaderMaterial`s and their shared uniforms (optics, iris, sclera, lid reflections). |
 | [`src/eye/eyeRig.js`](../src/eye/eyeRig.js) | Pivot (center of rotation, gaze) and eye-space group; world↔eye matrices. |
 | **Iris** ([`docs/IRIS.md`](IRIS.md)) | |
@@ -53,7 +53,8 @@
 | [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js) | The macro `PerspectiveCamera`, placed and sheared per sample. |
 | [`src/camera/cameraControls.js`](../src/camera/cameraControls.js) | Pointer orbit, pan and distance, written into `params.camera`. |
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
-| [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: render pass, accumulation, depth of field, effects. |
+| [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, effects. |
+| [`src/render/scenePass.js`](../src/render/scenePass.js) | The scene into the composer's buffer; living frames split into a full-resolution sharp share and a half-resolution blurred one. |
 | [`src/render/accumulationPass.js`](../src/render/accumulationPass.js) | Progressive mean of still frames in a float history; living frames pass through. |
 | [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare, tile bounds and gather), composited over the accumulated mean. |
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |

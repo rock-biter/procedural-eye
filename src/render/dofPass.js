@@ -5,7 +5,9 @@
 // effects. The largest blur radius per tile, spread over the neighboring
 // tiles (dof-tiles-fragment.glsl, dof-dilate-fragment.glsl), bounds each
 // pixel's spiral. Accumulated frames get their depth of field from the lens
-// samples instead, so the gather fades out over the first samples.
+// samples instead, so the gather fades out over the first samples. A split
+// frame (src/render/scenePass.js) shaded part of the image at half resolution
+// only: alpha −1 marks the pixels it left out of the full-resolution one.
 import { Pass } from 'postprocessing'
 import {
 	HalfFloatType,
@@ -41,10 +43,13 @@ function createHalfTarget(filter) {
 }
 
 export default class DofPass extends Pass {
-	// `focus`: () => the accumulated mean (rgb; alpha: the focus distance).
-	constructor(focus) {
+	// `focus`: () => the accumulated mean (rgb; alpha: the focus distance);
+	// `half`: the half-resolution share of split frames.
+	constructor(focus, half) {
 		super('DofPass')
 		this.focus = focus
+		// Whether `prepared` holds the last frame's radii at the current size.
+		this.preparedLast = false
 		// Half resolution: the color and signed blur radius, then the gather.
 		this.prepared = createHalfTarget(NearestFilter)
 		this.target = createHalfTarget(LinearFilter)
@@ -54,6 +59,7 @@ export default class DofPass extends Pass {
 		this.prepare = new ShaderMaterial({
 			uniforms: {
 				uSource: new Uniform(null),
+				uHalf: new Uniform(half),
 				uLens: new Uniform(new Vector4()),
 			},
 			vertexShader,
@@ -95,6 +101,7 @@ export default class DofPass extends Pass {
 		this.composite = new ShaderMaterial({
 			uniforms: {
 				uSharp: new Uniform(null),
+				uHalf: new Uniform(half),
 				uBlurred: new Uniform(this.target.texture),
 				uWeight: new Uniform(1),
 			},
@@ -124,6 +131,7 @@ export default class DofPass extends Pass {
 
 	render(renderer, inputBuffer, outputBuffer) {
 		const mean = this.focus()
+		this.preparedLast = this.weight > 0
 		if (this.weight <= 0) {
 			this.composite.uniforms.uWeight.value = 0
 		} else {
@@ -152,6 +160,7 @@ export default class DofPass extends Pass {
 		const half = [Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(height / 2))]
 		this.prepared.setSize(...half)
 		this.target.setSize(...half)
+		this.preparedLast = false
 		const tiles = half.map((size) => Math.ceil(size / TILE))
 		this.tiles.setSize(...tiles)
 		this.tileMax.setSize(...tiles)

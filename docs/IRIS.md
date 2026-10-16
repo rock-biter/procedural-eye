@@ -103,7 +103,7 @@ The same bake with `PIGMENT_PASS` writes the pigment atlas, with the same layout
   - At most `quality.irisSteps` steps.
   - The hit tolerance is half the pixel footprint: a ray cone from the camera's pixel angle through the refraction.
 - **Atlas LOD**: atlas lookups use `textureLod` at the mip level whose texels match the footprint.
-- **Normal**: tetrahedral, in a loop, with an epsilon of half the footprint (at least 2 µm).
+- **Normal**: forward differences from the field at the hit (the shading evaluates it anyway), three evaluations in a loop, with an epsilon of half the footprint (at least 2 µm).
 - **Ambient occlusion**: `quality.irisAoSteps` samples along the normal, spaced quadratically from 12 µm to 0.3 mm. This covers fiber crevices and whole crypts.
 - **Soft shadow**: iq's improved penumbra toward the key light, along its refracted direction, over `quality.irisShadowSteps` steps.
 

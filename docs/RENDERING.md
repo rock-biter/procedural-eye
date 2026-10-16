@@ -5,8 +5,8 @@
 Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)):
 
 1. **Key-light shadow pass** ([`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js)): the lids and lashes (layer 1) into a float depth map from emitter 0, 2048² for accumulation samples and 1024² for interactive frames ([`docs/OPTICS.md`](OPTICS.md#key-light-shadow)).
-2. **Scene pass** (pmndrs `RenderPass` into an RGBA16F buffer with depth). The lashes draw first (`renderOrder` −1) and the eyeball last (`renderOrder` 1): the depth test then skips the costly optics wherever the lids and lashes cover the eye.
-   - **Eyeball**: a surface of revolution in eye space with two index groups.
+2. **Scene pass** ([`src/render/scenePass.js`](../src/render/scenePass.js), in place of pmndrs' `RenderPass`, into an RGBA16F buffer with depth). The lashes draw first (`renderOrder` −1) and the eyeball last (`renderOrder` 1): the depth test then skips the costly optics wherever the lids and lashes cover the eye. Frames that pass through the accumulation are split ([Split Frames](#split-frames)).
+   - **Eyeball**: a surface of revolution in eye space with two index groups, coarsely tessellated (96 segments around, 32 rings on the cap, 24 on the sclera): the programs refine the exact surface, and small triangles would make the GPU shade the 2×2 quads along their edges, which cost the optics program dearly.
      - Group 0, the cornea and limbus cap, uses `eyeball-cap-fragment.glsl`: tear-film reflection, two-surface refraction, the iris trace and shading, the limbus and the limbal ring.
      - Group 1, the sclera beyond the cap, uses `eyeball-sclera-fragment.glsl`: the exact sphere point, then a wet, broken-up reflection over the vessel-mapped diffuse white.
    - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi. Its pigment patterns come from a texture baked with the lid mesh ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)).
@@ -43,13 +43,22 @@ The accumulation history keeps the alpha for the depth of field. The effects rec
 
 - **Accumulated samples**: their lens positions give the exact depth of field ([`docs/OPTICS.md`](OPTICS.md#physical-camera)).
 - **Fresh interactive frames**: Gustafsson's single-pass bokeh gather at half resolution.
-  - **Prepare** (`dof-prepare-fragment.glsl`): each half-resolution texel (RGBA16F, nearest) holds the mean color of its 2×2 texels of the history and the signed blur radius of the last of them (the texel a nearest lookup at its center reads). The radius is the thin lens's blur circle from the focus distance in alpha, c = (f²/N)·(d − s) / (d·(s − f)), in sensor millimeters converted to pixels, negative in front of the focus plane: it grows with the distance, so comparing radii compares distances.
+  - **Prepare** (`dof-prepare-fragment.glsl`): each half-resolution texel (RGBA16F, nearest) holds the mean color of its 2×2 texels of the history and the signed blur radius of the last of them (the texel a nearest lookup at its center reads); where a split frame shaded at half resolution, the texel of that share. The radius is the thin lens's blur circle from the focus distance in alpha, c = (f²/N)·(d − s) / (d·(s − f)), in sensor millimeters converted to pixels, negative in front of the focus plane: it grows with the distance, so comparing radii compares distances.
   - **Tiles** (`dof-tiles-fragment.glsl`, `dof-dilate-fragment.glsl`): per tile of 10×10 half-resolution texels (20 px, more than the gather's reach), the largest blur radius and whether every texel is the backdrop (a radius past the one halfway to `FOCUS_AT_INFINITY`); then the largest radius and the backdrop flag over the tile and its eight neighbors.
   - **Gather** (`dof-gather-fragment.glsl`): it walks a golden-angle spiral (maximum radius 18 px, step 1.6), turned by a constant rotation, with one texel read per tap. The spiral stops past the largest radius around the pixel's tile, where no tap could reach it any more, and a pixel whose neighboring tiles are all backdrop keeps its own color: both leave the result as the full spiral gives it, and skip most taps in focus and over the backdrop.
 - **Composite** (`dof-composite-fragment.glsl`):
-  - It reads the sharp mean from the history and writes an opaque alpha for the effects.
+  - It reads the sharp mean from the history (in a split frame's half-resolution share, the nearest texel of that share) and writes an opaque alpha for the effects.
   - It keeps the sharp frame where the blur is under a pixel and shows the gather in full from 2.5 px of blur radius on.
   - It fades out over the first 16 accumulated samples (`dof.weight`), so the transition to the true depth of field is seamless.
+
+## Split Frames
+
+A frame that passes through the accumulation (a living eye, a transition) shades at full resolution only what the depth of field keeps sharp. Where the blur radius passes 2.5 px the composite shows the half-resolution gather anyway: there the scene is shaded at half resolution (`quality.splitShading`, on by default).
+
+- **Which share**: the last frame's prepared blur radii, their smallest over each texel and its eight neighbors (`shading-spread-fragment.glsl`). Under `SHARP_RADIUS` (3 px) the texel's four pixels are shaded at full resolution, otherwise the texel at half resolution. The neighbors cover the composite's bilinear lookup and some motion. A frame whose last frame left no radii (the first one, a resize, photo mode before it) is not split.
+- **How**: the scene renders twice, into the full-resolution buffer and into `ScenePass.half` (half resolution, 4 samples per pixel). Each time a full-screen triangle draws first (`shading-block-fragment.glsl`, part of the scene and visible only then, because three invalidates a multisampled target after each render): over the pixels the pass leaves out it writes alpha −1 and the near plane's depth, so the depth test skips the scene there. The half-resolution pass doubles the materials' pixel angle (`uPixelAngle`), so their footprint-filtered detail matches.
+- **The 4 samples**: lashes thinner than a half-resolution pixel break into dots without them; with them each texel covers four points, as the 2×2 mean of the full-resolution frame does. They cost little because the meshes' triangles are not tiny.
+- **Mispredictions**: a pixel shaded at half resolution that turns out sharp (a fast saccade) shows the nearest half-resolution texel for one frame. A 12° gaze jump between two frames shows no visible difference.
 
 ## Shading Tiers
 
@@ -59,6 +68,7 @@ The accumulation history keeps the alpha for the depth of field. The effects rec
 - **Micro striations** ([`docs/IRIS.md`](IRIS.md)): fresh frames leave them out where the depth of field's gather will blur them over two of their widths (`uIrisMicroBlur`); accumulated samples always draw them.
 - **Common to both**: the march limit `quality.irisSteps`, plus the ray-footprint LOD of the atlases and the micro detail.
 - **Key-light shadow**: fresh frames filter a 1024² map, accumulated samples compare a 2048² one.
+- **Split frames**: frames that are not kept shade the blurred share at half resolution ([Split Frames](#split-frames)); kept ones are whole.
 - **Adaptive resolution**: the pixel ratio adapts on fresh frames only (`quality.adaptiveResolution`, `quality.minPixelRatio`).
 
 ## Materials and Uniforms
@@ -118,7 +128,7 @@ Defines:
 | `skin-pattern-fragment.glsl` | Bake of the pigment patterns that depend only on the rest position (mottling, veins, oily patches). |
 | `debug-views.glsl` | Debug view numbering. |
 | `eyeball-*.glsl`, `skin-*.glsl`, `lash-*.glsl`, `tear-*.glsl`, `shadow-depth-*.glsl` | Scene program entry points. |
-| `fullscreen-vertex.glsl`, `accumulate-fragment.glsl`, `dof-prepare-fragment.glsl`, `dof-tiles-fragment.glsl`, `dof-dilate-fragment.glsl`, `dof-gather-fragment.glsl`, `dof-composite-fragment.glsl`, `color-grade-fragment.glsl`, `film-grain-fragment.glsl` | Pass and effect programs. |
+| `fullscreen-vertex.glsl` (at the near plane with `NEAR_PLANE`), `shading-spread-fragment.glsl`, `shading-block-fragment.glsl`, `accumulate-fragment.glsl`, `dof-prepare-fragment.glsl`, `dof-tiles-fragment.glsl`, `dof-dilate-fragment.glsl`, `dof-gather-fragment.glsl`, `dof-composite-fragment.glsl`, `color-grade-fragment.glsl`, `film-grain-fragment.glsl` | Pass and effect programs. |
 
 ## Debug Views
 

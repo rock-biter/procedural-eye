@@ -6,7 +6,11 @@
 import { BufferAttribute, BufferGeometry } from 'three'
 import { DEG } from '../math'
 
-export const EYEBALL_SEGMENTS = Object.freeze({ angular: 256, cap: 120, sclera: 72 })
+// Coarse on purpose: the chords stay within 0.007 mm of the surface (about
+// half a pixel zoomed in, a pixel and a half in the closest presets, and only
+// at the silhouette, the rest is refined), while small triangles cost the
+// optics program dearly: the GPU shades the 2×2 quads straddling their edges.
+export const EYEBALL_SEGMENTS = Object.freeze({ angular: 96, cap: 32, sclera: 24 })
 
 // Past the equator: with ±35° of gaze the lids still hide everything behind.
 const MAX_POLAR_ANGLE = 125 * DEG

@@ -1,13 +1,15 @@
 // The post-processing chain: the scene renders offscreen into an RGBA16F
 // buffer (alpha holds the apparent focus distance, written by the materials),
-// the accumulation pass averages still frames, then one effect pass applies
-// the lens and color effects in linear light, tone mapping and film grain.
+// the accumulation pass averages still frames, the depth of field blurs fresh
+// ones, then one effect pass applies the lens and color effects in linear
+// light, tone mapping and film grain. A frame that passes through the
+// accumulation is split: what the depth of field blurs is shaded at half
+// resolution (src/render/scenePass.js).
 import {
 	ChromaticAberrationEffect,
 	Effect,
 	EffectComposer,
 	EffectPass,
-	RenderPass,
 	ToneMappingEffect,
 	ToneMappingMode,
 	VignetteEffect,
@@ -18,6 +20,7 @@ import colorGradeFragmentShader from '../shaders/color-grade-fragment.glsl'
 import filmGrainFragmentShader from '../shaders/film-grain-fragment.glsl'
 import AccumulationPass from './accumulationPass'
 import DofPass from './dofPass'
+import ScenePass from './scenePass'
 
 const TONE_MAPPING_MODES = {
 	agx: ToneMappingMode.AGX,
@@ -70,9 +73,13 @@ export default class PostProcessing {
 			frameBufferType: HalfFloatType,
 			multisampling: 0,
 		})
-		this.renderPass = new RenderPass(scene, camera)
+		this.renderPass = new ScenePass(scene, camera, () =>
+			this.dof.preparedLast ? this.dof.prepared.texture : null,
+		)
 		this.accumulation = new AccumulationPass()
-		this.dof = new DofPass(() => this.accumulation.history)
+		this.dof = new DofPass(() => this.accumulation.history, this.renderPass.half.texture)
+		// Split the frames that pass through (params.quality.splitShading).
+		this.splitShading = true
 		this.colorGrade = new ColorGradeEffect()
 		this.chromaticAberration = new ChromaticAberrationEffect({
 			offset: new Vector2(),
@@ -121,6 +128,7 @@ export default class PostProcessing {
 	}
 
 	render() {
+		this.renderPass.split = this.splitShading && this.accumulation.passthrough
 		this.composer.render()
 	}
 

@@ -407,6 +407,7 @@ export const BASE_PARAM_SCHEMA = {
 		irisAoSteps: discrete(num(5, 0, 8, 1, '', 'uniform', 'iris AO samples')),
 		interactiveShadowSteps: discrete(num(4, 0, 48, 1, '', 'uniform', 'shadow steps while moving')),
 		interactiveAoSteps: discrete(num(3, 0, 8, 1, '', 'uniform', 'AO samples while moving')),
+		splitShading: toggle(true, 'uniform', 'blur at half res while moving'),
 	},
 	debug: {
 		view: choice('beauty', DEBUG_VIEWS, 'define'),
