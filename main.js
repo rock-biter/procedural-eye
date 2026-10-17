@@ -300,19 +300,6 @@ if (urlParams.get('gui') !== '0') {
 	})
 	document.body.append(moreInfo, info)
 
-	// Phones show today's date, top right beside "eyes", as MM.DD.YY in the
-	// user's time zone; it turns over at local midnight.
-	const today = document.createElement('div')
-	today.className = 'today'
-	const showToday = () => {
-		const now = new Date()
-		const pad = (value) => String(value).padStart(2, '0')
-		today.textContent = `${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getFullYear() % 100)}`
-		const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-		setTimeout(showToday, midnight - now + 1000)
-	}
-	showToday()
-	document.body.appendChild(today)
 	const credit = document.createElement('p')
 	credit.className = 'credit'
 	credit.innerHTML =

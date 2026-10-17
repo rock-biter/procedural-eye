@@ -734,7 +734,6 @@ canvas {
 .masthead,
 .credit,
 .fps,
-.today,
 .snapshot {
 	position: fixed;
 	z-index: 10;
@@ -929,21 +928,28 @@ canvas {
 	}
 }
 
-/* Today's date, More info and the dropdown it opens show only on phones. */
-.today,
+/* More info and the dropdown it opens show only on phones. */
 .more-info,
 .info {
 	display: none;
 }
 
 @media (max-width: 640px) {
-	/* Today's date, at the right, its capitals (0.32em below its line's top)
-	   aligned with the top of "eyes" (--title-size below the top inset), where
-	   wider screens keep the viewport size and the frame rate. */
-	.today {
-		top: calc(var(--ui-inset) + env(safe-area-inset-top) + 0.8 * var(--title-size) - 0.32em);
+	/* A split HUD's camera angles, at the right, their capitals (0.32em below
+	   the top of a line 1.4 high) aligned with the top of "eyes"
+	   (--title-size below the top inset), where wider screens keep the
+	   viewport size and the frame rate; in place of their spot above the
+	   circle, which src/ui/hud.js sets inline. */
+	.hud.split .hud-camera-angles {
+		position: fixed;
+		top: calc(
+			var(--ui-inset) + env(safe-area-inset-top) + 0.8 * var(--title-size) - 0.32em
+		) !important;
 		right: calc(var(--ui-inset) + env(safe-area-inset-right));
-		display: block;
+		left: auto !important;
+		line-height: 1.4;
+		translate: none;
+		visibility: visible;
 	}
 
 	/* More info, in the accent and underlined, at the right on the baseline
