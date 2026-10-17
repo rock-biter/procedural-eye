@@ -20,6 +20,7 @@ import {
 	zoomDistance,
 	zoomLevel,
 	zoomProgress,
+	zoomRadius,
 } from '../src/ui/hudLayout'
 
 // The HUD's box on a desktop window (1600 × 1000), on a phone held upright
@@ -34,8 +35,6 @@ const DEGREE = Math.PI / 180
 
 const near = (a, b, tolerance = 1e-9) => Math.abs(a - b) <= tolerance
 const point = (radius, angle) => [radius * Math.cos(angle), radius * Math.sin(angle)]
-const chord = (radius, a, b) =>
-	Math.hypot(...point(radius, a).map((v, i) => v - point(radius, b)[i]))
 
 test('desktop: the circle is scaled from the one inscribed in the box, the tones around 180°, the zoom 32° apart around 0°', () => {
 	const { radius, angles } = hudLayout(...SCREENS.desktop, TONES)
@@ -47,67 +46,113 @@ test('desktop: the circle is scaled from the one inscribed in the box, the tones
 })
 
 for (const [screen, [width, height]] of Object.entries(SCREENS)) {
-	const { radius, angles } = hudLayout(width, height, TONES)
+	const { radius, zoomRadius: zoom, split, angles } = hudLayout(width, height, TONES)
+	const toneCenter = split ? HUD.split.tones.center : HUD.tones.center
 
 	test(`${screen}: every button and the knob's track lie inside the box`, () => {
 		assert.ok(
 			radius > 100 && radius <= (Math.min(width, height) / 2) * HUD.scale,
 			`radius ${radius}`,
 		)
-		const inside = (angle, half) => {
-			const [x, y] = point(radius, angle)
+		const inside = (angle, half, ring = radius) => {
+			const [x, y] = point(ring, angle)
 			return Math.abs(x) <= width / 2 - half && Math.abs(y) <= height / 2 - half
 		}
-		// The tones anywhere their group turns, glide and overshoot included.
-		const buttons = [...toneReach(angles, radius), angles.zoomIn, angles.zoomOut, angles.random]
-		for (const angle of buttons) assert.ok(inside(angle, HUD.button / 2), `${angle}`)
+		// The tones anywhere their group turns, glide and overshoot included;
+		// on a split HUD reaching a little past the box.
+		const overhang = split ? HUD.split.overhang : 0
+		const buttons = [...toneReach(angles, radius), angles.random]
+		for (const angle of buttons) assert.ok(inside(angle, HUD.button / 2 - overhang), `${angle}`)
+		for (const angle of [angles.zoomIn, angles.zoomOut])
+			assert.ok(inside(angle, HUD.button / 2, zoom), `${angle}`)
 		for (let level = 0; level <= 1; level += 0.05) {
-			assert.ok(inside(knobAngle(level, angles.track), HUD.knob / 2), `level ${level}`)
+			assert.ok(inside(knobAngle(level, angles.track), HUD.knob / 2, zoom), `level ${level}`)
 		}
 	})
 
-	test(`${screen}: the tones lie at the left, the middle one on the horizontal, fair highest, evenly spaced`, () => {
+	test(`${screen}: the tones lie evenly spaced about their center, fair highest, the middle one there`, () => {
 		const { tones } = angles
 		assert.equal(tones.length, TONES)
-		assert.ok(near(tones[(TONES - 1) / 2], Math.PI), 'the middle tone on the horizontal')
-		for (const angle of tones) assert.ok(angle > Math.PI / 2 && angle < 1.5 * Math.PI, `${angle}`)
+		assert.ok(near(tones[(TONES - 1) / 2], toneCenter), 'the middle tone at the center')
+		const [from, to] = split ? [Math.PI / 2, Math.PI] : [Math.PI / 2, 1.5 * Math.PI]
+		for (const angle of tones) assert.ok(angle >= from - 1e-9 && angle < to + 1e-9, `${angle}`)
 		for (let i = 1; i < tones.length; i++) {
 			assert.ok(tones[i] < tones[i - 1], 'each tone lower than the one before')
 			assert.ok(near((tones[i - 1] - tones[i]) * radius, HUD.tones.spacing), 'spacing in px')
 		}
 	})
 
-	test(`${screen}: zoom in above zoom out, the knob's track between them, Random eye below`, () => {
+	test(`${screen}: the zoom's buttons about the knob's track, Random eye clear of them`, () => {
 		const { zoomIn, zoomOut, random } = angles
 		assert.deepEqual(angles.track, [zoomIn, zoomOut], 'from under one button to under the other')
-		assert.ok(zoomIn < zoomOut && zoomOut < random, `${[zoomIn, zoomOut, random]}`)
-		assert.ok((zoomOut - zoomIn) * radius >= HUD.zoom.minArc - 1e-9, 'room for the knob')
+		assert.ok(zoomIn < zoomOut, `${[zoomIn, zoomOut]}`)
+		assert.ok((zoomOut - zoomIn) * zoom >= HUD.zoom.minArc - 1e-9, 'room for the knob')
 		assert.ok(zoomOut - zoomIn >= HUD.zoom.span - 1e-9)
-		assert.ok(random > 0 && random < Math.PI / 2)
-		assert.ok((random - zoomOut) * radius >= HUD.random.spacing - 1e-9)
+		if (split) {
+			// Zoom out at the left, zoom in at the right, the middle at the bottom.
+			assert.ok(near(zoom, radius * HUD.split.zoom.radiusRatio))
+			assert.ok((zoomOut - zoomIn) * zoom >= HUD.split.zoom.minArc - 1e-9)
+			assert.ok(Math.cos(zoomOut) < 0 && Math.cos(zoomIn) > 0)
+			assert.ok(near(random, 0), 'Random eye at the right, on the horizontal')
+		} else {
+			assert.equal(zoom, radius)
+			assert.ok(zoomOut < random && random > 0 && random < Math.PI / 2, 'Random eye below')
+			assert.ok((random - zoomOut) * radius >= HUD.random.spacing - 1e-9)
+		}
 	})
 
 	test(`${screen}: no two buttons overlap, whichever tone is pressed`, () => {
+		// Buttons as points; the zoom's on their own circle.
+		const at = (angle, ring = radius) => point(ring, angle)
+		const zooms = [angles.zoomIn, angles.zoomOut].map((angle) => at(angle, zoom))
+		const apart = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
 		for (let pressed = 0; pressed < TONES; pressed++) {
 			const turned = turnTones(angles.tones, radius, toneSteps(pressed, TONES))
-			// The pressed tone at the group's center, on the horizontal.
-			assert.ok(near(turned[pressed], HUD.tones.center))
-			const all = [...turned, angles.zoomIn, angles.zoomOut, angles.random]
+			// The pressed tone at the group's center.
+			assert.ok(near(turned[pressed], toneCenter))
+			const all = [...[...turned, angles.random].map((angle) => at(angle)), ...zooms]
 			for (let i = 0; i < all.length; i++) {
 				for (let j = i + 1; j < all.length; j++) {
-					const distance = chord(radius, all[i], all[j])
+					const distance = apart(all[i], all[j])
 					assert.ok(distance >= HUD.button, `buttons ${i} and ${j}: ${distance.toFixed(1)} px`)
 				}
 			}
 		}
 		// Nor anywhere between, as the group glides.
 		for (const angle of toneReach(angles, radius)) {
-			for (const other of [angles.zoomIn, angles.zoomOut, angles.random]) {
-				assert.ok(chord(radius, angle, other) >= HUD.button, `${angle} near ${other}`)
+			for (const other of [at(angles.random), ...zooms]) {
+				assert.ok(apart(at(angle), other) >= HUD.button, `${angle} near ${other}`)
+			}
+		}
+		// The knob's track clear of every tone and of Random eye.
+		if (split) {
+			for (let level = 0; level <= 1; level += 0.05) {
+				const knob = at(knobAngle(level, angles.track), zoom)
+				for (const angle of [...toneReach(angles, radius), angles.random])
+					assert.ok(apart(at(angle), knob) >= (HUD.button + HUD.knob) / 2, `level ${level}`)
 			}
 		}
 	})
 }
+
+test('a portrait box splits the HUD: the zoom on a wider circle, kept above a reserved bottom', () => {
+	const [width, height] = SCREENS.phone
+	assert.ok(hudLayout(...SCREENS.phone, TONES).split)
+	assert.ok(!hudLayout(...SCREENS['phone on its side'], TONES).split)
+	assert.ok(!hudLayout(...SCREENS.desktop, TONES).split)
+	assert.equal(zoomRadius(150, false), 150)
+	assert.equal(zoomRadius(150, true), 150 * HUD.split.zoom.radiusRatio)
+	for (const bottom of [0, 120, 260]) {
+		const { radius, zoomRadius: zoom, angles } = hudLayout(width, height, TONES, HUD, { bottom })
+		const floor = bottom > 0 ? height - bottom - HUD.split.zoom.clearance : height
+		for (let level = 0; level <= 1; level += 0.05) {
+			const [, y] = point(zoom, knobAngle(level, angles.track))
+			assert.ok(height / 2 + y <= floor - HUD.knob / 2 + 1e-9, `bottom ${bottom}, level ${level}`)
+		}
+		// A taller reserve costs the circle some size, never its place.
+		if (bottom === 260) assert.ok(radius < hudLayout(width, height, TONES).radius)
+	}
+})
 
 test('the knob runs from zoom out (level 0) to zoom in (level 1) and back', () => {
 	const track = [-0.1, 0.3]
@@ -167,11 +212,12 @@ test('the two zoom rings keep their zoom-out sizes and counter-rotate inside and
 	assert.ok(near(orbitRing(450, -0.1, 'outer', true).turn, 1.2 * 30 * DEGREE))
 })
 
-test('the knob sits on the horizontal at the middle of the zoom, the ends symmetric about it', () => {
+test('the knob sits on the horizontal at the middle of the zoom (split: at the bottom), the ends symmetric about it', () => {
 	for (const [width, height] of Object.values(SCREENS)) {
-		const { angles } = hudLayout(width, height, TONES)
-		assert.ok(near(knobAngle(0.5, angles.track), 0))
-		assert.ok(near(angles.zoomIn, -angles.zoomOut))
+		const { angles, split } = hudLayout(width, height, TONES)
+		const middle = split ? HUD.split.zoom.center : 0
+		assert.ok(near(knobAngle(0.5, angles.track), middle))
+		assert.ok(near(angles.zoomIn - middle, middle - angles.zoomOut))
 	}
 	// The start framing sits there: halfway on the zoom's log scale.
 	assert.ok(near(zoomLevel(zoomDistance(0.5, [180, 480]), [180, 480]), 0.5))

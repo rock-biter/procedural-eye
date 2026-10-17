@@ -4,6 +4,8 @@
 // along the circle, so on a small circle (a phone) they spread over a wider
 // angle about their center; the zoom keeps its angle, and a length in pixels
 // at least, for its knob to slide; Random eye moves down, clear of the zoom.
+// A portrait box (a phone held upright) splits the HUD over two circles
+// about the same center (HUD.split).
 
 const DEGREE = Math.PI / 180
 
@@ -37,6 +39,22 @@ export const HUD = Object.freeze({
 	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20, stretch: 5 }),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
 	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
+	// A portrait box splits the HUD. The circle keeps the skin tones, the
+	// pressed one at `tones.center` (the middle of the bottom left quarter),
+	// and Random eye at `random.angle` (the right, on the horizontal); their
+	// hit areas may reach `overhang` px past the box, into the gap inside the
+	// frame. A wider circle, `zoom.radiusRatio` times as large, takes the
+	// zoom: its track's middle (where the mobile start, zoom.mobileStart,
+	// sits) at `zoom.center`, the bottom on the vertical, zoom out at its
+	// left, zoom in at its right, at least `zoom.minArc` px apart; it keeps
+	// `zoom.clearance` px above the bottom the HUD reserves (the footer,
+	// hud.js reserveBottom()).
+	split: Object.freeze({
+		overhang: 10,
+		tones: Object.freeze({ center: 135 * DEGREE }),
+		random: Object.freeze({ angle: 0 }),
+		zoom: Object.freeze({ center: 90 * DEGREE, radiusRatio: 1.45, minArc: 208, clearance: 12 }),
+	}),
 	// Ratios of the central radius keep the inner arcs inside and the outer
 	// arcs outside even on phones, fixed throughout the zoom. The four inner
 	// circles, the tones' arcs, the inner zoom ring, the central circle and
@@ -94,18 +112,30 @@ export const HUD = Object.freeze({
 	}),
 })
 
+// The radius (px) of the zoom's circle about a HUD circle of `radius` px:
+// the same circle, or the wider one of a split HUD.
+export function zoomRadius(radius, split, hud = HUD) {
+	return split ? radius * hud.split.zoom.radiusRatio : radius
+}
+
 // The angle of every button on a circle of `radius` px, with `toneCount`
 // skin tones, and the knob's track: [the angle at zoom in, at zoom out],
-// those of the two buttons.
-export function hudAngles(radius, toneCount, hud = HUD) {
+// those of the two buttons. `split`: the zoom on its own, wider circle
+// (zoomRadius()), the tones and Random eye placed as HUD.split says.
+export function hudAngles(radius, toneCount, hud = HUD, split = false) {
 	const arc = (length) => length / radius
-	const span = Math.max(hud.zoom.span, arc(hud.zoom.minArc))
-	const zoomIn = hud.zoom.center - span / 2
-	const zoomOut = hud.zoom.center + span / 2
-	const random = Math.max(hud.random.angle, zoomOut + arc(hud.random.spacing))
+	const minArc = split ? hud.split.zoom.minArc : hud.zoom.minArc
+	const span = Math.max(hud.zoom.span, minArc / zoomRadius(radius, split, hud))
+	const zoomCenter = split ? hud.split.zoom.center : hud.zoom.center
+	const zoomIn = zoomCenter - span / 2
+	const zoomOut = zoomCenter + span / 2
+	const random = split
+		? hud.split.random.angle
+		: Math.max(hud.random.angle, zoomOut + arc(hud.random.spacing))
+	const toneCenter = split ? hud.split.tones.center : hud.tones.center
 	const tones = Array.from(
 		{ length: toneCount },
-		(_, i) => hud.tones.center + ((toneCount - 1) / 2 - i) * arc(hud.tones.spacing),
+		(_, i) => toneCenter + ((toneCount - 1) / 2 - i) * arc(hud.tones.spacing),
 	)
 	return { tones, zoomIn, zoomOut, track: [zoomIn, zoomOut], random }
 }
@@ -137,30 +167,42 @@ export function toneReach(angles, radius, hud = HUD) {
 
 // Whether every button, and the knob anywhere along its track, lies inside a
 // box of `width` × `height` px centered on the circle; the tones anywhere
-// their group turns.
-function fits(radius, angles, width, height, hud) {
-	const inside = (angle, half) => {
-		const x = width / 2 + radius * Math.cos(angle)
-		const y = height / 2 + radius * Math.sin(angle)
-		return x >= half && x <= width - half && y >= half && y <= height - half
+// their group turns, their hit areas up to `overhang` px past it. The
+// zoom's buttons and knob lie on a circle of `zoom` px, above `floor` px
+// from the box's top.
+function fits(radius, zoom, angles, width, height, floor, overhang, hud) {
+	const inside = (angle, half, ring = radius, bottom = height) => {
+		const x = width / 2 + ring * Math.cos(angle)
+		const y = height / 2 + ring * Math.sin(angle)
+		return x >= half && x <= width - half && y >= half && y <= bottom - half
 	}
-	const buttons = [...toneReach(angles, radius, hud), angles.zoomIn, angles.zoomOut, angles.random]
-	if (!buttons.every((angle) => inside(angle, hud.button / 2))) return false
+	const buttons = [...toneReach(angles, radius, hud), angles.random]
+	if (!buttons.every((angle) => inside(angle, hud.button / 2 - overhang))) return false
+	const ends = [angles.zoomIn, angles.zoomOut]
+	if (!ends.every((angle) => inside(angle, hud.button / 2, zoom, floor))) return false
 	const [from, to] = angles.track
-	const steps = Math.max(1, Math.ceil(((to - from) * radius) / 4))
+	const steps = Math.max(1, Math.ceil(((to - from) * zoom) / 4))
 	for (let i = 0; i <= steps; i++) {
-		if (!inside(from + ((to - from) * i) / steps, hud.knob / 2)) return false
+		if (!inside(from + ((to - from) * i) / steps, hud.knob / 2, zoom, floor)) return false
 	}
 	return true
 }
 
 // The circle in a box of `width` × `height` px: `scale` times the circle
 // inscribed in it (a whole number of px), or smaller until its buttons fit
-// inside it. `{ radius, angles }`, or null for a box too small.
-export function hudLayout(width, height, toneCount, hud = HUD) {
+// inside it. A portrait box splits the HUD (HUD.split): the zoom's wider
+// circle keeps `bottom` px at the box's bottom free, and HUD.split's
+// clearance above them. `{ radius, zoomRadius, split, angles }`, or null for
+// a box too small.
+export function hudLayout(width, height, toneCount, hud = HUD, { bottom = 0 } = {}) {
+	const split = height > width
+	const floor = split && bottom > 0 ? height - bottom - hud.split.zoom.clearance : height
+	const overhang = split ? hud.split.overhang : 0
 	for (let radius = Math.floor((Math.min(width, height) / 2) * hud.scale); radius > 0; radius--) {
-		const angles = hudAngles(radius, toneCount, hud)
-		if (fits(radius, angles, width, height, hud)) return { radius, angles }
+		const angles = hudAngles(radius, toneCount, hud, split)
+		const zoom = zoomRadius(radius, split, hud)
+		if (fits(radius, zoom, angles, width, height, floor, overhang, hud))
+			return { radius, zoomRadius: zoom, split, angles }
 	}
 	return null
 }

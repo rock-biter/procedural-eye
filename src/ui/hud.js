@@ -121,7 +121,8 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // onZoomWheel(deltaY) (the wheel over the knob) and onRandom() run the
 // controls; getZoomElasticity() reads the current drag extension.
 // (onZoom without a duration glides over the zoom's own). Returns the
-// element, mount() (once it is in the page), pressTone(color), which presses
+// element, mount() (once it is in the page), reserveBottom(height), the
+// bottom of the box the zoom's circle keeps clear of, pressTone(color), which presses
 // the tone of `color` (none for another color), and showZoomLevel(level),
 // where the knob goes (at an end, its button shows in full) and the two
 // segmented rings' sizes and turns, and showZoomValue(text), the zoom's
@@ -141,11 +142,13 @@ export function createHud({
 	element.style.setProperty('--hud-knob', `${HUD.knob}px`)
 	element.style.setProperty('--tone-scale', HUD.toneScale)
 
-	// The circle, cut around each button by a mask.
+	// The circle, cut around each button by a mask, and the zoom's wider
+	// circle of a split HUD (HUD.split), cut by the same mask.
 	const ring = svgElement('svg', { class: 'hud-ring', 'aria-hidden': 'true' })
 	const mask = svgElement('mask', { id: 'hud-ring-cuts' })
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
+	const zoomLine = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
 	// The rings' SVGs at their intrinsic size (`size` px square), centered on
 	// their circle (of `radius` px at `cx`, `cy`): their wrappers turn and
 	// scale them about it. Turned 0, each is symmetric about the horizontal:
@@ -182,7 +185,7 @@ export function createHud({
 	// The spinning circle and its teeth sway together.
 	const spinGroup = svgElement('g')
 	spinGroup.append(spin, spinTeeth)
-	ring.append(mask, line, spinGroup, ...arcs)
+	ring.append(mask, line, zoomLine, spinGroup, ...arcs)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -298,11 +301,12 @@ export function createHud({
 	)
 
 	// Each button with its angle on the circle and its cut in the line.
-	// The tones' angles are their group's, turned (`toneShift`).
+	// The tones' angles are their group's, turned (`toneShift`); the zoom's
+	// buttons lie on the zoom's circle (`zoom`).
 	const items = [
 		...toneButtons.map((button, i) => ({ button, angle: (angles, toned) => toned[i] })),
-		{ button: zoomIn, angle: (angles) => angles.zoomIn },
-		{ button: zoomOut, angle: (angles) => angles.zoomOut },
+		{ button: zoomIn, angle: (angles) => angles.zoomIn, zoom: true },
+		{ button: zoomOut, angle: (angles) => angles.zoomOut, zoom: true },
 		{ button: random, angle: (angles) => angles.random },
 	]
 	const toneItems = items.slice(0, toneButtons.length)
@@ -463,7 +467,7 @@ export function createHud({
 	// reticle (--zoom-squeeze, 0 to 1, as far as the knob can stretch).
 	const placeZoomSymbols = () => {
 		if (!placed || knob.level === null) return
-		const arc = placed.radius * Math.abs(placed.track[1] - placed.track[0])
+		const arc = placed.zoomRadius * Math.abs(placed.track[1] - placed.track[0])
 		const reach = HUD.zoom.stretch * getZoomElasticity()
 		for (const [button, end] of [
 			[zoomIn, 1],
@@ -480,32 +484,41 @@ export function createHud({
 		}
 	}
 
+	// The height (px) at the bottom of the HUD's box that the zoom's circle of
+	// a split HUD keeps clear of (reserveBottom()).
+	let bottom = 0
 	const layout = () => {
 		const { clientWidth: width, clientHeight: height } = element
-		const fit = hudLayout(width, height, tones.length)
+		const fit = hudLayout(width, height, tones.length, HUD, { bottom })
 		if (!fit) return
-		const { radius, angles } = fit
+		const { radius, angles, split } = fit
 		const circle = { cx: width / 2, cy: height / 2, radius }
+		const zoomCircle = { ...circle, radius: fit.zoomRadius }
 		line.setAttribute('cx', circle.cx)
 		line.setAttribute('cy', circle.cy)
 		line.setAttribute('r', radius)
 		line.setAttribute('stroke-dasharray', dashes(radius))
+		zoomLine.style.display = split ? '' : 'none'
+		zoomLine.setAttribute('cx', circle.cx)
+		zoomLine.setAttribute('cy', circle.cy)
+		zoomLine.setAttribute('r', zoomCircle.radius)
+		zoomLine.setAttribute('stroke-dasharray', dashes(zoomCircle.radius))
 		for (const element of [spin, spinTeeth]) {
 			element.setAttribute('cx', circle.cx)
 			element.setAttribute('cy', circle.cy)
 		}
 		const toned = turnTones(angles.tones, radius, toneShift.steps)
 		for (const item of items) {
-			place(item.button, item.cut, item.angle(angles, toned), circle)
+			place(item.button, item.cut, item.angle(angles, toned), item.zoom ? zoomCircle : circle)
 			cutRadius(item)
 		}
 		placedAngles = angles
-		knob.setTrack({ ...circle, track: angles.track })
+		knob.setTrack({ ...zoomCircle, track: angles.track })
 		const middle = (angles.track[0] + angles.track[1]) / 2
 		const reach = zoomValueRadius(radius)
 		zoomValue.place(circle, reach, middle, width)
 		cameraAngles.place(circle, reach, middle + Math.PI, width)
-		placed = { ...circle, track: angles.track }
+		placed = { ...circle, zoomRadius: zoomCircle.radius, track: angles.track }
 		placeSpin()
 		placeArcs()
 		// The sway turns about the center, which moved with the layout.
@@ -521,6 +534,13 @@ export function createHud({
 		mount() {
 			layout()
 			requestAnimationFrame(stepSway)
+		},
+		// Keep the zoom's circle of a split HUD above the bottom `height` px of
+		// the HUD's box (main.js: the footer on phones).
+		reserveBottom(height) {
+			if (height === bottom) return
+			bottom = height
+			layout()
 		},
 		pressTone(color) {
 			toneButtons.forEach((button, i) =>

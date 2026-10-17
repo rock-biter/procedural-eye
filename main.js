@@ -335,13 +335,15 @@ if (urlParams.get('gui') !== '0') {
 
 	// The two share a footer: no box of its own on wide screens, where each
 	// keeps its corner; on phones a column across the frame, Snapshot above
-	// the credit line, and the panel stops above it (--footer-height).
+	// the credit line, and the panel stops above it (--footer-height), as
+	// does the zoom's circle of a split HUD (src/ui/hud.js).
 	const footer = document.createElement('footer')
 	footer.className = 'footer'
 	footer.append(snapshot, credit)
 	document.body.appendChild(footer)
 	new ResizeObserver(() => {
 		document.documentElement.style.setProperty('--footer-height', `${footer.offsetHeight}px`)
+		hud.reserveBottom(footer.offsetHeight)
 	}).observe(footer)
 
 	// The frame rate, top right, styled as the credit line: the frames the page
