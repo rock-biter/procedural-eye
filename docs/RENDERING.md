@@ -28,7 +28,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
 
 The canvas has no depth, alpha or MSAA: everything reaches it through the composer.
 
-**Backdrop**: past the skin and the back shell the scene shows the clear color, set every frame by `EyeApp`: the tone of the lit skin (its albedo raised to 1.3, as saturated as the subsurface shading makes it, times the rig's luminance), `skin.backdrop` as bright, so it blends with the skin a little darker. **Photo mode** is the same pipeline with the eye frozen: samples accumulate until `quality.photoSamples`, then rendering stops.
+**Backdrop**: past the skin and the back shell the scene shows the clear color, set every frame by `EyeApp`: the tone of the default skin lit (the `skin.color` of `defaults.json`, the HUD's light tone: its albedo raised to 1.3, as saturated as the subsurface shading makes it, times the rig's luminance), `skin.backdrop` as bright, so it blends with that skin a little darker. It keeps the default tone whatever `skin.color` becomes, so the page does not change with the skin tones. **Photo mode** is the same pipeline with the eye frozen: samples accumulate until `quality.photoSamples`, then rendering stops.
 
 ## Alpha Contract
 

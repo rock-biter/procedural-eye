@@ -274,7 +274,7 @@ export const BASE_PARAM_SCHEMA = {
 		veins: num(0.4, 0, 1, 0.01, '', 'uniform', 'veins (thin-skin tint)'),
 		pigmentation: num(0.4, 0, 1, 0.01, '', 'uniform', 'crease and canthi pigment'),
 		occlusion: num(1, 0, 1, 0.01, '', 'uniform', 'baked ambient occlusion'),
-		backdrop: num(0.55, 0, 1.5, 0.01, '', 'uniform', 'backdrop (× lit skin tone)'),
+		backdrop: num(0.55, 0, 1.5, 0.01, '', 'uniform', 'backdrop (× lit default skin tone)'),
 	},
 	// The back shell closing the skin patch behind the eye
 	// (src/adnexa/backShell.js): how far it keeps behind the globe and the lids,

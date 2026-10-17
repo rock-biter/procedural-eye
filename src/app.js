@@ -44,6 +44,9 @@ import { FOCUS_AT_INFINITY } from './renderSetup'
 import ScleraMaps from './sclera/scleraMaps'
 import { SCLERA_PSI } from './sclera/vesselGenerator'
 
+// The skin tone of the backdrop: the default skin.color (defaults.json).
+const BACKDROP_SKIN = getLeaf(PARAM_SCHEMA, 'skin.color').default
+
 export default class EyeApp {
 	// `frozen`: start with the animation clock stopped (captures).
 	constructor({ setup, params, frozen = false }) {
@@ -506,11 +509,13 @@ export default class EyeApp {
 		this.post.render()
 	}
 
-	// The backdrop beyond the skin: the tone of the lit skin (its albedo,
-	// saturated as the subsurface shading saturates it), skin.backdrop as bright.
+	// The backdrop beyond the skin: the tone of the default skin lit (its
+	// albedo, saturated as the subsurface shading saturates it), skin.backdrop
+	// as bright. It keeps that tone whatever skin.color becomes, so the page
+	// does not change with the skin tones.
 	backdropRadiance() {
 		const light = this.lightRig.luminance * 0.05 * this.params.skin.backdrop
-		return hexToLinearRgb(this.params.skin.color).map((c) => c ** 1.3 * light)
+		return hexToLinearRgb(BACKDROP_SKIN).map((c) => c ** 1.3 * light)
 	}
 
 	// Approximate radiance of a diffuse surface of sRGB `hex` near the eye, lit
