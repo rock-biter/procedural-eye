@@ -409,12 +409,17 @@ export const BASE_PARAM_SCHEMA = {
 	// ones, much narrower, from `mobileIn` to `mobileOut`, both farther.
 	// Landscape screens start `start` of the way from their zoom in to their
 	// zoom out on the zoom's log scale (0.5: the knob on the horizontal),
-	// portrait ones `mobileStart` of the way.
+	// portrait ones `mobileStart` of the way. The zoom sets the sensor height
+	// too, from `sensorOut` zoomed out to `sensorIn` zoomed in (zoomSensor(),
+	// src/ui/hudLayout.js): a smaller sensor, farther away for the same
+	// framing, deepens the focus up close.
 	zoom: {
 		in: num(180, 60, 1000, 0.5, 'mm', 'uniform', 'desktop zoom in distance'),
 		out: num(480, 60, 1000, 0.5, 'mm', 'uniform', 'zoom out distance'),
 		mobileIn: num(268, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom in distance'),
 		mobileOut: num(811, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom out distance'),
+		sensorIn: num(24, 8, 36, 0.1, 'mm', 'uniform', 'sensor height zoomed in'),
+		sensorOut: num(24, 8, 36, 0.1, 'mm', 'uniform', 'sensor height zoomed out'),
 		start: num(0.5, 0, 1, 0.01, '', 'uniform', 'desktop start (zoom in → out, log)'),
 		mobileStart: num(0.5, 0, 1, 0.01, '', 'uniform', 'mobile start (zoom in → out, log)'),
 		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),

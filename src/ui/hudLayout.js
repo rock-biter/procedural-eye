@@ -452,3 +452,12 @@ export function zoomValueRadius(radius, hud = HUD, split = false) {
 export function zoomDistance(level, [near, far]) {
 	return far * (near / far) ** level
 }
+
+// The sensor height (mm) of a zoom level (clamped to [0, 1]), from `sensorOut`
+// zoomed out to `sensorIn` zoomed in: geometric in the square of the level, so
+// it shrinks mostly near the zoom-in end, where a smaller sensor (and the
+// camera farther away for the same framing) deepens the thin focus.
+export function zoomSensor(level, [sensorIn, sensorOut]) {
+	const t = Math.min(Math.max(level, 0), 1)
+	return sensorOut * (sensorIn / sensorOut) ** (t * t)
+}

@@ -321,7 +321,7 @@
   },
   "camera": {
     "focalLength": 110,
-    "fNumber": 17,
+    "fNumber": 24,
     "sensorHeight": 24,
     "distance": 381.438769,
     "azimuth": -60.5,
@@ -333,12 +333,14 @@
     "whiteBalance": 5600
   },
   "zoom": {
-    "in": 180,
+    "in": 230,
     "out": 480,
-    "mobileIn": 268,
+    "mobileIn": 426,
     "mobileOut": 811,
-    "start": 0.36,
-    "mobileStart": 0.5,
+    "sensorIn": 12,
+    "sensorOut": 24,
+    "start": 0.34,
+    "mobileStart": 0.42,
     "duration": 0.7,
     "elasticity": 0.12
   },

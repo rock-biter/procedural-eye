@@ -1,7 +1,7 @@
 // Pointer controls that edit params.camera directly (the params stay the single
 // source of truth): drag orbits, shift- or right-drag pans the target, the
 // wheel changes the focus distance (and with it the magnification) within
-// `distanceLimits`. An orbit coasts after the drag lets go, for
+// `distanceLimits`, and the sensor height with it (`zoomSensor`). An orbit coasts after the drag lets go, for
 // `controls.inertia`. The mouse also turns the view a little toward itself
 // (`controls.parallax` zoomed in, `controls.parallaxOut` zoomed out): a turn
 // of the orbit kept in `parallax`, not in the params, which
@@ -29,6 +29,9 @@ export default class CameraControls {
 		// wheel only brings the camera back toward them. The parallax's reach
 		// follows the zoom level between them.
 		this.distanceLimits = null
+		// (distance) => the sensor height (mm) the zoom sets there, or null:
+		// the wheel eases the sensor toward it with the distance.
+		this.zoomSensor = null
 		this.pointer = null
 		// The coasting orbit's speed (deg/s), or null.
 		this.velocity = null
@@ -142,7 +145,10 @@ export default class CameraControls {
 	}
 
 	// One step of the camera toward the wheel's target. Anything else that
-	// sets the distance meanwhile (a zoom button, the knob) takes over.
+	// sets the distance meanwhile (a zoom button, the knob) takes over. The
+	// sensor eases toward the target's on the same log scale and lag: from a
+	// distance and sensor of the zoom it stays on the zoom's curve, from
+	// others (a reference preset) it joins it without a jump.
 	stepZoom(dt) {
 		if (this.zoomTarget === null) return
 		const camera = this.params.camera
@@ -150,10 +156,18 @@ export default class CameraControls {
 			this.zoomTarget = null
 			return
 		}
-		const distance = zoomToward(camera.distance, this.zoomTarget, dt, this.params.controls.zoomLag)
+		const lag = this.params.controls.zoomLag
+		const distance = zoomToward(camera.distance, this.zoomTarget, dt, lag)
 		this.set('camera.distance', distance)
+		let landed = distance === this.zoomTarget
+		if (this.zoomSensor) {
+			const target = this.zoomSensor(this.zoomTarget)
+			const sensor = zoomToward(camera.sensorHeight, target, dt, lag)
+			this.set('camera.sensorHeight', sensor)
+			landed &&= sensor === target
+		}
 		this.zoomSet = camera.distance
-		if (distance === this.zoomTarget) this.zoomTarget = null
+		if (landed) this.zoomTarget = null
 		this.onChange()
 	}
 

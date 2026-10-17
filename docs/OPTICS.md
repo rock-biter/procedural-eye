@@ -104,6 +104,7 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 - **Field of view**: that of a thin lens focused there, fov = 2·atan(h / 2s_i) with s_i = f·s / (s − f).
   - The field narrows as the focus gets closer (focus breathing).
   - At the default 185 mm with the default 110 mm lens, the magnification is about 1.5:1. The reference presets use 100 mm, about 1.2:1.
+- **Depth of field and the sensor**: for one framing, the depth of field depends only on the f-number and the magnification, about 2·N·c·(1 + m)/m², with c the blur circle of a pixel (the sensor height over the image's). A smaller sensor frames the same field at a lower magnification, from farther away, so its focus is deeper; the focal length does not change it. The zoom uses this: it shrinks the sensor as it goes in ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)), where the focus of a macro framing is thinnest. Diffraction, which would soften a small sensor at a high f-number, is not modeled.
 - **Accumulation samples**:
   - They move the camera across the aperture (radius f / 2N, concentric-disk samples) and shear the projection so the focus plane stays fixed, plus a subpixel jitter.
   - The mean of the samples is the physically correct depth of field, reflections and refraction included.

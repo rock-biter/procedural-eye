@@ -23,6 +23,7 @@ import {
 	zoomLevel,
 	zoomProgress,
 	zoomRadius,
+	zoomSensor,
 } from '../src/ui/hudLayout'
 
 // The HUD's box on a desktop window (1600 × 1000), on a phone held upright
@@ -298,6 +299,28 @@ test('the knob sits on the horizontal at the middle of the zoom (split: at the b
 	}
 	// The start framing sits there: halfway on the zoom's log scale.
 	assert.ok(near(zoomLevel(zoomDistance(0.5, [180, 480]), [180, 480]), 0.5))
+})
+
+test('the zoom shrinks the sensor toward the zoom-in end, the framing tightening all the way', () => {
+	const sensors = [12, 24]
+	assert.ok(near(zoomSensor(0, sensors), 24))
+	assert.ok(near(zoomSensor(1, sensors), 12))
+	// Past the ends (an elastic drag) it holds the end's.
+	assert.ok(near(zoomSensor(-0.2, sensors), 24))
+	assert.ok(near(zoomSensor(1.2, sensors), 12))
+	// Mostly near the zoom-in end: halfway it has done less than half.
+	assert.ok(zoomSensor(0.5, sensors) > Math.sqrt(12 * 24))
+	// With the defaults' ends (a 110 mm lens, the zoom-in farther for the
+	// smaller sensor), the field framed narrows monotonically as the zoom goes in.
+	const limits = [230, 480]
+	let field = Infinity
+	for (let level = 0; level <= 1; level += 0.05) {
+		const distance = zoomDistance(level, limits)
+		const next = (zoomSensor(level, sensors) * (distance - 110)) / 110
+		assert.ok(next < field, `field at ${level}`)
+		assert.ok(zoomSensor(level + 0.05, sensors) <= zoomSensor(level, sensors))
+		field = next
+	}
 })
 
 test('the zoom value reads between the spinning circle and the outer zoom ring', () => {

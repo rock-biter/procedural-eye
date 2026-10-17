@@ -117,7 +117,7 @@
 The panel, the camera controls and `window.__EYE__.setParams()` all edit the one params object.
 - **Changes**: `EyeApp.onParamChange(path)` looks up the schema leaf, records its `kind` as dirty and restarts the accumulation. Values of kind `uniform` need nothing else, because every frame reads the params.
 - **Listeners**: those added to `app.listeners` hear every change. The panel refreshes after camera moves, and at the start and end of transitions. Tweakpane reports its own refreshes as changes; the panel ignores them, because they are not edits.
-- **Bulk changes**: loading a preset, **Random eye** and the zoom buttons glide to their values ([Transitions](#transitions)); a zoom changes only `camera.distance`, over `zoom.duration`. `setParams()` ends a running transition, then replaces the values at once and marks everything for rebuild.
+- **Bulk changes**: loading a preset, **Random eye** and the zoom buttons glide to their values ([Transitions](#transitions)); a zoom changes only `camera.distance` and `camera.sensorHeight` (the sensor the zoom sets there, [`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)), over `zoom.duration`. `setParams()` ends a running transition, then replaces the values at once and marks everything for rebuild.
 
 ## Transitions
 

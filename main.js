@@ -17,7 +17,7 @@ import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
-import { zoomDistance, zoomLevel, zoomProgress } from './src/ui/hudLayout'
+import { zoomDistance, zoomLevel, zoomProgress, zoomSensor } from './src/ui/hudLayout'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
 // #debug), creates the params, the renderer and the app, the HUD unless
@@ -47,14 +47,19 @@ if (urlParams.has('view')) setValue(PARAM_SCHEMA, params, 'debug.view', urlParam
 function zoomDistances(settings) {
 	return portrait() ? [settings.mobileIn, settings.mobileOut] : [settings.in, settings.out]
 }
+// Sets the camera of `target` to the zoom `level` (0 out, 1 in; past them
+// while the knob is dragged elastically) of the screen's zoom `settings`: the
+// distance, and the sensor height the zoom sets there (src/ui/hudLayout.js),
+// smaller zoomed in for a deeper focus.
+function zoomCamera(target, level, settings) {
+	const distance = zoomDistance(level, zoomDistances(settings))
+	const sensor = zoomSensor(level, [settings.sensorIn, settings.sensorOut])
+	setValue(PARAM_SCHEMA, target, 'camera.distance', distance)
+	setValue(PARAM_SCHEMA, target, 'camera.sensorHeight', sensor)
+}
 if (!urlParams.has('state') && !urlParams.has('preset')) {
 	const start = portrait() ? params.zoom.mobileStart : params.zoom.start
-	setValue(
-		PARAM_SCHEMA,
-		params,
-		'camera.distance',
-		zoomDistance(1 - start, zoomDistances(params.zoom)),
-	)
+	zoomCamera(params, 1 - start, params.zoom)
 }
 
 const setup = new RenderSetup({ params, urlParams })
@@ -63,6 +68,13 @@ const app = new EyeApp({ setup, params, frozen: urlParams.has('photo') })
 // The app object itself, for console debugging.
 if (urlParams.has('debug')) window.__EYE_APP__ = app
 app.controls.distanceLimits = () => zoomDistances(app.targetParams.zoom)
+app.controls.zoomSensor = (distance) => {
+	const settings = app.targetParams.zoom
+	return zoomSensor(zoomLevel(distance, zoomDistances(settings)), [
+		settings.sensorIn,
+		settings.sensorOut,
+	])
+}
 
 // The panel's random-eye ancestry and the length of preset and random-eye
 // transitions (seconds; 0 switches at once).
@@ -96,9 +108,8 @@ function loadRandomEye(ancestry = panelState.ancestry, seed, duration = panelSta
 // HUD's knob snapping to an end). The rest keeps the values a running
 // transition is heading for.
 function zoom(direction, duration = app.targetParams.zoom.duration) {
-	const [near, far] = zoomDistances(app.targetParams.zoom)
 	const target = cloneParams(app.targetParams)
-	setValue(PARAM_SCHEMA, target, 'camera.distance', direction === 'in' ? near : far)
+	zoomCamera(target, direction === 'in' ? 1 : 0, target.zoom)
 	app.transitionTo(target, duration)
 }
 
@@ -108,8 +119,9 @@ function zoom(direction, duration = app.targetParams.zoom.duration) {
 const zoomLimits = () => zoomDistances(app.targetParams.zoom)
 const getZoomLevel = () => zoomLevel(app.params.camera.distance, zoomLimits())
 function setZoomLevel(level) {
-	setValue(PARAM_SCHEMA, app.params, 'camera.distance', zoomDistance(level, zoomLimits()))
+	zoomCamera(app.params, level, app.targetParams.zoom)
 	app.onParamChange('camera.distance')
+	app.onParamChange('camera.sensorHeight')
 }
 
 // Glides `skin.color` to the tone `name` (src/params/skinTones.js), as the
