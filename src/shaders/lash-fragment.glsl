@@ -8,10 +8,12 @@
 uniform vec3 uLashColor;
 uniform float uLashShine;
 
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying vec3 vTangent;
-varying vec2 vLash;
+// Centroid, so a multisampled pass never shades a lash off its tube
+// (lash-vertex.glsl).
+centroid varying vec3 vWorldPos;
+centroid varying vec3 vNormal;
+centroid varying vec3 vTangent;
+centroid varying vec2 vLash;
 
 void main() {
 	vec3 v = normalize(cameraPosition - vWorldPos);

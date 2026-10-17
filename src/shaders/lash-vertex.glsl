@@ -6,10 +6,15 @@ attribute vec2 lash; // position along the lash (0 root, 1 tip), per-lash random
 
 attribute vec2 follow;
 
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying vec3 vTangent;
-varying vec2 vLash;
+// Centroid: a multisampled pass (the half-resolution share of a split
+// frame, src/render/scenePass.js) shades a lash that covers one sample of a
+// pixel at the pixel's center, off the thin tube, where plain varyings
+// extrapolate far (vLash.x past 1 cubed into the albedo, a point hundreds
+// of mm away) and the pixel flares; centroid ones stay on the triangle.
+centroid varying vec3 vWorldPos;
+centroid varying vec3 vNormal;
+centroid varying vec3 vTangent;
+centroid varying vec2 vLash;
 
 void main() {
 	float angle = lidFollowAngle(follow);

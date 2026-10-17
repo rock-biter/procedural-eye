@@ -765,9 +765,9 @@ canvas {
 }
 
 .masthead h1 {
-	margin: 0px 0 0 -6px;
+	margin: 3px 0 0 -4px;
 	font-family: 'Kode Mono', 'JetBrains Mono', ui-monospace, monospace;
-	font-size: 112px;
+	font-size: 84px;
 	font-weight: inherit;
 	line-height: 0.9;
 	color: #fff;
@@ -779,7 +779,7 @@ canvas {
 
 /* Under the title, the project in a few lines. */
 .masthead p {
-	max-width: 76ch;
+	max-width: 60ch;
 	margin: 4px 0 0 0px;
 	text-wrap: pretty;
 	font-size: 12px;
@@ -828,7 +828,7 @@ canvas {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 2px 64px;
+	padding: 2px 48px;
 	border: 0;
 	background:
 		linear-gradient(var(--accent), var(--accent)) left top / 12px 1px,
@@ -888,7 +888,7 @@ canvas {
 	}
 
 	.masthead h1 {
-		margin: -0.04em 0 0 -0.078em;
+		margin: -0.05em 0 0 -0.078em;
 		font-size: var(--title-size);
 		line-height: 0.8;
 		white-space: nowrap;
