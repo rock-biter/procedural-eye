@@ -670,6 +670,7 @@ canvas {
 .masthead,
 .credit,
 .fps,
+.today,
 .snapshot {
 	position: fixed;
 	z-index: 10;
@@ -805,9 +806,9 @@ canvas {
    second line, without the dash. At a line height of 0.8 the capitals
    (0.70em) start 0.04em below the line's top, which the top margin takes
    back: the first line's capitals start at --ui-inset, the second's
-   --title-size lower, where the viewport size and the frame rate align
-   their capitals (0.32em below their line's top). The line about the project
-   is hidden. */
+   --title-size lower. The line about the project is hidden. The viewport
+   size and the frame rate move to the bottom right, beside the credit line,
+   in its type and on its last baseline. */
 @media (max-width: 640px) {
 	:root {
 		--title-size: calc(
@@ -836,7 +837,8 @@ canvas {
 	}
 
 	.fps {
-		top: calc(var(--ui-inset) + env(safe-area-inset-top) + 0.8 * var(--title-size) - 0.32em);
+		top: auto;
+		bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
 	}
 
 	/* Snapshot above the credit line, across the frame; the credit takes
@@ -860,6 +862,106 @@ canvas {
 
 	.credit {
 		max-width: 75%;
+	}
+}
+
+/* Today's date, More info and the dropdown it opens show only on phones. */
+.today,
+.more-info,
+.info {
+	display: none;
+}
+
+@media (max-width: 640px) {
+	/* Today's date, at the right, its capitals (0.32em below its line's top)
+	   aligned with the top of "eyes" (--title-size below the top inset), where
+	   wider screens keep the viewport size and the frame rate. */
+	.today {
+		top: calc(var(--ui-inset) + env(safe-area-inset-top) + 0.8 * var(--title-size) - 0.32em);
+		right: calc(var(--ui-inset) + env(safe-area-inset-right));
+		display: block;
+	}
+
+	/* More info, in the accent and underlined, at the right on the baseline
+	   of "eyes" (1.5 --title-size below the top inset; its own baseline 1.06em
+	   below its line's top). */
+	.more-info {
+		position: fixed;
+		top: calc(var(--ui-inset) + env(safe-area-inset-top) + 1.5 * var(--title-size) - 1.06em);
+		right: calc(var(--ui-inset) + env(safe-area-inset-right));
+		z-index: 10;
+		display: block;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--accent);
+		font:
+			400 12px/1.4 'JetBrains Mono',
+			ui-monospace,
+			monospace;
+		letter-spacing: 0.02em;
+		text-transform: inherit;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	/* The dropdown: across the frame from 16px below the baseline of "eyes"
+	   to 16px above Snapshot (the footer's height, set by main.js), on a
+	   faint white over the blurred image, its top left and bottom right
+	   corners cut at 45 degrees. It fades in. */
+	.info {
+		--info-cut: 24px;
+		position: fixed;
+		top: calc(var(--ui-inset) + env(safe-area-inset-top) + 1.5 * var(--title-size) + 16px);
+		right: calc(var(--ui-inset) + env(safe-area-inset-right));
+		bottom: calc(
+			var(--ui-inset) + env(safe-area-inset-bottom) + var(--footer-height, 120px) + 16px
+		);
+		left: calc(var(--ui-inset) + env(safe-area-inset-left));
+		z-index: 11;
+		display: block;
+		box-sizing: border-box;
+		padding: 24px;
+		overflow-y: auto;
+		background: rgba(255, 255, 255, 0.08);
+		-webkit-backdrop-filter: blur(16px);
+		backdrop-filter: blur(16px);
+		clip-path: polygon(
+			var(--info-cut) 0,
+			100% 0,
+			100% calc(100% - var(--info-cut)),
+			calc(100% - var(--info-cut)) 100%,
+			0 100%,
+			0 var(--info-cut)
+		);
+		color: #ffffffcc;
+		font:
+			400 12px/1.6 'JetBrains Mono',
+			ui-monospace,
+			monospace;
+		letter-spacing: 0.02em;
+		opacity: 0;
+		visibility: hidden;
+		transition:
+			opacity 0.2s,
+			visibility 0s 0.2s;
+	}
+
+	.info.open {
+		opacity: 1;
+		visibility: visible;
+		transition: opacity 0.2s;
+	}
+
+	.info p {
+		margin: 0;
+		text-wrap: pretty;
+	}
+
+	.info span {
+		color: var(--accent);
 	}
 }
 

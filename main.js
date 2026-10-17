@@ -262,13 +262,58 @@ if (urlParams.get('gui') !== '0') {
 	// buttons do. On phones the title drops its dash and breaks before "eyes",
 	// and the panel starts below it, at its height (--masthead-height,
 	// style.css).
+	const description = `The digital eye configurator.<br> Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with <span>the eyes</span>.`
 	const masthead = document.createElement('header')
 	masthead.className = 'masthead'
-	masthead.innerHTML = `<h1>Random<span class="title-dash">-</span><span class="title-eyes">eyes</span></h1><p>The digital eye configurator.<br> Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with <span>the eyes</span>.</p>`
+	masthead.innerHTML = `<h1>Random<span class="title-dash">-</span><span class="title-eyes">eyes</span></h1><p>${description}</p>`
 	document.body.appendChild(masthead)
 	new ResizeObserver(() => {
 		document.documentElement.style.setProperty('--masthead-height', `${masthead.offsetHeight}px`)
 	}).observe(masthead)
+
+	// Phones hide the line about the project under the title: More info, on
+	// the baseline of "eyes", opens it in a dropdown between the title and
+	// Snapshot (style.css). A second press, Escape or a press outside it
+	// closes it.
+	const moreInfo = document.createElement('button')
+	moreInfo.type = 'button'
+	moreInfo.className = 'more-info'
+	moreInfo.textContent = 'More info'
+	moreInfo.setAttribute('aria-controls', 'info')
+	const info = document.createElement('div')
+	info.id = 'info'
+	info.className = 'info'
+	info.innerHTML = `<p>${description}</p>`
+	const showInfo = (shown) => {
+		info.classList.toggle('open', shown)
+		moreInfo.setAttribute('aria-expanded', String(shown))
+	}
+	showInfo(false)
+	moreInfo.addEventListener('click', () => {
+		moreInfo.blur()
+		showInfo(!info.classList.contains('open'))
+	})
+	window.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') showInfo(false)
+	})
+	window.addEventListener('pointerdown', (event) => {
+		if (!info.contains(event.target) && !moreInfo.contains(event.target)) showInfo(false)
+	})
+	document.body.append(moreInfo, info)
+
+	// Phones show today's date, top right beside "eyes", as MM.DD.YY in the
+	// user's time zone; it turns over at local midnight.
+	const today = document.createElement('div')
+	today.className = 'today'
+	const showToday = () => {
+		const now = new Date()
+		const pad = (value) => String(value).padStart(2, '0')
+		today.textContent = `${pad(now.getMonth() + 1)}.${pad(now.getDate())}.${pad(now.getFullYear() % 100)}`
+		const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+		setTimeout(showToday, midnight - now + 1000)
+	}
+	showToday()
+	document.body.appendChild(today)
 	const credit = document.createElement('p')
 	credit.className = 'credit'
 	credit.innerHTML =
