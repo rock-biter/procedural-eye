@@ -276,7 +276,7 @@ canvas {
 	fill: none;
 	stroke: #fff;
 	stroke-width: 1;
-	opacity: 0.3;
+	opacity: 0.5;
 }
 
 /* The circle between the central ring and the outer zoom ring: long
@@ -284,7 +284,7 @@ canvas {
    quickly, with the --elastic settle. */
 .hud-spin {
 	stroke-width: 1;
-	opacity: 0.5;
+	opacity: 0.4;
 	transition:
 		stroke-dashoffset 0.6s var(--elastic),
 		stroke 0.4s;
@@ -331,7 +331,7 @@ canvas {
    accent; a change of skin tone carries each to its new place, elastically. */
 .hud-arc {
 	stroke-width: 2;
-	opacity: 0.4;
+	opacity: 0.5;
 	transition:
 		stroke-dashoffset 1s var(--elastic),
 		stroke 0.4s;
@@ -354,15 +354,15 @@ canvas {
 /* Their opacity at rest (the SVGs' strokes are opaque, the outer ring's
    arcs 0.75 of its ticks); lit, they also show more (`.active`). */
 .hud-orbit-inner {
-	opacity: 0.35;
+	opacity: 0.5;
 }
 
 .hud-orbit-outer {
-	opacity: 0.4;
+	opacity: 0.5;
 }
 
 .hud-orbit.active {
-	opacity: 0.85;
+	opacity: 0.8;
 }
 
 /* Each ring's SVG masks a box of the wrapper's color (its strokes' own
