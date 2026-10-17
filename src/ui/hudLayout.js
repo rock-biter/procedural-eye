@@ -53,11 +53,20 @@ export const HUD = Object.freeze({
 	// circle (HUD.spin) on a wider one, `spin.radiusRatio` of it, its teeth
 	// `spin.tooth` px long. The readouts sit at `readouts.radiusRatio` of it,
 	// the zoom's value `readouts.drop` px further out (lower, at the bottom).
+	// The segmented zoom rings (HUD.inner, HUD.outer) lie at `inner` and
+	// `outer.radiusRatio` of it, the outer one's ticks `outer.tick` of its
+	// radius long, turned `orbitTurn` further: symmetric about the vertical,
+	// where the zoom is. They turn the other way with the zoom
+	// (`orbitDirection`).
 	split: Object.freeze({
 		overhang: 10,
 		arcs: Object.freeze({ radiusRatio: 0.69 }),
 		spin: Object.freeze({ radiusRatio: 1.185, tooth: 9 }),
 		readouts: Object.freeze({ radiusRatio: 1.28, drop: 4 }),
+		inner: Object.freeze({ radiusRatio: 0.762 }),
+		outer: Object.freeze({ radiusRatio: 1.596, tick: 0.05825 }),
+		orbitTurn: 90 * DEGREE,
+		orbitDirection: -1,
 		tones: Object.freeze({ center: 135 * DEGREE }),
 		random: Object.freeze({ angle: 0 }),
 		zoom: Object.freeze({ center: 90 * DEGREE, radiusRatio: 1.45, minArc: 208, clearance: 12 }),
@@ -293,14 +302,24 @@ export function zoomLevel(distance, limits) {
 // framing and the knob sit), turned `turn` (radians, clockwise) zoomed in and
 // as much the other way zoomed out. Past an end (`stretch`: an elastic drag,
 // up to zoom.elasticity) they turn on; otherwise they stop at the end. Their
-// ratios preserve strict separation from the central ring at any size.
-export function orbitRing(radius, level, kind, stretch = false, hud = HUD) {
+// ratios preserve strict separation from the central ring at any size. On
+// a split HUD (`split`) they take HUD.split's ratios and turn from the
+// vertical instead, each the other way.
+export function orbitRing(radius, level, kind, stretch = false, hud = HUD, split = false) {
 	const orbit = hud[kind]
 	const zoom = stretch ? level : Math.min(Math.max(level, 0), 1)
 	return {
-		radius: radius * orbit.radiusRatio,
-		turn: orbit.turn * (2 * zoom - 1),
+		radius: radius * orbitShape(kind, split, hud).radiusRatio,
+		turn: split
+			? hud.split.orbitTurn + hud.split.orbitDirection * orbit.turn * (2 * zoom - 1)
+			: orbit.turn * (2 * zoom - 1),
 	}
+}
+
+// A segmented ring's shape (HUD.inner or HUD.outer), with a split HUD's
+// ratio and tick in place of its own.
+function orbitShape(kind, split, hud) {
+	return split ? { ...hud[kind], ...hud.split[kind] } : hud[kind]
 }
 
 // The dashes along a line `length` px long that starts and ends on a whole
@@ -317,9 +336,9 @@ export function dashFit(length, dash, gap) {
 // down): `{ reach, paths: [{ d, dashArray, opacity }] }`, `reach` the
 // farthest any reaches. Its geometry follows the radius; its dashes keep
 // their size in px (HUD.orbitDash), each line starting and ending on a
-// whole dash.
-export function orbitArt(kind, radius, hud = HUD) {
-	const { radiusRatio, arc, tick, arcOpacity = 1 } = hud[kind]
+// whole dash. `split`: a split HUD's ring (orbitShape()).
+export function orbitArt(kind, radius, hud = HUD, split = false) {
+	const { radiusRatio, arc, tick, arcOpacity = 1 } = orbitShape(kind, split, hud)
 	const { dash, gap, tickDash, tickGap } = hud.orbitDash
 	const ring = radius * radiusRatio
 	const foot = ring * (1 + tick)

@@ -161,13 +161,13 @@ export function createHud({
 		wrapper.append(art)
 		return { kind, wrapper, art, radius: null }
 	})
-	// Each ring's paths for the HUD's circle of `radius` px, redrawn when it
-	// changes.
-	const drawOrbits = (radius) => {
+	// Each ring's paths for the HUD's circle of `radius` px, split or not,
+	// redrawn when either changes.
+	const drawOrbits = (radius, split) => {
 		for (const asset of orbitAssets) {
-			if (asset.radius === radius) continue
-			asset.radius = radius
-			const { reach, paths } = orbitArt(asset.kind, radius)
+			if (asset.radius === radius && asset.split === split) continue
+			Object.assign(asset, { radius, split })
+			const { reach, paths } = orbitArt(asset.kind, radius, HUD, split)
 			const half = Math.ceil(reach) + 1
 			asset.art.setAttribute('viewBox', `${-half} ${-half} ${2 * half} ${2 * half}`)
 			asset.art.style.left = asset.art.style.top = `${-half}px`
@@ -462,10 +462,10 @@ export function createHud({
 	let level = null
 	const placeOrbit = () => {
 		if (!placed || level === null) return
-		const { cx, cy, radius } = placed
-		drawOrbits(radius)
+		const { cx, cy, radius, split } = placed
+		drawOrbits(radius, split)
 		for (const asset of orbitAssets) {
-			const ring = orbitRing(radius, level, asset.kind, stretching)
+			const ring = orbitRing(radius, level, asset.kind, stretching, HUD, split)
 			asset.wrapper.style.left = `${cx}px`
 			asset.wrapper.style.top = `${cy}px`
 			const turn = ring.turn + sway[asset.kind]

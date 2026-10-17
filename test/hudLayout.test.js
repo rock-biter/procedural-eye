@@ -212,6 +212,32 @@ test('the two zoom rings keep their zoom-out sizes and counter-rotate inside and
 	// Stretched past an end by a drag, they turn on a little.
 	assert.ok(near(orbitRing(450, 1.1, 'inner', true).turn, 1.2 * 45 * DEGREE))
 	assert.ok(near(orbitRing(450, -0.1, 'outer', true).turn, 1.2 * 30 * DEGREE))
+	// A split HUD's: level with the vertical at the middle of the zoom, the
+	// inner one in from the central circle, clear of the tones' arcs, the
+	// outer one out past the spinning circle and the readouts.
+	const radius = 163
+	for (const kind of ['inner', 'outer']) {
+		const ring = orbitRing(radius, 0.5, kind, false, HUD, true)
+		assert.ok(near(ring.turn, 90 * DEGREE))
+		assert.ok(near(ring.radius, radius * HUD.split[kind].radiusRatio))
+		const ends = [0, 1].map((level) => orbitRing(radius, level, kind, false, HUD, true).turn)
+		assert.ok(near(ends[0] - 90 * DEGREE, 90 * DEGREE - ends[1]))
+		// Each the other way than elsewhere.
+		const turned = orbitRing(radius, 1, kind).turn
+		assert.ok(near(ends[1] - 90 * DEGREE, -turned))
+		const art = orbitArt(kind, radius, HUD, true)
+		const tick = HUD.split[kind].tick ?? HUD[kind].tick
+		assert.ok(near(art.reach, ring.radius * (1 + Math.max(tick, 0))))
+	}
+	const inner = orbitRing(radius, 0.5, 'inner', false, HUD, true).radius
+	assert.ok(inner * (1 + HUD.inner.tick) > toneArcs(radius, 0, HUD, true)[0].radius + 4)
+	assert.ok(inner < radius - 8)
+	const outer = orbitRing(radius, 0.5, 'outer', false, HUD, true).radius
+	// The outer ring's ticks half as long as elsewhere.
+	assert.ok(near(HUD.split.outer.tick, HUD.outer.tick / 2))
+	const teeth = spinRing(radius, 0, HUD, true).teeth
+	assert.ok(outer > teeth.radius + teeth.width / 2 + 8)
+	assert.ok(outer > zoomValueRadius(radius, HUD, true) + 8)
 })
 
 test('a dashed line starts and ends on a whole dash, its gap close to the one asked', () => {
@@ -287,7 +313,7 @@ test('the zoom value reads between the spinning circle and the outer zoom ring',
 		const angles = at - (split ? HUD.split.readouts.drop : 0)
 		for (const reach of [at, angles]) {
 			assert.ok(reach > spin.teeth.radius + spin.teeth.width / 2 - 1)
-			assert.ok(reach < orbitRing(radius, 0.5, 'outer').radius)
+			assert.ok(reach < orbitRing(radius, 0.5, 'outer', false, HUD, split).radius)
 		}
 	}
 	assert.ok(near(zoomValueRadius(163, HUD, true), 163 * 1.28 + 4))
@@ -357,7 +383,7 @@ test('the spinning circle lies between the central and the outer ring and turns 
 		[460, false],
 		[163, true],
 	]) {
-		const outer = orbitRing(radius, 0.5, 'outer').radius
+		const outer = orbitRing(radius, 0.5, 'outer', false, HUD, split).radius
 		const still = spinRing(radius, 0, HUD, split)
 		assert.ok(still.radius > radius + 8 && still.radius < outer - 8)
 		const [dash, gap] = still.dashArray

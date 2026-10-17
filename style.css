@@ -287,7 +287,8 @@ canvas {
 	opacity: 0.4;
 	transition:
 		stroke-dashoffset 0.6s var(--elastic),
-		stroke 0.4s;
+		stroke 0.4s,
+		opacity 0.4s;
 }
 
 /* A layer in use lights up in the accent (src/ui/hud.js `activate()`): the
@@ -334,7 +335,8 @@ canvas {
 	opacity: 0.5;
 	transition:
 		stroke-dashoffset 1s var(--elastic),
-		stroke 0.4s;
+		stroke 0.4s,
+		opacity 0.4s;
 }
 
 /* The segmented zoom rings (src/ui/hud.js): SVGs drawn at the layout's
@@ -363,6 +365,38 @@ canvas {
 
 .hud-orbit.active {
 	opacity: 0.8;
+}
+
+/* A split HUD (a phone held upright, src/ui/hud.js) draws every circle 0.3
+   fainter: the central circle and the zoom's, the spinning circle and its
+   teeth, the tones' arcs and the zoom rings. Lit, the spinning circle and
+   the arcs also show 0.2 more, the zoom rings 0.3 more. */
+.hud.split .hud-line {
+	opacity: 0.2;
+}
+
+.hud.split .hud-spin {
+	opacity: 0.1;
+}
+
+.hud.split .hud-arc {
+	opacity: 0.2;
+}
+
+.hud.split .hud-spin.active {
+	opacity: 0.3;
+}
+
+.hud.split .hud-arc.active {
+	opacity: 0.4;
+}
+
+.hud.split .hud-orbit {
+	opacity: 0.2;
+}
+
+.hud.split .hud-orbit.active {
+	opacity: 0.5;
 }
 
 /* Each ring's strokes take the wrapper's color, so it can change. */
