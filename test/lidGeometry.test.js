@@ -217,6 +217,46 @@ test('the skin turns into the face without creases', () => {
 	}
 })
 
+test('the lower lid flows into the cheek without a groove under it', () => {
+	// Down each lower-lid column, from past the margin's edge to beyond the
+	// junction with the cheek, the skin's profile bends gently (its skin
+	// following the receding globe left a groove under the lid that bent it by
+	// 0.7 per mm).
+	const around = 280
+	const across = 150
+	const cases = [
+		[params.lids, 1],
+		[params.lids, -1],
+		[{ ...params.lids, fissureWidth: 31, mrd2: 7 }, 1],
+		[{ ...params.lids, fissureWidth: 25, mrd2: 4 }, -1],
+		[{ ...params.lids, lowerHeight: 4, lowerFullness: 1 }, -1],
+		[{ ...params.lids, lowerHeight: 9, cheekProjection: 4 }, 1],
+	]
+	for (const [lids, side] of cases) {
+		const mesh = createLidMesh(lids, eyes[side], side, { around, across })
+		let worst = 0
+		for (let i = 0; i < around; i++) {
+			if (mesh.lid[i * across * 4 + 3] > 0.01) continue
+			const profile = []
+			for (let j = 0; j < across; j++) {
+				const k = i * across + j
+				profile.push([mesh.lid[k * 4 + 2], mesh.positions[k * 3 + 2]])
+			}
+			const z = (a) => {
+				const k = profile.findIndex((p) => p[0] >= a)
+				const f = (a - profile[k - 1][0]) / (profile[k][0] - profile[k - 1][0])
+				return profile[k - 1][1] + (profile[k][1] - profile[k - 1][1]) * f
+			}
+			for (let a = 1.5; a <= 10.5; a += 0.25) {
+				const slope = (z(a + 0.5) - z(a - 0.5)) / 1
+				const bend = (z(a + 0.5) - 2 * z(a) + z(a - 0.5)) / 0.25 / (1 + slope * slope) ** 1.5
+				worst = Math.max(worst, bend)
+			}
+		}
+		assert.ok(worst < 0.4, `bend ${worst} per mm`)
+	}
+})
+
 test('the mesh keeps its layout as the lids close (a blink can morph between them)', () => {
 	const size = { around: 120, across: 40 }
 	const open = createLidMesh(params.lids, eye, 1, size)

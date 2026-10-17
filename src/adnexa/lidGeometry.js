@@ -13,9 +13,10 @@
 // - the intermarginal strip: the posterior margin rests on the support, the
 //   strip rises `marginThickness` off it;
 // - the anterior edge, rounded with `marginRadius`, where the lashes grow;
-// - the lid: a shell over the support that thickens to the lid's thickness,
-//   with the upper lid's crease under its fold and the lower lid's pretarsal
-//   roll;
+// - the lid: on the upper lid a shell over the support that thickens to the
+//   lid's thickness, with the crease under its fold; on the lower lid a front
+//   that leaves the edge at the margin's tilt and bulges down to the cheek
+//   (lowerFront()), with its pretarsal roll and its fullness;
 // - the face (createFace()), which the lid turns into away from the margin:
 //   the brow above, the nose medially, the cheek below, the temple laterally.
 //   The face passes through the lid's shell along a ring around the fissure,
@@ -77,6 +78,12 @@ const SHIFT_FADE = 6
 const LOWER_MARGIN = 0.8
 // The thinnest the lid gets off the globe (mm), in its crease.
 const MIN_THICKNESS = 0.6
+// The lower lid's front (lowerFront()) turns into the face from `turn` mm
+// before its junction with it (`lids.lowerHeight`) to `after` mm past it; its
+// fullness (`lids.lowerFullness`) fades out `fullness` mm past the junction,
+// all of it on a lid at least `full` mm high. The slope it meets the face at
+// is clamped to `slopes` (mm per mm).
+const LOWER_FRONT = { turn: 1.5, after: 2.5, fullness: 1.5, full: 6.5, slopes: [-0.3, 0.5] }
 
 const bell = (value, width) => Math.exp(-((value / width) ** 2))
 const angleOf = (v) => Math.atan2(v[1], v[0])
@@ -121,15 +128,21 @@ function lidContext(lids, eye, fissure) {
 		// The face passes through the lids' shell along a ring around the
 		// fissure, so the lids turn into it smoothly.
 		// The open lids' shell: the face stays put as they close.
-		const openContext = { ...context, fissure: open }
-		const ring = []
-		// Laid out like the mesh's columns, so the corners' fans get points too
-		// (the face must meet the lids straight out of the canthi as well).
-		for (const column of loopColumns(open, nasalSign, FACE_RING)) {
-			const { profile, trace } = columnAt(openContext, column)
-			ring.push(shellPoint(openContext, profile, trace, profile.ring).position)
+		// The lower lid's front meets the face at the face's own slope, so the
+		// face is built twice: the first one (`cheek`) gives that slope.
+		const ringPoints = (cheek) => {
+			const openContext = { ...context, fissure: open, cheek }
+			const ring = []
+			// Laid out like the mesh's columns, so the corners' fans get points too
+			// (the face must meet the lids straight out of the canthi as well).
+			for (const column of loopColumns(open, nasalSign, FACE_RING)) {
+				const { profile, trace } = columnAt(openContext, column)
+				ring.push(shellPoint(openContext, profile, trace, profile.ring).position)
+			}
+			return ring
 		}
-		context.face = createFace(eye, lids, ring)
+		context.cheek = createFace(eye, lids, ringPoints(null))
+		context.face = createFace(eye, lids, ringPoints(context.cheek))
 		contexts.set(fissure, context)
 	}
 	return context
@@ -287,7 +300,6 @@ function columnProfile(context, column) {
 		(LOWER_MARGIN + (1 - LOWER_MARGIN) * share) *
 		(thinnest + (1 - thinnest) * canthi)
 	const radius = Math.min(lids.marginRadius, thickness * 0.45)
-	const lidThickness = lids.lowerThickness + (lids.lidThickness - lids.lowerThickness) * share
 	// The fold over the crease, a little lower toward the canthi, fading out
 	// before them (it does not run into the corners); it unfolds as the lid
 	// closes.
@@ -297,9 +309,9 @@ function columnProfile(context, column) {
 		(0.6 + 0.4 * Math.sin(Math.PI * s) ** 0.6)
 	const creaseFade = Math.sin(Math.PI * along) ** 1.5
 	const band = share * (crease + 1) + (1 - share) * 7
-	// Where the face meets the lid (lidContext()): above the fold, below the
-	// pretarsal roll, closer to the margin toward the canthi.
-	const ring = (share * (crease + 2.2) + (1 - share) * 3.5) * (0.3 + 0.7 * volume)
+	// Where the face meets the lid (lidContext()): above the fold, at the lower
+	// lid's junction with the cheek, closer to the margin toward the canthi.
+	const ring = (share * (crease + 2.2) + (1 - share) * lids.lowerHeight) * (0.3 + 0.7 * volume)
 	// How far the closing margin has slid from the open one.
 	const [ox, oy] = open.loop(t)
 	const [cx, cy] = fissure.loop(t)
@@ -311,7 +323,7 @@ function columnProfile(context, column) {
 		volume,
 		thickness,
 		radius,
-		lidThickness: thickness + (lidThickness - thickness) * volume,
+		lidThickness: thickness + (lids.lidThickness - thickness) * volume,
 		crease,
 		creaseFade,
 		band,
@@ -402,13 +414,32 @@ function lateralFold(lids, fissure, x, y) {
 	return { offset: 0.5 * overlap * step * near, groove: -overlap * bell(v, LATERAL_FOLD.width) }
 }
 
+// The lower lid's front, its height at distance `a` from the margin. The lid
+// is a wedge: under it the globe recedes steeply (about 50° from the front
+// laterally), and the orbicularis and the orbital fat fill in front of it, so
+// its skin does not fall back with the globe. From the anterior edge, at the
+// margin's tilt (at most about 35°, thicknessDirection()), its slope turns
+// evenly (a smoothstep, so its curvature is spread over the whole lid) to the
+// face's at the junction (`profile.ring`): the lid flows into the cheek in one
+// curve, without a groove under it.
+function lowerFront(profile, a) {
+	const { z, slope, end } = profile.front
+	const length = Math.max(profile.ring - profile.radius, 1e-3)
+	const u = Math.min(Math.max((a - profile.radius) / length, 0), 1)
+	const turn = end - slope
+	const curve = z + length * (slope * u + turn * (u ** 3 - u ** 4 / 2))
+	return curve + Math.max(0, a - profile.ring) * end + Math.min(0, a - profile.radius) * slope
+}
+
 // The lid's shell at distance `a` from the margin: off the support by the
-// margin's thickness at the edge, by the lid's past 2.5 mm.
+// margin's thickness at the edge, by the lid's past 2.5 mm. On the lower lid
+// its height is the front's (lowerFront()); the shell only shows across the
+// canthi, where the lids blend.
 function shellPoint(context, profile, trace, a) {
 	const { lids, eye, fissure } = context
 	const { point: q, direction } = alongTrace(trace, a, profile)
-	// The upper lid thickens within 2.5 mm; the lower one over 4.5, so it slopes
-	// down from its margin instead of standing in a shelf over the globe.
+	// The upper lid thickens within 2.5 mm; slower toward the canthi and the
+	// lower lid.
 	const reach = 2.5 + 2 * (1 - profile.share) + 2 * (1 - profile.volume)
 	const rise = smootherstep(profile.radius, reach, a)
 	const b = profile.thickness + (profile.lidThickness - profile.thickness) * rise
@@ -427,7 +458,10 @@ function shellPoint(context, profile, trace, a) {
 	// From the margin's edge, which stands along the margin's normal, into it.
 	const offset = vec3.madd([q[0], q[1], supportZ(eye, lids, fissure, q[0], q[1])], n, b)
 	const into = smootherstep(profile.radius, profile.radius + 3, a)
-	return { position: vec3.lerp(offset, upright, into), normal, q, direction }
+	const position = vec3.lerp(offset, upright, into)
+	// The lower lid's skin is its front instead.
+	position[2] += (lowerFront(profile, a) - position[2]) * (1 - profile.share)
+	return { position, normal, q, direction }
 }
 
 // The skin point of a column at distance `a` from the margin: the lid's shell
@@ -439,9 +473,16 @@ function skinPoint(context, profile, trace, a) {
 	const shell = shellPoint(context, profile, trace, a)
 	const [x, y, z] = shell.position
 	// Toward the canthi it starts right past the margin's edge: around the
-	// corners the margin must not stand as a rim with a moat behind it.
+	// corners the margin must not stand as a rim with a moat behind it. The
+	// lower lid's front turns into it around their junction.
+	const lower = 1 - profile.share
 	const start = profile.radius + (1.5 - profile.radius) * profile.volume
-	const toFace = smootherstep(start, profile.ring + 2, a)
+	const lowerStart = Math.max(profile.radius, profile.ring - LOWER_FRONT.turn)
+	const toFace = smootherstep(
+		start + (lowerStart - start) * lower,
+		profile.ring + 2 + (LOWER_FRONT.after - 2) * lower,
+		a,
+	)
 	const position = [x, y, z + (face(x, y) - z) * toFace]
 	const upper = profile.share * profile.creaseFade
 	const creaseGroove = -lids.creaseDepth * bell(a - profile.crease, 0.9) * upper
@@ -449,6 +490,14 @@ function skinPoint(context, profile, trace, a) {
 	// The pretarsal roll, fullest in the middle of the lower lid.
 	relief +=
 		lids.lowerRoll * bell(a - 2.5, 1.6) * (1 - profile.share) * Math.sin(Math.PI * profile.along)
+	// The lower lid's fullness: it bulges out between its edge and the cheek,
+	// its curvature easing in and out at both ends ((u (1 − u))³). A shorter
+	// lid bulges less (as the square of its height under LOWER_FRONT.full, so
+	// the bulge keeps its curvature), and it fades toward the canthi.
+	const reach = profile.ring + LOWER_FRONT.fullness - profile.radius
+	const u = Math.min(Math.max((a - profile.radius) / reach, 0), 1)
+	const full = Math.min(1, (profile.ring / LOWER_FRONT.full) ** 2) * profile.volume
+	relief += lids.lowerFullness * 64 * (u * (1 - u)) ** 3 * lower * full
 	const fold = lateralFold(lids, open, shell.q[0], shell.q[1])
 	relief += fold.offset * smootherstep(profile.radius, profile.radius + 0.6, a)
 	// However deep the crease, the skin stays clear of the globe.
@@ -472,6 +521,31 @@ function columnAt(context, column) {
 	// The direction the margin stands off the support in.
 	const [mx, my] = alongTrace(trace, 0, profile).point
 	profile.marginNormal = thicknessDirection(supportAt(eye, lids, fissure, mx, my).normal)
+	// The lower lid's edge rounds off in the margin's own frame: toward
+	// `across`, the row's direction square to the margin's normal (`reach` mm
+	// of the front plane per mm along it), so its front leaves the edge at the
+	// margin's tilt (lowerFront()).
+	const n = profile.marginNormal
+	const [dx, dy] = alongTrace(trace, 0, profile).direction
+	const along = dx * n[0] + dy * n[1]
+	profile.across = vec3.normalize([dx - along * n[0], dy - along * n[1], -along * n[2]])
+	profile.reach = Math.hypot(profile.across[0], profile.across[1])
+	profile.margin = [mx, my, supportZ(eye, lids, fissure, mx, my)]
+	const edge = vec3.madd(
+		vec3.madd(profile.margin, profile.across, profile.radius / profile.reach),
+		n,
+		profile.thickness,
+	)
+	// The face's slope along the row at the junction (level in the first
+	// pass, lidContext()).
+	let end = 0
+	if (context.cheek) {
+		const [x0, y0] = alongTrace(trace, profile.ring, profile).point
+		const [x1, y1] = alongTrace(trace, profile.ring + 1, profile).point
+		const [low, high] = LOWER_FRONT.slopes
+		end = Math.min(Math.max(context.cheek(x1, y1) - context.cheek(x0, y0), low), high)
+	}
+	profile.front = { z: edge[2], slope: profile.across[2] / profile.reach, end }
 	return { column, profile, trace }
 }
 
@@ -485,8 +559,15 @@ function pointOn(context, data, s) {
 	if (b !== null) {
 		const { point: q, direction } = alongTrace(trace, a, profile)
 		const support = supportAt(eye, lids, fissure, q[0], q[1])
+		const position = vec3.madd(support.point, profile.marginNormal, b)
+		// The lower lid's edge rounds off in the margin's frame (columnAt()).
+		const square = vec3.madd(
+			vec3.madd(profile.margin, profile.across, a / profile.reach),
+			profile.marginNormal,
+			b,
+		)
 		return {
-			position: vec3.madd(support.point, profile.marginNormal, b),
+			position: vec3.lerp(position, square, 1 - profile.share),
 			a,
 			direction: a > 0 ? direction : column.direction,
 			fold: 0,
