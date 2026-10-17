@@ -58,12 +58,16 @@
 	}
 }
 
+/* A double tap never zooms the page on touch screens (`manipulation`
+   applies to every element inside): the canvas already takes every touch
+   (touch-action: none), the HUD, the title and the footer only taps. */
 html,
 body {
 	margin: 0;
 	height: 100%;
 	overflow: hidden;
 	background: #000;
+	touch-action: manipulation;
 }
 
 canvas {
