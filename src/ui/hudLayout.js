@@ -38,7 +38,7 @@ export const HUD = Object.freeze({
 	// (knobLevel()).
 	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20, stretch: 5 }),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
-	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
+	random: Object.freeze({ angle: 33 * DEGREE, spacing: 60 }),
 	// A portrait box splits the HUD. The circle keeps the skin tones, the
 	// pressed one at `tones.center` (the middle of the bottom left quarter),
 	// and Random eye at `random.angle` (the right, on the horizontal); their
