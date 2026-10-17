@@ -80,6 +80,8 @@ export default class EyeApp {
 		this.dirty = new Set(['rebuild', 'bake', 'define'])
 		this.listeners = new Set()
 		this.lastTime = null
+		// Whether the last frame drew an interactive (fresh) frame.
+		this.lastFresh = false
 
 		this.eyeRig = new EyeRig()
 		setup.scene.add(this.eyeRig.pivot)
@@ -338,6 +340,7 @@ export default class EyeApp {
 	endTransition() {
 		this.transition = null
 		this.poseFrom = null
+		this.setup.adaptivePixelRatio.resetHold()
 		this.notifyChange('*')
 	}
 
@@ -447,6 +450,7 @@ export default class EyeApp {
 		// frame of a transition (outside #debug nothing changes them anyway).
 		if (!this.transition && this.bakeSkin()) this.invalidate()
 		if (this.benchmark) {
+			this.lastFresh = false
 			this.measureFrame(time)
 			return
 		}
@@ -456,6 +460,7 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
 		if (this.converged) {
+			this.lastFresh = false
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
 			if (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30) {
@@ -466,12 +471,15 @@ export default class EyeApp {
 		}
 
 		// Only interactive frames adapt the resolution: a resize restarts the
-		// accumulation. It comes before the frame is drawn: a canvas resized
-		// after drawing is cleared, and the browser would show it black.
-		if (this.samples === 0 && delta > 0) this.setup.adaptPixelRatio(delta)
+		// accumulation. The interval measures the previous frame, so it counts
+		// only when that one was interactive too, not a full-quality sample or
+		// a converged image. It comes before the frame is drawn: a canvas
+		// resized after drawing is cleared, and the browser would show it black.
+		const fresh = this.samples === 0
+		if (fresh && this.lastFresh && delta > 0) this.setup.adaptPixelRatio(delta)
+		this.lastFresh = fresh
 		const stats = this.setup.frameStats
 		stats.beginFrame(time)
-		const fresh = this.samples === 0
 		// A living eye or a transition restarts the image on the next frame:
 		// this one is shown without being kept.
 		this.post.accumulation.passthrough = fresh && this.restartsEveryFrame
