@@ -69,9 +69,23 @@ export const HUD = Object.freeze({
 	// stays 0.29 out from the spinning circle. Level
 	// with the horizontal at the middle of the zoom, they turn `turn` by
 	// either end, the inner one clockwise as the zoom goes in, the outer one
-	// the other way.
-	inner: Object.freeze({ radiusRatio: 0.89, turn: 45 * DEGREE }),
-	outer: Object.freeze({ radiusRatio: 1.4, turn: -30 * DEGREE }),
+	// the other way. Turned 0, each is symmetric about the horizontal
+	// (orbitArt()): the inner one two lines, each a tick in, an arc over
+	// ±`arc` about the horizontal and a tick in; the outer one two arcs over
+	// ±`arc`, at `arcOpacity`, with a tick out from each on the horizontal.
+	// The ticks are `tick` of the ring's radius long (negative: inward).
+	inner: Object.freeze({ radiusRatio: 0.89, turn: 45 * DEGREE, arc: 31 * DEGREE, tick: -0.044 }),
+	outer: Object.freeze({
+		radiusRatio: 1.4,
+		turn: -30 * DEGREE,
+		arc: 33.4 * DEGREE,
+		tick: 0.1165,
+		arcOpacity: 0.75,
+	}),
+	// The rings' dashes, at any size: `dash` px every about `dash` + `gap`
+	// px along the arcs (and the inner ring's ticks), `tickDash` px every
+	// about `tickDash` + `tickGap` px along the outer ring's ticks.
+	orbitDash: Object.freeze({ dash: 3, gap: 4, tickDash: 4, tickGap: 4 }),
 	// The circle between the central ring and the outer zoom ring
 	// (`radiusRatio` of the central radius): `dash` px every about
 	// `dash` + `gap` px, and `teeth` solid ticks `tooth` px out from it, evenly
@@ -287,6 +301,58 @@ export function orbitRing(radius, level, kind, stretch = false, hud = HUD) {
 		radius: radius * orbit.radiusRatio,
 		turn: orbit.turn * (2 * zoom - 1),
 	}
+}
+
+// The dashes along a line `length` px long that starts and ends on a whole
+// dash: [`dash`, the gap], the gap about `gap`, so a whole number of dashes
+// fits; a line too short for two dashes is one.
+export function dashFit(length, dash, gap) {
+	const count = Math.round((length + gap) / (dash + gap))
+	if (count < 2) return [length, 0]
+	return [dash, (length - count * dash) / (count - 1)]
+}
+
+// A segmented zoom ring (`kind`, 'inner' or 'outer') about the HUD's
+// circle of `radius` px, turned 0, as SVG paths about its center (screen y
+// down): `{ reach, paths: [{ d, dashArray, opacity }] }`, `reach` the
+// farthest any reaches. Its geometry follows the radius; its dashes keep
+// their size in px (HUD.orbitDash), each line starting and ending on a
+// whole dash.
+export function orbitArt(kind, radius, hud = HUD) {
+	const { radiusRatio, arc, tick, arcOpacity = 1 } = hud[kind]
+	const { dash, gap, tickDash, tickGap } = hud.orbitDash
+	const ring = radius * radiusRatio
+	const foot = ring * (1 + tick)
+	const round = (value) => Math.round(value * 100) / 100
+	const at = (r, angle) => `${round(r * Math.cos(angle))} ${round(r * Math.sin(angle))}`
+	const paths = []
+	// The right half, then the left, clockwise.
+	for (const side of [0, Math.PI]) {
+		const [from, to] = [side - arc, side + arc]
+		const sweep = `A${round(ring)} ${round(ring)} 0 0 1 ${at(ring, to)}`
+		const length = 2 * arc * ring
+		if (kind === 'inner') {
+			paths.push({
+				d: `M${at(foot, from)}L${at(ring, from)}${sweep}L${at(foot, to)}`,
+				dashArray: dashFit(length + 2 * Math.abs(foot - ring), dash, gap),
+				opacity: 1,
+			})
+		} else {
+			paths.push(
+				{
+					d: `M${at(ring, from)}${sweep}`,
+					dashArray: dashFit(length, dash, gap),
+					opacity: arcOpacity,
+				},
+				{
+					d: `M${at(ring, side)}L${at(foot, side)}`,
+					dashArray: dashFit(Math.abs(foot - ring), tickDash, tickGap),
+					opacity: 1,
+				},
+			)
+		}
+	}
+	return { reach: Math.max(ring, foot), paths }
 }
 
 // The circle between the HUD's circle of `radius` px and the outer zoom

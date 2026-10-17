@@ -7,6 +7,7 @@ import {
 	knobAngle,
 	knobLevel,
 	knobSnap,
+	orbitArt,
 	orbitRing,
 	pullLevel,
 	spinRing,
@@ -21,8 +22,6 @@ import { gsap } from 'gsap'
 import { TextPlugin } from 'gsap/TextPlugin'
 import { follow } from '../camera/orbitMotion'
 import bracketAsset from './assets/bracket.svg?url'
-import innerRingAsset from './assets/zoom-ring-inner.svg?url'
-import outerRingAsset from './assets/zoom-ring-outer.svg?url'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -149,29 +148,41 @@ export function createHud({
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
 	const zoomLine = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
-	// The rings' SVGs at their intrinsic size (`size` px square), centered on
-	// their circle (of `radius` px at `cx`, `cy`): their wrappers turn and
-	// scale them about it. Turned 0, each is symmetric about the horizontal:
-	// the inner one two lines (a tick in, an arc over ±31°, a tick in), the
-	// outer one two arcs over ±33.4° with a tick out from each on the
-	// horizontal. Each SVG masks a box filled with the wrapper's color, so the
-	// rings take the accent when active (style.css).
-	const orbitAssets = [
-		{ kind: 'inner', src: innerRingAsset, size: 820, cx: 410, cy: 410, radius: 409 },
-		{ kind: 'outer', src: outerRingAsset, size: 1459, cx: 729.5, cy: 729.5, radius: 652.5 },
-	].map((asset) => {
+	// The two segmented zoom rings, each an SVG drawn about the center of its
+	// wrapper (orbitArt()) at the layout's size, its dashes in px; the
+	// wrappers sit on the HUD's center and turn about it. Their strokes take
+	// the wrapper's color, so the rings take the accent when active
+	// (style.css).
+	const orbitAssets = ['inner', 'outer'].map((kind) => {
 		const wrapper = document.createElement('div')
-		wrapper.className = `hud-orbit hud-orbit-${asset.kind}`
+		wrapper.className = `hud-orbit hud-orbit-${kind}`
 		wrapper.setAttribute('aria-hidden', 'true')
-		const art = document.createElement('span')
-		art.className = 'hud-orbit-art'
-		art.style.left = `${-asset.cx}px`
-		art.style.top = `${-asset.cy}px`
-		art.style.width = art.style.height = `${asset.size}px`
-		art.style.webkitMaskImage = art.style.maskImage = `url("${asset.src}")`
+		const art = svgElement('svg', { class: 'hud-orbit-art' })
 		wrapper.append(art)
-		return { ...asset, wrapper }
+		return { kind, wrapper, art, radius: null }
 	})
+	// Each ring's paths for the HUD's circle of `radius` px, redrawn when it
+	// changes.
+	const drawOrbits = (radius) => {
+		for (const asset of orbitAssets) {
+			if (asset.radius === radius) continue
+			asset.radius = radius
+			const { reach, paths } = orbitArt(asset.kind, radius)
+			const half = Math.ceil(reach) + 1
+			asset.art.setAttribute('viewBox', `${-half} ${-half} ${2 * half} ${2 * half}`)
+			asset.art.style.left = asset.art.style.top = `${-half}px`
+			asset.art.style.width = asset.art.style.height = `${2 * half}px`
+			asset.art.replaceChildren(
+				...paths.map(({ d, dashArray, opacity }) =>
+					svgElement('path', {
+						d,
+						'stroke-dasharray': dashArray.join(' '),
+						'stroke-opacity': opacity,
+					}),
+				),
+			)
+		}
+	}
 	// The circle between the central ring and the outer zoom ring, which
 	// each click on Random eye turns a little further (style.css eases it).
 	const spin = svgElement('circle', { class: 'hud-line hud-spin' })
@@ -452,12 +463,13 @@ export function createHud({
 	const placeOrbit = () => {
 		if (!placed || level === null) return
 		const { cx, cy, radius } = placed
+		drawOrbits(radius)
 		for (const asset of orbitAssets) {
 			const ring = orbitRing(radius, level, asset.kind, stretching)
 			asset.wrapper.style.left = `${cx}px`
 			asset.wrapper.style.top = `${cy}px`
 			const turn = ring.turn + sway[asset.kind]
-			asset.wrapper.style.transform = `rotate(${turn}rad) scale(${ring.radius / asset.radius})`
+			asset.wrapper.style.transform = `rotate(${turn}rad)`
 		}
 	}
 

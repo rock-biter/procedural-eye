@@ -337,8 +337,8 @@ canvas {
 		stroke 0.4s;
 }
 
-/* The segmented zoom rings (src/ui/assets/): their SVGs keep their intrinsic
-   geometry; hud.js scales and turns the wrappers. */
+/* The segmented zoom rings (src/ui/hud.js): SVGs drawn at the layout's
+   size, their dashes and strokes in px; hud.js turns the wrappers. */
 .hud-orbit {
 	position: absolute;
 	width: 0;
@@ -351,8 +351,8 @@ canvas {
 		opacity 0.4s;
 }
 
-/* Their opacity at rest (the SVGs' strokes are opaque, the outer ring's
-   arcs 0.75 of its ticks); lit, they also show more (`.active`). */
+/* Their opacity at rest (the strokes are opaque, the outer ring's arcs 0.75
+   of its ticks); lit, they also show more (`.active`). */
 .hud-orbit-inner {
 	opacity: 0.5;
 }
@@ -365,16 +365,14 @@ canvas {
 	opacity: 0.8;
 }
 
-/* Each ring's SVG masks a box of the wrapper's color (its strokes' own
-   opacities carried as the mask's alpha), so the color can change. */
+/* Each ring's strokes take the wrapper's color, so it can change. */
 .hud-orbit-art {
 	position: absolute;
 	display: block;
-	background: currentColor;
-	-webkit-mask-size: 100% 100%;
-	mask-size: 100% 100%;
-	-webkit-mask-repeat: no-repeat;
-	mask-repeat: no-repeat;
+	overflow: visible;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1;
 }
 
 .hud-cut {

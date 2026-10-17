@@ -7,6 +7,8 @@ import {
 	knobAngle,
 	knobLevel,
 	knobSnap,
+	dashFit,
+	orbitArt,
 	orbitRing,
 	pullLevel,
 	spinRing,
@@ -210,6 +212,55 @@ test('the two zoom rings keep their zoom-out sizes and counter-rotate inside and
 	// Stretched past an end by a drag, they turn on a little.
 	assert.ok(near(orbitRing(450, 1.1, 'inner', true).turn, 1.2 * 45 * DEGREE))
 	assert.ok(near(orbitRing(450, -0.1, 'outer', true).turn, 1.2 * 30 * DEGREE))
+})
+
+test('a dashed line starts and ends on a whole dash, its gap close to the one asked', () => {
+	for (const length of [7, 40, 151.3, 1234.5]) {
+		const [dash, gap] = dashFit(length, 3, 4)
+		const count = (length + gap) / (dash + gap)
+		assert.ok(near(count, Math.round(count), 1e-9), `${length}`)
+		assert.equal(dash, 3)
+		assert.ok(Math.abs(gap - 4) <= 3.5 / Math.max(1, Math.round(count) - 1) + 1e-9)
+	}
+	assert.deepEqual(dashFit(2, 3, 4), [2, 0], 'too short for two dashes: one')
+})
+
+test('the segmented rings keep their dashes in px at any size, their geometry following it', () => {
+	const { dash, gap, tickDash, tickGap } = HUD.orbitDash
+	for (const kind of ['inner', 'outer']) {
+		for (const radius of [100, 163, 487]) {
+			const { reach, paths } = orbitArt(kind, radius)
+			const ring = radius * HUD[kind].radiusRatio
+			assert.ok(near(reach, ring * (1 + Math.max(HUD[kind].tick, 0))))
+			assert.equal(paths.length, kind === 'inner' ? 2 : 4)
+			for (const { d, dashArray } of paths) {
+				// The arcs' dashes or the outer ticks', their gap within half a
+				// period spread over the gaps of the line.
+				const tick = dashArray[0] === tickDash && kind === 'outer' && !d.includes('A')
+				const [want, space] = tick ? [tickDash, tickGap] : [dash, gap]
+				assert.equal(dashArray[0], want, d)
+				const numbers = d.match(/-?[\d.]+/g).map(Number)
+				assert.ok(Math.hypot(numbers[0], numbers[1]) <= reach + 0.01, d)
+				const length = tick ? Math.abs(HUD[kind].tick) * ring : null
+				if (length !== null) {
+					const count = Math.round((length + space) / (want + space))
+					assert.ok(Math.abs(dashArray[1] - space) <= (want + space) / 2 / (count - 1) + 1e-9)
+				} else assert.ok(Math.abs(dashArray[1] - space) < 0.5, `${kind} ${radius}: ${dashArray}`)
+			}
+		}
+	}
+	// The inner ring's arcs over ±31° about the horizontal, the outer's ±33.4°.
+	const end = (d) =>
+		d
+			.match(/A[^A-Z]*/)[0]
+			.trim()
+			.split(/\s+/)
+			.slice(-2)
+			.map(Number)
+	for (const kind of ['inner', 'outer']) {
+		const [x, y] = end(orbitArt(kind, 487).paths[0].d)
+		assert.ok(near(Math.atan2(y, x), HUD[kind].arc, 1e-3), kind)
+	}
 })
 
 test('the knob sits on the horizontal at the middle of the zoom (split: at the bottom), the ends symmetric about it', () => {
