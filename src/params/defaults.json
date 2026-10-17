@@ -307,6 +307,18 @@
       "photographer": false
     }
   },
+  "dust": {
+    "enabled": true,
+    "brightness": 0.7,
+    "count": 400,
+    "seed": 1,
+    "size": 350,
+    "extent": 200,
+    "forward": 0.65,
+    "drift": 1.6,
+    "turbulence": 4.6,
+    "haze": 0.04
+  },
   "camera": {
     "focalLength": 110,
     "fNumber": 17,
@@ -347,7 +359,7 @@
   },
   "quality": {
     "adaptiveResolution": true,
-    "minPixelRatio": 0.9,
+    "minPixelRatio": 1.0,
     "photoSamples": 256,
     "irisSteps": 64,
     "irisShadowSteps": 10,

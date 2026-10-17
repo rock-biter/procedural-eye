@@ -12,10 +12,12 @@ The measurements behind the models are in [`docs/RESEARCH.md`](RESEARCH.md).
 | Mode | When | Pose |
 | --- | --- | --- |
 | Living | `animation.enabled` on, live | The animator steps with the frame time, and every frame restarts the accumulation. |
-| Photo | Space, the **Photo** action, or `?photo=` at start | The clock stops and the eye keeps its instant; samples accumulate until `quality.photoSamples`. A frozen start takes one step: the steady state. |
+| Photo | Space, the **Photo** action, or `?photo=` at start | The clock stops and the eye keeps its instant; samples accumulate until `quality.photoSamples`. A frozen start takes one step: the steady state. The dust stops too. |
 | Still | `animation.enabled` off | The eye is posed by its parameters alone whenever the image restarts: the pupil is `iris.pupilDiameter`, the line of sight is `animation.yaw` / `animation.pitch`, and nothing moves. The camera can circle a still subject. |
 
 The reference presets are still eyes, so their tuned pupil and gaze hold in captures.
+
+The dust drifts in every mode but photo: over a still eye's converged image, it is redrawn every frame without rendering the scene ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)).
 
 **Transitions**: a preset or a random eye glides in ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#transitions)). When it changes where the pose comes from (a still eye coming alive or the reverse, another gaze mode, the reflex toggled), `EyeApp` blends the pose from where it was with the transition's progress: pupil, gaze, lids and framing.
 

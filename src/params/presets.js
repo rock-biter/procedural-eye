@@ -8,7 +8,9 @@
 const frontal = { focalLength: 100, azimuth: 0, elevation: 0 }
 // Close iris macro framing: about 2:1 on the iris, shallow focus.
 const macro = { camera: { ...frontal, distance: 150, fNumber: 11 } }
-const living = { animation: { enabled: false } }
+// Still, in clear air: the tuned pupil and gaze hold, and nothing floats
+// between the camera and the eye of the photograph.
+const reference = { animation: { enabled: false }, dust: { enabled: false, haze: 0 } }
 
 export const PRESETS = {
 	default: { label: 'Default (defaults.json)', params: {} },
@@ -16,7 +18,7 @@ export const PRESETS = {
 		label: 'Amber lattice (01)',
 		references: ['eye-01.jpg'],
 		params: {
-			...living,
+			...reference,
 			camera: {
 				...macro.camera,
 				azimuth: -6,
@@ -58,7 +60,7 @@ export const PRESETS = {
 		label: 'Blue-grey phone macro (02)',
 		references: ['eye-02.jpg'],
 		params: {
-			...living,
+			...reference,
 			camera: { ...frontal, distance: 170, fNumber: 2.8, exposure: 0.3, whiteBalance: 6200 },
 			iris: { pupilDiameter: 3.0 },
 			irisColor: {
@@ -85,7 +87,7 @@ export const PRESETS = {
 		label: 'Brown crypts (03, 06)',
 		references: ['eye-03.png', 'eye-06.jpg'],
 		params: {
-			...living,
+			...reference,
 			camera: { ...macro.camera, exposure: 0.5, whiteBalance: 4800 },
 			iris: { pupilDiameter: 4.2 },
 			irisColor: {
@@ -120,7 +122,7 @@ export const PRESETS = {
 		label: 'Green, central heterochromia (04)',
 		references: ['eye-04.jpg'],
 		params: {
-			...living,
+			...reference,
 			camera: { ...frontal, distance: 158, fNumber: 9, exposure: 0.6, whiteBalance: 5600 },
 			iris: { pupilDiameter: 3.6 },
 			irisColor: {
@@ -152,7 +154,7 @@ export const PRESETS = {
 		label: 'Blue, orange collarette (05, 07)',
 		references: ['eye-05.jpg', 'eye-07.avif'],
 		params: {
-			...living,
+			...reference,
 			camera: {
 				...frontal,
 				distance: 175,
@@ -196,7 +198,7 @@ export const PRESETS = {
 		label: 'Hazel with nevi (08)',
 		references: ['eye-08.avif'],
 		params: {
-			...living,
+			...reference,
 			camera: { ...frontal, distance: 190, fNumber: 8, exposure: 0.4 },
 			iris: { pupilDiameter: 3.3 },
 			irisColor: {
@@ -220,7 +222,7 @@ export const PRESETS = {
 		label: 'Blue crypts (09)',
 		references: ['eye-09.jpg'],
 		params: {
-			...living,
+			...reference,
 			camera: { ...macro.camera, distance: 140, exposure: 0.5, whiteBalance: 6500 },
 			iris: { pupilDiameter: 3.0 },
 			irisColor: {
@@ -245,7 +247,7 @@ export const PRESETS = {
 	},
 	'refraction-checker': {
 		label: 'Refraction checker (debug)',
-		params: { ...living, camera: frontal, debug: { view: 'refraction-checker' } },
+		params: { ...reference, camera: frontal, debug: { view: 'refraction-checker' } },
 	},
 	outdoor: {
 		label: 'Outdoor sky',

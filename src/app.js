@@ -121,7 +121,16 @@ export default class EyeApp {
 		this.tearFilm = new TearFilm(this.lightRig.worldUniforms, this.keyShadow.uniforms)
 		setup.scene.add(this.tearFilm.meniscus, this.tearFilm.bubbles)
 		this.physicalCamera = new PhysicalCamera()
-		this.post = new PostProcessing(setup.renderer, setup.scene, this.physicalCamera.camera)
+		this.post = new PostProcessing(
+			setup.renderer,
+			setup.scene,
+			this.physicalCamera.camera,
+			this.lightRig.worldUniforms,
+		)
+		// The dust's clock (s), stopped in photo mode, and when it was last
+		// shown over a converged image.
+		this.dustTime = 0
+		this.dustShown = -Infinity
 		// The radians per pixel of this frame; the half-resolution share of a
 		// split frame doubles them (src/render/scenePass.js).
 		this.pixelAngle = 0.001
@@ -445,7 +454,16 @@ export default class EyeApp {
 		const living = this.params.animation.enabled && !this.frozen
 		if (this.controls.update(Math.min(delta / 1000, 0.1), living)) this.invalidate()
 		this.pose(delta / 1000)
-		if (this.converged) return
+		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
+		if (this.converged) {
+			// The image is done, the dust still drifts over it: a few pixels per
+			// second, so 30 frames per second are enough.
+			if (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30) {
+				this.dustShown = this.dustTime
+				this.renderDisplay()
+			}
+			return
+		}
 
 		// Only interactive frames adapt the resolution: a resize restarts the
 		// accumulation. It comes before the frame is drawn: a canvas resized
@@ -460,6 +478,42 @@ export default class EyeApp {
 		this.renderSample(fresh ? null : accumulationSample(this.samples))
 		this.post.accumulation.passthrough = false
 		stats.endFrame()
+	}
+
+	// Whether the dust moves over a converged image (not in photo mode).
+	get dustDrifts() {
+		const dust = this.params.dust
+		return (
+			!this.frozen &&
+			dust.enabled &&
+			dust.brightness > 0 &&
+			dust.count > 0 &&
+			(dust.drift > 0 || dust.turbulence > 0) &&
+			this.params.debug.view === 'beauty'
+		)
+	}
+
+	// Shows the accumulated mean again with this instant's dust, without
+	// rendering the scene or adding a sample.
+	renderDisplay() {
+		const { renderPass, accumulation } = this.post
+		this.updateAtmosphere()
+		renderPass.enabled = false
+		accumulation.displayOnly = true
+		this.post.render()
+		renderPass.enabled = true
+		accumulation.displayOnly = false
+	}
+
+	// The dust and the haze of the frame the physical camera is placed for.
+	updateAtmosphere() {
+		this.post.updateAtmosphere({
+			params: this.params,
+			pinhole: this.physicalCamera.pinhole,
+			emitters: this.lightRig.emitters,
+			time: this.dustTime,
+			beauty: this.params.debug.view === 'beauty',
+		})
 	}
 
 	get restartsEveryFrame() {
@@ -528,6 +582,7 @@ export default class EyeApp {
 			focusDistance: this.physicalCamera.focusDistance,
 			sensorHeight: lens.sensorHeight,
 		})
+		this.updateAtmosphere()
 		this.post.render()
 	}
 

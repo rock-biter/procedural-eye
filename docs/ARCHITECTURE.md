@@ -53,14 +53,17 @@
 | [`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js) | The key light's shadow map of the lids and lashes. |
 | [`src/camera/cameraOptics.js`](../src/camera/cameraOptics.js) * | Thin-lens formulas, blur circle, lens-shift projection shear. |
 | [`src/camera/lensSampling.js`](../src/camera/lensSampling.js) * | Halton and concentric-disk samples (pixel, lens, light). |
-| [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js) | The macro `PerspectiveCamera`, placed and sheared per sample. |
+| [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js) | The macro `PerspectiveCamera`, placed and sheared per sample; its `pinhole` matrices before the sample's jitter place the dust. |
 | [`src/camera/orbitMotion.js`](../src/camera/orbitMotion.js) * | The orbit's release speed and coasting, the mouse parallax's reach by zoom level and its lagged follow. |
 | [`src/camera/cameraControls.js`](../src/camera/cameraControls.js) | Pointer orbit (with inertia), pan and distance, written into `params.camera`; the mouse parallax, a turn of the orbit outside the params. |
+| **Atmosphere** ([`docs/RENDERING.md`](RENDERING.md#dust-and-haze)) | |
+| [`src/atmosphere/dustField.js`](../src/atmosphere/dustField.js) * | Seeded dust motes (fibers, flakes, crossed fibers) in a unit cube, the lights the haze scatters, the Henyey–Greenstein phase. |
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
 | [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, effects. |
 | [`src/render/scenePass.js`](../src/render/scenePass.js) | The scene into the composer's buffer; living frames split into a full-resolution sharp share and a half-resolution blurred one. |
 | [`src/render/accumulationPass.js`](../src/render/accumulationPass.js) | Progressive mean of still frames in a float history; living frames pass through. |
-| [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare, tile bounds and gather), composited over the accumulated mean. |
+| [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare, tile bounds and gather), composited over the accumulated mean; the haze. |
+| [`src/render/dustPass.js`](../src/render/dustPass.js) | The dust motes as their images blurred by the lens, added over the depth of field's output before the effects. |
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
@@ -96,7 +99,7 @@
    - In photo mode it keeps its instant.
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.
-5. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image.
+5. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image. Out of photo mode the dust still drifts over it (`dustDrifts`): `renderDisplay()` shows the mean again with this instant's dust, at most 30 times a second, without the scene pass or a sample (the composite, the dust and the effects). The dust's clock (`dustTime`) runs with the frame time unless the eye is frozen.
 6. **Adaptive resolution**: before a fresh frame is drawn, the interval since the last frame feeds the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation. The resize comes before drawing: a canvas resized after it is cleared, and the browser would show a black frame.
 7. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field. When the next frame restarts the image anyway (a living eye, a running transition), it is shown without being kept in the accumulation ([`docs/RENDERING.md`](RENDERING.md#pipeline)); `capture()` then renders and keeps one first.
@@ -107,7 +110,7 @@
      3. `LightRig` rebuilds the emitters and packs them in eye space and in world space.
      4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window.
      5. The eyeball, lid and lash uniforms are refreshed from the params.
-     6. The post-processing updates the lens of the depth of field and its fade, then the composer renders.
+     6. The post-processing updates the lens of the depth of field and its fade, then the haze and the dust (`updateAtmosphere()`: the pinhole camera, the rig and the dust's clock), then the composer renders.
 
 ## Parameter Routing
 
@@ -142,7 +145,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - `globe`, `cornea`, `chamber`, `limbus`;
   - `iris`, `irisStructure`, `irisColor`;
   - `lids`, `lashes`, `skin`, `shell` (the back shell), `sclera`;
-  - `lighting`, `camera`, `zoom` (the HUD's zoom distances and duration), `controls` (the mouse parallax, the wheel zoom's easing and the orbit's inertia), `post`, `quality`, `debug`.
+  - `lighting`, `dust` (the motes and the haze), `camera`, `zoom` (the HUD's zoom distances and duration), `controls` (the mouse parallax, the wheel zoom's easing and the orbit's inertia), `post`, `quality`, `debug`.
 - **Leaves**: each leaf is `{ default, min, max, step, unit, kind, label }`. A `#rrggbb` default is a color, `options` make a choice, and a boolean is a toggle.
 - **Defaults**: [`src/params/defaults.json`](../src/params/defaults.json) holds the default values; the schema keeps what is tunable and how.
   - `paramSchema.js` writes `BASE_PARAM_SCHEMA` with a `default` per leaf, then `withDefaults()` replaces each default the file names (sanitized like any override) to make `PARAM_SCHEMA`. A leaf the file does not name, such as a new one, keeps the default written in the schema; a name the file has but the schema lacks is reported with a console warning.
@@ -155,7 +158,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 - **Presets** ([`src/params/presets.js`](../src/params/presets.js)): deep partial overrides of the defaults.
   - Choosing one in the panel glides to its overrides on the defaults ([Transitions](#transitions)).
   - Each reference preset names its photographs (`references`, shown by the capture contact sheet).
-  - Reference presets keep the living eye off, so their pupil and gaze are the tuned ones.
+  - Reference presets keep the living eye off, so their pupil and gaze are the tuned ones, and the air clear (no dust, no haze), as in their photographs.
   - They also pin the frontal 100 mm framing they were tuned with (`frontal`). The default camera looks from 26° to the side and 7.8° below, with a 110 mm lens.
   - `refraction-checker` is a debug preset; `outdoor` swaps the studio for the sky.
 - **Random eye** ([`src/params/populationPriors.js`](../src/params/populationPriors.js)): `randomEye(ancestry)`, with ancestry `european`, `east-asian` or `south-asian`.

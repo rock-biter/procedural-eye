@@ -44,6 +44,7 @@
 - **Pupil**: the panel has no light-step button and no D(t) graph. The dynamics are covered by unit tests.
 - **Age**: `eye.age` only changes the pupil, not the scleral yellowing, the limbal ring, or the lids (folds, bags, hooding).
 - **Self-test**: there is no `?selftest=1` comparison of GLSL twins against their JS versions. Shader–CPU agreement is checked visually (the refraction checker, captures).
+- **Dust**: a mote's occlusion compares its distance with the sharp one in the accumulated mean, so a surface out of focus cuts a blurred mote behind it along its sharp outline; the key light's shadow does not reach the motes; the motes' cube (`dust.extent`) is centered on the globe and covers the desktop zoom-out framing, so the portrait zoom-out shows fewer at its edges; the haze lifts the backdrop a little from the tone it is matched to (`skin.backdrop`).
 - **Gaze and orbit**: a living eye with `animation.gaze` = `camera` turns toward the camera as it orbits. Use the default `wander`, `fixed`, photo mode, or a still eye to look at grazing angles.
 
 ## Future Work

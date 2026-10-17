@@ -4,7 +4,7 @@
 // accumulation samples it moves across the aperture and shears the frustum so
 // the focus plane stays put (src/camera/cameraOptics.js): averaging the
 // samples gives the true depth of field, reflections and refraction included.
-import { MathUtils, PerspectiveCamera, Quaternion, Vector3 } from 'three'
+import { MathUtils, Matrix4, PerspectiveCamera, Quaternion, Vector3 } from 'three'
 import { gazeQuaternion } from '../animation/gaze'
 import { sphericalDirection } from '../lighting/envRig'
 import { apertureRadius, projectionShear, verticalFov } from './cameraOptics'
@@ -18,6 +18,9 @@ export default class PhysicalCamera {
 		this.right = new Vector3()
 		this.up = new Vector3()
 		this.focusDistance = 200
+		// The camera of the frame before the sample's lens and pixel jitter:
+		// world matrix, view and projection (src/render/dustPass.js).
+		this.pinhole = { matrixWorld: new Matrix4(), view: new Matrix4(), projection: new Matrix4() }
 		// { azimuth, elevation } in degrees, added to params.camera's.
 		this.orbitOffset = { azimuth: 0, elevation: 0 }
 	}
@@ -50,6 +53,9 @@ export default class PhysicalCamera {
 		camera.far = c.distance * 40
 		camera.updateProjectionMatrix()
 		camera.updateMatrixWorld()
+		this.pinhole.matrixWorld.copy(camera.matrixWorld)
+		this.pinhole.view.copy(camera.matrixWorldInverse)
+		this.pinhole.projection.copy(camera.projectionMatrix)
 		if (!sample) return
 
 		const aperture = apertureRadius(c.focalLength, c.fNumber)
