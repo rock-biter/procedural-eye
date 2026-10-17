@@ -71,10 +71,11 @@ canvas {
 	touch-action: none;
 }
 
-/* The panel starts below the frame rate (--panel-top), scrolls when its open
-   folders outgrow the viewport, and stops at the frame (--panel-bottom). */
+/* The panel starts below the viewport size and the frame rate (--panel-top),
+   scrolls when its open folders outgrow the viewport, and stops at the frame
+   (--panel-bottom). */
 .tp-dfwv {
-	--panel-top: calc(var(--ui-inset) + 28px);
+	--panel-top: calc(var(--ui-inset) + 44px);
 	--panel-bottom: var(--ui-inset);
 	top: calc(var(--panel-top) + env(safe-area-inset-top)) !important;
 	right: calc(var(--ui-inset) + env(safe-area-inset-right)) !important;
@@ -662,10 +663,10 @@ canvas {
 	}
 }
 
-/* The title, top left, the credit line, bottom left, the frame rate, top
-   right, and Snapshot, bottom right: inside the frame, in JetBrains Mono, the
-   title in Kode Mono. Only the credit's link and Snapshot take the pointer,
-   so drags across the text still orbit the camera. */
+/* The title, top left, the credit line, bottom left, the viewport size and
+   the frame rate, top right, and Snapshot, bottom right: inside the frame, in
+   JetBrains Mono, the title in Kode Mono. Only the credit's link and Snapshot
+   take the pointer, so drags across the text still orbit the camera. */
 .masthead,
 .credit,
 .fps,
@@ -741,7 +742,13 @@ canvas {
 .fps {
 	top: calc(var(--ui-inset) + env(safe-area-inset-top));
 	right: calc(var(--ui-inset) + env(safe-area-inset-right));
+	text-align: right;
 	white-space: nowrap;
+}
+
+/* The viewport size keeps its lowercase x (the page is uppercase). */
+.viewport-size {
+	text-transform: none;
 }
 
 /* Snapshot: the icon (four open corners, as the HUD's reticles, around a

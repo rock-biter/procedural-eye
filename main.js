@@ -293,11 +293,21 @@ if (urlParams.get('gui') !== '0') {
 
 	// The frame rate, top right, styled as the credit line: the frames the page
 	// shows per second, counted over half a second. A gap longer than a second
-	// is a hidden tab, not a slow frame, and is not shown.
+	// is a hidden tab, not a slow frame, and is not shown. Above it, the
+	// viewport's size in CSS pixels, updated as the window resizes.
+	const stats = document.createElement('div')
+	stats.className = 'fps'
+	const viewport = document.createElement('div')
+	viewport.className = 'viewport-size'
+	const showViewport = () => {
+		viewport.textContent = `${window.innerWidth}x${window.innerHeight}`
+	}
+	showViewport()
+	window.addEventListener('resize', showViewport)
 	const fps = document.createElement('div')
-	fps.className = 'fps'
 	fps.textContent = '-- fps'
-	document.body.appendChild(fps)
+	stats.append(viewport, fps)
+	document.body.appendChild(stats)
 	let frames = 0
 	let since = null
 	const countFrame = (time) => {
