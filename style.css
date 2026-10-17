@@ -760,7 +760,7 @@ canvas {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 0px 32px;
+	padding: 2px 64px;
 	border: 0;
 	background:
 		linear-gradient(var(--accent), var(--accent)) left top / 12px 1px,
