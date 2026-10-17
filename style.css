@@ -35,7 +35,7 @@
 
 	--spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 	/* The room Snapshot takes at the bottom right, which the credit leaves. */
-	--snapshot-room: 120px;
+	--snapshot-room: 200px;
 	--elastic: var(--spring);
 	text-transform: uppercase;
 }
@@ -90,12 +90,12 @@ canvas {
 	scrollbar-width: thin;
 }
 
-/* Phones: below the title too (its height, with the line under it, set by
-   main.js), and above the credit line, which wraps to two lines there. */
+/* Phones: below the title too, and above Snapshot and the credit line
+   (their heights, set by main.js). */
 @media (max-width: 640px) {
 	.tp-dfwv {
 		--panel-top: calc(var(--ui-inset) + var(--masthead-height, 44px) + 8px);
-		--panel-bottom: calc(var(--ui-inset) + 44px);
+		--panel-bottom: calc(var(--ui-inset) + var(--footer-height, 120px) + 8px);
 	}
 }
 
@@ -751,18 +751,27 @@ canvas {
 	text-transform: none;
 }
 
-/* Snapshot: the icon (four open corners, as the HUD's reticles, around a
-   dot) then the word, on the credit line's baseline; brighter when hovered
-   or focused. */
+/* Snapshot: the word inside four open corners in the accent, as the HUD's
+   reticles, its box at the frame's bottom right as the credit line's;
+   brighter when hovered or focused. */
 .snapshot {
-	bottom: calc(var(--ui-inset-y) + env(safe-area-inset-bottom));
+	bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
 	right: calc(var(--ui-inset) + env(safe-area-inset-right));
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	padding: 0;
+	justify-content: center;
+	padding: 0px 32px;
 	border: 0;
-	background: none;
+	background:
+		linear-gradient(var(--accent), var(--accent)) left top / 12px 1px,
+		linear-gradient(var(--accent), var(--accent)) left top / 1px 12px,
+		linear-gradient(var(--accent), var(--accent)) right top / 12px 1px,
+		linear-gradient(var(--accent), var(--accent)) right top / 1px 12px,
+		linear-gradient(var(--accent), var(--accent)) left bottom / 12px 1px,
+		linear-gradient(var(--accent), var(--accent)) left bottom / 1px 12px,
+		linear-gradient(var(--accent), var(--accent)) right bottom / 12px 1px,
+		linear-gradient(var(--accent), var(--accent)) right bottom / 1px 12px;
+	background-repeat: no-repeat;
 	text-transform: inherit;
 	white-space: nowrap;
 	pointer-events: auto;
@@ -780,33 +789,78 @@ canvas {
 	outline-offset: 6px;
 }
 
-.snapshot-icon {
-	position: relative;
-	color: #ffb700;
-	width: 24px;
-	height: 24px;
-	background:
-		linear-gradient(currentColor, currentColor) left top / 8px 1px,
-		linear-gradient(currentColor, currentColor) left top / 1px 8px,
-		linear-gradient(currentColor, currentColor) right top / 8px 1px,
-		linear-gradient(currentColor, currentColor) right top / 1px 8px,
-		linear-gradient(currentColor, currentColor) left bottom / 8px 1px,
-		linear-gradient(currentColor, currentColor) left bottom / 1px 8px,
-		linear-gradient(currentColor, currentColor) right bottom / 8px 1px,
-		linear-gradient(currentColor, currentColor) right bottom / 1px 8px;
-	background-repeat: no-repeat;
+.snapshot:active {
+	scale: 0.98;
 }
 
-.snapshot-icon::after {
-	content: '';
-	position: absolute;
-	inset: 9px;
-	border-radius: 50%;
-	background: currentColor;
+/* Wide screens: the footer has no box, Snapshot and the credit line keep
+   their corners. */
+.footer {
+	display: contents;
 }
 
-.snapshot:active .snapshot-icon {
-	scale: 0.9;
+/* Phones. The title spans the frame: "Random" from the left inset to the
+   right one, its ink (3.269em of Kode Mono with this letter spacing, the
+   first glyph's side bearing 0.078em) measured in the font; "eyes" on a
+   second line, without the dash. At a line height of 0.8 the capitals
+   (0.70em) start 0.04em below the line's top, which the top margin takes
+   back: the first line's capitals start at --ui-inset, the second's
+   --title-size lower, where the viewport size and the frame rate align
+   their capitals (0.32em below their line's top). The line about the project
+   is hidden. */
+@media (max-width: 640px) {
+	:root {
+		--title-size: calc(
+			(100vw - 2 * var(--ui-inset) - env(safe-area-inset-left) - env(safe-area-inset-right)) / 3.269
+		);
+	}
+
+	.masthead {
+		top: calc(var(--ui-inset) + env(safe-area-inset-top));
+	}
+
+	.masthead h1 {
+		margin: -0.04em 0 0 -0.078em;
+		font-size: var(--title-size);
+		line-height: 0.8;
+		white-space: nowrap;
+	}
+
+	.masthead p,
+	.title-dash {
+		display: none;
+	}
+
+	.title-eyes {
+		display: block;
+	}
+
+	.fps {
+		top: calc(var(--ui-inset) + env(safe-area-inset-top) + 0.8 * var(--title-size) - 0.32em);
+	}
+
+	/* Snapshot above the credit line, across the frame; the credit takes
+	   three quarters of the width. */
+	.footer {
+		position: fixed;
+		right: calc(var(--ui-inset) + env(safe-area-inset-right));
+		bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
+		left: calc(var(--ui-inset) + env(safe-area-inset-left));
+		z-index: 10;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		pointer-events: none;
+	}
+
+	.footer .credit,
+	.footer .snapshot {
+		position: static;
+	}
+
+	.credit {
+		max-width: 75%;
+	}
 }
 
 /* Phones and tablets: the frame 8px from the edges and the interface 12px

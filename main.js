@@ -259,11 +259,12 @@ if (urlParams.get('gui') !== '0') {
 
 	// The title with a line about the project, top left, and the credit line,
 	// bottom left; the credit's link blurs itself after a click, as the HUD
-	// buttons do. On phones the panel starts below the title, at its height
-	// (--masthead-height, style.css).
+	// buttons do. On phones the title drops its dash and breaks before "eyes",
+	// and the panel starts below it, at its height (--masthead-height,
+	// style.css).
 	const masthead = document.createElement('header')
 	masthead.className = 'masthead'
-	masthead.innerHTML = `<h1>Random<span>-eyes</span></h1><p>The digital eye configurator.<br> Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with <span>the eyes</span>.</p>`
+	masthead.innerHTML = `<h1>Random<span class="title-dash">-</span><span class="title-eyes">eyes</span></h1><p>The digital eye configurator.<br> Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with <span>the eyes</span>.</p>`
 	document.body.appendChild(masthead)
 	new ResizeObserver(() => {
 		document.documentElement.style.setProperty('--masthead-height', `${masthead.offsetHeight}px`)
@@ -273,23 +274,31 @@ if (urlParams.get('gui') !== '0') {
 	credit.innerHTML =
 		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
 	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
-	document.body.appendChild(credit)
 
 	// Snapshot, bottom right: saves the image as the panel's Save PNG does
-	// (the state in a tEXt chunk). An icon of the HUD's reticle corners with a
-	// dot in the middle, then the word; it blurs itself after a click, as the
-	// HUD buttons do (Space toggles photo mode only when the page has the
-	// focus).
+	// (the state in a tEXt chunk). The word inside the HUD's reticle corners
+	// (style.css); it blurs itself after a click, as the HUD buttons do (Space
+	// toggles photo mode only when the page has the focus).
 	const snapshot = document.createElement('button')
 	snapshot.type = 'button'
 	snapshot.className = 'snapshot'
 	snapshot.title = 'Save a PNG of the image'
-	snapshot.innerHTML = '<span class="snapshot-icon" aria-hidden="true"></span>Snapshot'
+	snapshot.textContent = 'Snapshot'
 	snapshot.addEventListener('click', () => {
 		snapshot.blur()
 		savePng()
 	})
-	document.body.appendChild(snapshot)
+
+	// The two share a footer: no box of its own on wide screens, where each
+	// keeps its corner; on phones a column across the frame, Snapshot above
+	// the credit line, and the panel stops above it (--footer-height).
+	const footer = document.createElement('footer')
+	footer.className = 'footer'
+	footer.append(snapshot, credit)
+	document.body.appendChild(footer)
+	new ResizeObserver(() => {
+		document.documentElement.style.setProperty('--footer-height', `${footer.offsetHeight}px`)
+	}).observe(footer)
 
 	// The frame rate, top right, styled as the credit line: the frames the page
 	// shows per second, counted over half a second. A gap longer than a second
