@@ -29,12 +29,16 @@ uniform vec4 uSkinPatternBox; // its box in the front plane: min x, min y, 1 / w
 uniform float uShellTone; // the back shell's albedo, a share of the skin's
 #endif
 
-varying vec3 vWorldPos;
-varying vec3 vRestPos;
-varying vec3 vNormal;
-varying vec4 vLid;
-varying vec4 vRelief;
-varying float vAo;
+// Centroid for the shading, plain copies for the derivatives
+// (skin-vertex.glsl).
+centroid varying vec3 vWorldPos;
+centroid varying vec3 vRestPos;
+centroid varying vec3 vNormal;
+centroid varying vec4 vLid;
+centroid varying vec4 vRelief;
+centroid varying float vAo;
+varying vec3 vCenterWorldPos;
+varying vec4 vCenterFrame;
 
 // Meibomian orifices per margin, upper and lower (docs/RESEARCH.md).
 const vec2 ORIFICES = vec2(34.0, 24.0);
@@ -84,10 +88,10 @@ void main() {
 	float alongMm = along * marginLength;
 	float u = s / uSkin2.z;
 	vec2 m = vec2(alongMm, u * STRIP);
-	vec3 dpdx = dFdx(vWorldPos);
-	vec3 dpdy = dFdy(vWorldPos);
-	vec3 gradAlong = surfaceGradient(alongMm, geometric, dpdx, dpdy);
-	vec3 gradAcross = surfaceGradient(u * STRIP, geometric, dpdx, dpdy);
+	vec3 dpdx = dFdx(vCenterWorldPos);
+	vec3 dpdy = dFdy(vCenterWorldPos);
+	vec3 gradAlong = surfaceGradient(vCenterFrame.z * marginLength, geometric, dpdx, dpdy);
+	vec3 gradAcross = surfaceGradient(vCenterFrame.w / uSkin2.z * STRIP, geometric, dpdx, dpdy);
 
 	// The pixel footprint (mm), widened by the depth of field's blur circle
 	// on the skin (aperture × defocus / focus distance): furrows and wrinkles
@@ -194,8 +198,8 @@ void main() {
 #ifdef SKIN_SHELL
 	// The relief's gradient in the unrolled coordinates, carried onto the
 	// surface by theirs (the band stands edge-on to the front plane).
-	vec3 gradient = height.y * surfaceGradient(p.x, geometric, dpdx, dpdy) +
-		height.z * surfaceGradient(p.y, geometric, dpdx, dpdy);
+	vec3 gradient = height.y * surfaceGradient(vCenterFrame.x, geometric, dpdx, dpdy) +
+		height.z * surfaceGradient(vCenterFrame.y, geometric, dpdx, dpdy);
 #else
 	vec3 gradient = vec3(height.yz, 0.0);
 	gradient -= geometric * dot(gradient, geometric);

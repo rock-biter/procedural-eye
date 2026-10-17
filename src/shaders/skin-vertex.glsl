@@ -13,12 +13,24 @@ attribute vec2 coords; // the skin unrolled into the front plane (mm)
 
 attribute vec2 follow;
 
-varying vec3 vWorldPos;
-varying vec3 vRestPos;
-varying vec3 vNormal;
-varying vec4 vLid;
-varying vec4 vRelief;
-varying float vAo;
+// Centroid: a multisampled pass (the half-resolution share of a split
+// frame, src/render/scenePass.js) shades a triangle that covers one sample
+// of a pixel at the pixel's center, off the triangle, where plain varyings
+// extrapolate (the lid frame, the relief, the occlusion past their ranges)
+// and the shading turned negative, which the depth of field spread into
+// black blots. Centroid ones stay on the triangle. Their derivatives are
+// unreliable where the centroid moves, so the screen-space derivatives
+// (skin-fragment.glsl) take plain copies, interpolated at the center:
+// the world position, and the rest position (xy), the place along the
+// margin and across the profile (zw).
+centroid varying vec3 vWorldPos;
+centroid varying vec3 vRestPos;
+centroid varying vec3 vNormal;
+centroid varying vec4 vLid;
+centroid varying vec4 vRelief;
+centroid varying float vAo;
+varying vec3 vCenterWorldPos;
+varying vec4 vCenterFrame;
 
 void main() {
 	float angle = lidFollowAngle(follow);
@@ -34,5 +46,7 @@ void main() {
 	vLid = lid;
 	vRelief = relief;
 	vAo = ao;
+	vCenterWorldPos = vWorldPos;
+	vCenterFrame = vec4(vRestPos.xy, relief.w, lid.y);
 	gl_Position = projectionMatrix * viewMatrix * world;
 }
