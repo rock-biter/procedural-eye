@@ -140,6 +140,8 @@ export default class EyeApp {
 		// Continuous interactive frames for measure(): { remaining, resolve }.
 		this.benchmark = null
 		this.compileMs = null
+		// How long the last bake of the skin's relief took (ms, CPU side).
+		this.skinBakeMs = null
 		this.rebuild()
 		setup.onResize = () => this.resize()
 		this.resize()
@@ -153,6 +155,7 @@ export default class EyeApp {
 		if (this.dirty.has('rebuild') || this.dirty.has('bake')) this.bake()
 		this.dirty.delete('rebuild')
 		this.dirty.delete('bake')
+		this.bakeSkin()
 		const started = performance.now()
 		this.renderSample(null)
 		await this.setup.renderer.compileAsync(this.setup.scene, this.physicalCamera.camera)
@@ -245,6 +248,22 @@ export default class EyeApp {
 		this.irisAtlas.bake(this.setup.renderer, this.params, this.irisSpace, this.eye.nasalSign)
 		if (!this.irisColorLut.blending) this.irisColorLut.update(this.params.irisColor)
 		this.scleraMaps.bake(this.params, this.eye.scleraRadius)
+	}
+
+	// Bakes the skin's relief and freckles if the skin reads them baked and
+	// their inputs changed (src/adnexa/lids.js). Returns whether it baked.
+	bakeSkin() {
+		const baked = this.lids.bakeRelief(this.setup.renderer, this.params)
+		if (baked) this.skinBakeMs = this.lids.relief.bakeMs
+		return baked
+	}
+
+	// Outside #debug the skin reads its relief and freckles baked; in #debug
+	// it evaluates them per pixel, so the panel's edits show at once.
+	setSkinBaked(baked) {
+		this.lids.setBaked(baked)
+		this.bakeSkin()
+		this.invalidate()
 	}
 
 	resize() {
@@ -415,6 +434,9 @@ export default class EyeApp {
 			this.lashes.setDebugView(this.params.debug.view)
 		}
 		this.dirty.clear()
+		// The skin's relief bakes again once its inputs settle: not every
+		// frame of a transition (outside #debug nothing changes them anyway).
+		if (!this.transition && this.bakeSkin()) this.invalidate()
 		if (this.benchmark) {
 			this.measureFrame(time)
 			return
@@ -571,6 +593,11 @@ export default class EyeApp {
 			measure: (frames) => this.measure(frames),
 			measureSync: (frames) => this.measureSync(frames),
 			getCompileMs: () => this.compileMs,
+			// The skin's relief: baked (outside #debug) or per pixel; the last
+			// bake's time.
+			setSkinBaked: (baked) => this.setSkinBaked(Boolean(baked)),
+			isSkinBaked: () => this.lids.baked,
+			getSkinBakeMs: () => this.skinBakeMs,
 			getEyeGeometry: () => ({ apexZ: this.eye.apexZ, focusDepth: this.focusDepth }),
 		}
 	}

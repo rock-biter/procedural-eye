@@ -419,4 +419,11 @@ async function createPanel() {
 	return gui
 }
 
+// Outside #debug the skin reads its relief and freckles baked (once, before
+// the first frame); in #debug it evaluates them per pixel, live with the
+// panel. Also without the HUD (?gui=0), for captures.
+const updateSkinMode = () => app.setSkinBaked(window.location.hash !== '#debug')
+window.addEventListener('hashchange', updateSkinMode)
+updateSkinMode()
+
 app.start()

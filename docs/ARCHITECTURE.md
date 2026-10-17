@@ -39,6 +39,7 @@
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, back shell, lash, meniscus and bubble meshes with their materials. |
 | [`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js) | The skin's pigment patterns baked on the GPU over the lid mesh at rest. |
+| [`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js) | The skin's relief and freckles baked on the GPU over the same box, read outside `#debug`. |
 | [`src/sclera/vesselGenerator.js`](../src/sclera/vesselGenerator.js) * | Seeded episcleral and conjunctival vessel network. |
 | [`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) | The network rasterized into the polar vessel map, when its parameters or the globe change. |
 | **Animation** ([`docs/ANIMATION.md`](ANIMATION.md)) | |
@@ -70,7 +71,7 @@
 
 ## Frame Loop
 
-`EyeApp.start()` applies the initial rebuild and bake and renders one frame. It then compiles every program with `renderer.compileAsync()` (recorded as `getCompileMs()`) before the first animation frame. `EyeApp.frame()` then runs on every animation frame:
+`EyeApp.start()` applies the initial rebuild and bake, bakes the skin's relief (outside `#debug`; `main.js` sets the mode from the hash before it, and again on every hash change through `setSkinBaked()`), and renders one frame. It then compiles every program with `renderer.compileAsync()` (recorded as `getCompileMs()`) before the first animation frame. `EyeApp.frame()` then runs on every animation frame:
 
 1. **Transition** ([below](#transitions)): a running transition writes its next values, marks their kinds dirty, crossfades the color lookup and restarts the accumulation. Its time step is capped at 0.1 s, so a long frame does not skip it.
 2. **Pending dirty kinds**
@@ -88,6 +89,7 @@
      - the color lookup (spectral model in JS, about 35 ms), only when the layer model changed, and not while it crossfades;
      - the scleral vessel map, only when its parameters or the globe changed.
    - `define`: the debug view define of the eyeball, lid, back shell and lash materials. The tone-mapping mode is set by the post-processing every frame; `postprocessing` recompiles it.
+   - **Skin relief** (`bakeSkin()`): outside `#debug`, when no transition runs, the skin's relief and freckles bake again if the lid mesh, `lids.seed`, `skin.pores`, `skin.wrinkles` or `skin.freckles` changed (about 30 ms). These leaves stay of kind `uniform`: in `#debug` the skin reads them every frame.
 3. **Controls**: `CameraControls.update()` steps a coasting orbit (which restarts the accumulation as a drag does) and the mouse parallax, which restarts it while it moves ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
 4. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
    - A living eye steps the animator and restarts the accumulation.
