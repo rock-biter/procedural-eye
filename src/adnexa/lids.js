@@ -2,7 +2,9 @@
 // fissure, in world space (it does not turn with the gaze), with the skin
 // program and its baked pigment patterns (src/adnexa/skinPattern.js); and the
 // back shell (src/adnexa/backShell.js) closing the skin patch behind, with the
-// skin program's SKIN_SHELL variant.
+// skin program's SKIN_SHELL variant. Outside #debug both read the relief and
+// the freckles baked by src/adnexa/skinRelief.js (SKIN_BAKED); in #debug they
+// evaluate them per pixel, so the panel's edits show at once.
 import {
 	BufferAttribute,
 	BufferGeometry,
@@ -28,6 +30,7 @@ import {
 } from './lidGeometry'
 import { bakeLidOcclusion } from './lidOcclusion'
 import SkinPattern from './skinPattern'
+import SkinRelief from './skinRelief'
 
 export default class Lids {
 	// `shadowUniforms`: the key light's shadow map (src/lighting/keyShadow.js).
@@ -46,6 +49,10 @@ export default class Lids {
 			uOcclusion: new Uniform(1),
 			uSkinPattern: new Uniform(this.pattern.texture),
 			uSkinPatternBox: new Uniform(this.pattern.box),
+			uSkinRelief: new Uniform(null),
+			uSkinReliefTexel: new Uniform(1),
+			uSkinFreckles: new Uniform(null),
+			uSkinFrecklesTexel: new Uniform(1),
 			...envUniforms,
 			...shadowUniforms,
 		}
@@ -63,7 +70,12 @@ export default class Lids {
 		this.fissure = null
 		// The back shell: the same skin uniforms, and its tone. It lies behind
 		// the skin the key light falls on, so it casts no shadow.
-		this.backUniforms = { ...this.uniforms, uShellTone: new Uniform(1) }
+		this.backUniforms = {
+			...this.uniforms,
+			uShellTone: new Uniform(1),
+			uSkinRelief: new Uniform(null),
+			uSkinReliefTexel: new Uniform(1),
+		}
 		this.backMaterial = new ShaderMaterial({
 			uniforms: this.backUniforms,
 			defines: { ...this.material.defines, SKIN_SHELL: '' },
@@ -73,6 +85,16 @@ export default class Lids {
 		this.backMaterial.name = 'BackShell'
 		this.back = new Mesh(new BufferGeometry(), this.backMaterial)
 		this.back.name = 'BackShell'
+		// The baked relief and freckles, read while `baked`; the lid ring they
+		// are baked from, and its version (one per rebuild).
+		this.relief = new SkinRelief(this.uniforms)
+		const textures = this.relief.textures()
+		this.uniforms.uSkinRelief.value = textures.lids
+		this.uniforms.uSkinFreckles.value = textures.freckles
+		this.backUniforms.uSkinRelief.value = textures.shell
+		this.baked = false
+		this.ring = new BufferGeometry()
+		this.version = 0
 	}
 
 	// The lids and the back shell, for params.lids and params.shell.
@@ -126,6 +148,16 @@ export default class Lids {
 			return shifted
 		})
 		geometry.setIndex(new BufferAttribute(join(indices), 1))
+		// The lid ring alone (the first part), for the relief bake: the same
+		// buffers, drawn up to its last triangle.
+		this.ring.dispose()
+		this.ring = new BufferGeometry()
+		for (const name of ['position', 'lid', 'relief']) {
+			this.ring.setAttribute(name, geometry.getAttribute(name))
+		}
+		this.ring.setIndex(geometry.getIndex())
+		this.ring.setDrawRange(0, data.indices.length)
+		this.version++
 		geometry.computeVertexNormals()
 		geometry.computeBoundingSphere()
 		geometry.computeBoundingBox()
@@ -161,6 +193,35 @@ export default class Lids {
 		this.back.geometry = geometry
 	}
 
+	// Whether the skin reads the baked relief and freckles (SKIN_BAKED) or
+	// evaluates them per pixel (#debug). Bake with bakeRelief() before the
+	// next frame.
+	setBaked(baked) {
+		if (baked === this.baked) return
+		this.baked = baked
+		for (const material of [this.material, this.backMaterial]) {
+			if (baked) material.defines.SKIN_BAKED = ''
+			else delete material.defines.SKIN_BAKED
+			material.needsUpdate = true
+		}
+	}
+
+	// Bakes the relief and freckles for `params` unless they are baked for
+	// them already (or the skin evaluates them per pixel). Returns whether it
+	// baked.
+	bakeRelief(renderer, params) {
+		if (!this.baked) return false
+		const { pores, wrinkles, freckles } = params.skin
+		const key = JSON.stringify([this.version, params.lids.seed, pores, wrinkles, freckles])
+		if (key === this.relief.key) return false
+		this.update(params, this.uniforms.uPixelAngle.value)
+		this.relief.bake(renderer, this.pattern.box, this.ring, key)
+		this.uniforms.uSkinReliefTexel.value = this.relief.texel.lids
+		this.uniforms.uSkinFrecklesTexel.value = this.relief.texel.freckles
+		this.backUniforms.uSkinReliefTexel.value = this.relief.texel.shell
+		return true
+	}
+
 	setDebugView(view) {
 		const value = debugViewDefine(view)
 		for (const material of [this.material, this.backMaterial]) {
@@ -192,5 +253,7 @@ export default class Lids {
 		this.back.geometry.dispose()
 		this.backMaterial.dispose()
 		this.pattern.dispose()
+		this.ring.dispose()
+		this.relief.dispose()
 	}
 }

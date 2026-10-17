@@ -9,6 +9,9 @@
 // SKIN_SHELL: the back shell (src/adnexa/backShell.js), plain skin far from
 // the lids, without freckles and veins, darker by uShellTone; its pattern
 // coordinates are its own skin unrolled into the front plane.
+// SKIN_BAKED (outside #debug): the micro-relief, the wrinkles and the
+// freckles come from textures baked at rest (src/adnexa/skinRelief.js)
+// instead of being hashed per pixel.
 #include ./debug-views.glsl
 #include ./lit-surface.glsl
 #include ./key-shadow.glsl
@@ -25,6 +28,14 @@ uniform vec2 uDefocus; // camera aperture diameter, focus distance (mm)
 uniform float uOcclusion; // strength of the baked ambient occlusion
 uniform sampler2D uSkinPattern; // baked pigment patterns (skin-pattern-fragment.glsl)
 uniform vec4 uSkinPatternBox; // its box in the front plane: min x, min y, 1 / width, 1 / height (mm)
+#ifdef SKIN_BAKED
+// The baked relief and freckles (src/adnexa/skinRelief.js) over the same box,
+// and their texel sizes (mm).
+uniform sampler2D uSkinRelief;
+uniform float uSkinReliefTexel;
+uniform sampler2D uSkinFreckles;
+uniform float uSkinFrecklesTexel;
+#endif
 #ifdef SKIN_SHELL
 uniform float uShellTone; // the back shell's albedo, a share of the skin's
 #endif
@@ -76,7 +87,8 @@ void main() {
 	vec2 p = vRestPos.xy;
 	uint seed = uint(uSkin3.w + 0.5) * 7919u + 101u;
 	// Melanin and blood mottling, veins, oily patches (skin-pattern-fragment.glsl).
-	vec4 pattern = texture(uSkinPattern, (p - uSkinPatternBox.xy) * uSkinPatternBox.zw);
+	vec2 uv = (p - uSkinPatternBox.xy) * uSkinPatternBox.zw;
+	vec4 pattern = texture(uSkinPattern, uv);
 	float onMargin = 1.0 - smoothstep(uSkin2.z, uSkin2.w, s);
 	float onSkin = 1.0 - onMargin;
 	// The canthi, where the margin features fade out.
@@ -104,67 +116,47 @@ void main() {
 	float relief = 1.0 - smoothstep(0.05, 0.16, footprint);
 	float detail = 1.0 - smoothstep(0.015, 0.05, footprint);
 
-	// Skin tension lines: along the margin on the lids, radial out of the
-	// lateral canthus, where the crow's feet are.
-	vec2 across = normalize(vRelief.xy + vec2(1e-6, 0.0));
-	vec2 outward = normalize(uCanthi.zw - uCanthi.xy);
-	vec2 fromLateral = p - uCanthi.zw;
-	float r = max(length(fromLateral), 1e-3);
-	float cosAngle = dot(fromLateral, outward) / r;
-	float sinAngle = (fromLateral.y * outward.x - fromLateral.x * outward.y) / r;
-	float angle = atan(sinAngle, cosAngle);
-	vec2 dAngle = (cosAngle * vec2(-outward.y, outward.x) - sinAngle * outward) / r;
-	float fan = smoothstep(3.0, 7.0, r) * (1.0 - smoothstep(15.0, 23.0, r)) * (1.0 - smoothstep(0.8, 1.3, abs(angle)));
-	vec2 alongLid = vec2(-across.y, across.x);
-	vec2 radial = fromLateral / r;
-	// Blend the two orientations as doubled angles (lines have no sign).
-	vec2 doubled = mix(
-		vec2(sq(alongLid.x) - sq(alongLid.y), 2.0 * alongLid.x * alongLid.y),
-		vec2(sq(radial.x) - sq(radial.y), 2.0 * radial.x * radial.y),
-		fan
-	);
-	float tensionAngle = 0.5 * atan(doubled.y, doubled.x);
-	vec2 tension = vec2(cos(tensionAngle), sin(tensionAngle));
-
 	// Regions of the skin.
 	float upperLid = upper * smoothstep(1.0, 2.5, a) * (1.0 - smoothstep(9.0, 15.0, a));
 	float underEye = (1.0 - upper) * smoothstep(1.0, 3.0, a) * (1.0 - smoothstep(8.0, 13.0, a));
 	float canthi = exp(-sq(distance(p, uCanthi.xy) / 3.5)) + 0.6 * exp(-sq(distance(p, uCanthi.zw) / 3.5));
 #ifdef SKIN_SHELL
 	// The shell's coordinates cover the front plane's again: no canthi there.
-	// Its tension lines wander over about a centimeter: lines all along the
-	// edge streak where the shell turns away, furrows all as shallow cross
-	// into a regular lattice.
 	canthi = 0.0;
-	fan = 0.0;
-	float tensionTurn = PI * valueNoise(p / 12.0, seed + 19u);
-	tension = vec2(cos(tensionTurn), sin(tensionTurn));
 #endif
 
-	// Micro-relief (furrows, fine network, pores) and fine wrinkles: heights
-	// (mm) with their front-plane gradients. The anterior edge of the margin
-	// is skin too.
-	vec3 furrowed = vec3(0.0);
-	vec3 network = vec3(0.0);
-	vec3 wrinkles = vec3(0.0);
+	// Micro-relief (furrows, fine network, pores) and fine wrinkles
+	// (skin-relief.glsl): the front-plane gradient of their height (mm), and
+	// their terms in the albedo (furrows darker) and the occlusion. The
+	// anterior edge of the margin is skin too.
+	vec2 reliefGradient = vec2(0.0);
+	float reliefShade = 0.0;
+	float reliefOcclusion = 0.0;
 	float keratinized = smoothstep(0.85, 1.3, u);
+#ifdef SKIN_BAKED
+	// Baked at rest (src/adnexa/skinRelief.js), read at the mip level of the
+	// footprint: the mipmaps filter it as the footprint did. Its wrinkles are
+	// weighed by the skin share already.
 	if (relief > 0.0 && keratinized > 0.0) {
-		furrowed = 0.011 * relief * keratinized * furrows(p, tension, footprint, seed + 11u);
-		if (detail > 0.0) {
-			float pores = uSkin.w * mix(0.35, 1.0, smoothstep(2.0, 8.0, a)) * mix(1.0, 0.6, upper);
-			network = 0.0025 * relief * keratinized * detail * fineNetwork(p, pores, footprint, seed + 13u);
-		}
-		float lidLines = uSkin2.x * smoothstep(1.2, 2.5, a) * (1.0 - smoothstep(13.0, 20.0, a)) * (1.0 - fan) *
-			smoothstep(0.0, 0.15, along);
-		// Slanted lines: 25° off the margin, toward the lateral side.
-		float side = (upper > 0.5 ? 1.0 : -1.0) * sign(uCanthi.x - uCanthi.z);
-		float slant = 0.906 * a + 0.423 * alongMm;
-		vec2 dSlant = 0.906 * across + 0.423 * side * vec2(-across.y, across.x);
-		wrinkles = relief * onSkin *
-			lidWrinkles(p, a, across, slant, dSlant, lidLines, angle, dAngle, uSkin2.x * fan, footprint, seed + 17u);
+		vec4 baked = textureLod(uSkinRelief, uv, log2(max(0.7 * footprint / uSkinReliefTexel, 1.0)));
+		float weight = relief * keratinized;
+		reliefGradient = weight * (baked.rg * 2.0 - 1.0) * RELIEF_SLOPE;
+		reliefShade = weight * (baked.b - 1.0) * RELIEF_SHADE;
+		reliefOcclusion = weight * (baked.a - 1.0) * RELIEF_OCCLUSION;
 	}
-	vec3 micro = furrowed + network;
-	vec3 height = micro + wrinkles;
+#else
+	if (relief > 0.0 && keratinized > 0.0) {
+		vec2 across = normalize(vRelief.xy + vec2(1e-6, 0.0));
+		MicroRelief r =
+			skinMicroRelief(p, a, along, alongMm, upper, across, uCanthi, uSkin.w, uSkin2.x, footprint, detail, seed);
+		vec3 furrowed = relief * keratinized * r.furrowed;
+		vec3 network = relief * keratinized * detail * r.network;
+		vec3 wrinkles = relief * onSkin * r.wrinkles;
+		reliefGradient = furrowed.yz + network.yz + wrinkles.yz;
+		reliefShade = 3.0 * furrowed.x + network.x;
+		reliefOcclusion = 4.0 * (furrowed.x + network.x) + 1.5 * wrinkles.x;
+	}
+#endif
 
 	// The margin's relief, in the strip's own frame: fine bumps of the mucosa
 	// (they break the wet reflection into glints) and the orifices.
@@ -198,10 +190,10 @@ void main() {
 #ifdef SKIN_SHELL
 	// The relief's gradient in the unrolled coordinates, carried onto the
 	// surface by theirs (the band stands edge-on to the front plane).
-	vec3 gradient = height.y * surfaceGradient(vCenterFrame.x, geometric, dpdx, dpdy) +
-		height.z * surfaceGradient(vCenterFrame.y, geometric, dpdx, dpdy);
+	vec3 gradient = reliefGradient.x * surfaceGradient(vCenterFrame.x, geometric, dpdx, dpdy) +
+		reliefGradient.y * surfaceGradient(vCenterFrame.y, geometric, dpdx, dpdy);
 #else
-	vec3 gradient = vec3(height.yz, 0.0);
+	vec3 gradient = vec3(reliefGradient, 0.0);
 	gradient -= geometric * dot(gradient, geometric);
 #endif
 	vec3 n = normalize(geometric - gradient - marginGradient * onMargin);
@@ -212,7 +204,11 @@ void main() {
 	float venous = 0.0;
 	float cavity = saturate(-fold / 0.5);
 #ifndef SKIN_SHELL
+#ifdef SKIN_BAKED
+	melanin += 1.1 * textureLod(uSkinFreckles, uv, log2(max(footprint / uSkinFrecklesTexel, 1.0))).r;
+#else
 	melanin += 1.1 * freckles(p, uSkin3.x, seed + 61u);
+#endif
 	float veins = pattern.b;
 	venous += uSkin3.y * (0.8 * upperLid + 1.0 * underEye + 1.6 * veins * saturate(upperLid + underEye + 0.15));
 #endif
@@ -222,7 +218,7 @@ void main() {
 	vec3 albedo = uSkinColor * pow(vec3(0.8, 0.68, 0.56), vec3(melanin)) *
 		pow(vec3(1.0, 0.8, 0.82), vec3(blood)) * pow(vec3(0.84, 0.85, 1.0), vec3(venous));
 	// Furrows are a little darker; the lash roots darker still.
-	albedo *= 1.0 + 3.0 * furrowed.x + network.x;
+	albedo *= 1.0 + reliefShade;
 	albedo *= mix(1.0, 0.7, exp(-a / 0.5) * onSkin);
 #ifdef SKIN_SHELL
 	albedo *= uShellTone;
@@ -245,7 +241,7 @@ void main() {
 #endif
 
 	// Folds are shaded (ambient and specular occlusion), grooves a little.
-	float occlusion = (1.0 - 0.45 * pow(cavity, 0.8)) * (1.0 + 4.0 * micro.x + 1.5 * wrinkles.x);
+	float occlusion = (1.0 - 0.45 * pow(cavity, 0.8)) * (1.0 + reliefOcclusion);
 	// Baked over the geometry: deep in the canthi, under the margins, in the crease.
 	occlusion *= mix(1.0, vAo, uOcclusion);
 	// Wet toward the margin, oily patches on the lids, matte further out.

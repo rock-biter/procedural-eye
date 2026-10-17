@@ -222,4 +222,100 @@ float veinNetwork(vec2 p, uint seed) {
 	return max(veins, 0.5 * onSmall * exp(-sq(branch / 0.1)));
 }
 
+// The micro-relief and the fine wrinkles of the skin at `p`, unweighted: the
+// furrows and the fine network (with the pores) in mm, and the wrinkles, as
+// heights with their front-plane gradients. The caller weighs them by its
+// fades, the keratinized share and the skin share. `a`, `along`, `alongMm`
+// and `upper` are the lid frame (mm from the margin, along the margin 0–1
+// and in mm, the upper share), `across` the unit front-plane direction in
+// which `a` grows, `canthi` the medial (xy) and lateral (zw) canthus;
+// `pores` and `wrinkleAmount` are skin.pores and skin.wrinkles. The fine
+// network is left out where `detail` is 0. The skin program evaluates it per
+// pixel in #debug, the bake (skin-relief-bake-fragment.glsl) per texel.
+// SKIN_SHELL: the back shell's, in its own coordinates.
+struct MicroRelief {
+	vec3 furrowed;
+	vec3 network;
+	vec3 wrinkles;
+};
+
+MicroRelief skinMicroRelief(
+	vec2 p,
+	float a,
+	float along,
+	float alongMm,
+	float upper,
+	vec2 across,
+	vec4 canthi,
+	float pores,
+	float wrinkleAmount,
+	float footprint,
+	float detail,
+	uint seed
+) {
+	// Skin tension lines: along the margin on the lids, radial out of the
+	// lateral canthus, where the crow's feet are.
+	vec2 outward = normalize(canthi.zw - canthi.xy);
+	vec2 fromLateral = p - canthi.zw;
+	float r = max(length(fromLateral), 1e-3);
+	float cosAngle = dot(fromLateral, outward) / r;
+	float sinAngle = (fromLateral.y * outward.x - fromLateral.x * outward.y) / r;
+	float angle = atan(sinAngle, cosAngle);
+	vec2 dAngle = (cosAngle * vec2(-outward.y, outward.x) - sinAngle * outward) / r;
+	float fan = smoothstep(3.0, 7.0, r) * (1.0 - smoothstep(15.0, 23.0, r)) * (1.0 - smoothstep(0.8, 1.3, abs(angle)));
+	vec2 alongLid = vec2(-across.y, across.x);
+	vec2 radial = fromLateral / r;
+	// Blend the two orientations as doubled angles (lines have no sign).
+	vec2 doubled = mix(
+		vec2(sq(alongLid.x) - sq(alongLid.y), 2.0 * alongLid.x * alongLid.y),
+		vec2(sq(radial.x) - sq(radial.y), 2.0 * radial.x * radial.y),
+		fan
+	);
+	float tensionAngle = 0.5 * atan(doubled.y, doubled.x);
+	vec2 tension = vec2(cos(tensionAngle), sin(tensionAngle));
+#ifdef SKIN_SHELL
+	// The shell's coordinates cover the front plane's again: no canthi there.
+	// Its tension lines wander over about a centimeter: lines all along the
+	// edge streak where the shell turns away, furrows all as shallow cross
+	// into a regular lattice.
+	fan = 0.0;
+	float tensionTurn = PI * valueNoise(p / 12.0, seed + 19u);
+	tension = vec2(cos(tensionTurn), sin(tensionTurn));
+#endif
+
+	MicroRelief relief;
+	relief.furrowed = 0.011 * furrows(p, tension, footprint, seed + 11u);
+	relief.network = vec3(0.0);
+	if (detail > 0.0) {
+		float poreShare = pores * mix(0.35, 1.0, smoothstep(2.0, 8.0, a)) * mix(1.0, 0.6, upper);
+		relief.network = 0.0025 * fineNetwork(p, poreShare, footprint, seed + 13u);
+	}
+	float lidLines = wrinkleAmount * smoothstep(1.2, 2.5, a) * (1.0 - smoothstep(13.0, 20.0, a)) * (1.0 - fan) *
+		smoothstep(0.0, 0.15, along);
+	// Slanted lines: 25° off the margin, toward the lateral side.
+	float side = (upper > 0.5 ? 1.0 : -1.0) * sign(canthi.x - canthi.z);
+	float slant = 0.906 * a + 0.423 * alongMm;
+	vec2 dSlant = 0.906 * across + 0.423 * side * vec2(-across.y, across.x);
+	relief.wrinkles = lidWrinkles(p, a, across, slant, dSlant, lidLines, angle, dAngle, wrinkleAmount * fan, footprint, seed + 17u);
+	return relief;
+}
+
+// The baked relief (src/adnexa/skinRelief.js), RGBA8 over the front-plane
+// box: the front-plane gradient of the whole height (rg, ±RELIEF_SLOPE), the
+// albedo term of the furrows and the network (b, 3 furrows + network, in
+// −RELIEF_SHADE–0) and the occlusion term (a, 4 micro-relief + 1.5 wrinkles,
+// in −RELIEF_OCCLUSION–0). All linear in the heights, so the mipmaps filter
+// them as the footprint would.
+const float RELIEF_SLOPE = 1.5;
+const float RELIEF_SHADE = 0.12;
+const float RELIEF_OCCLUSION = 0.4;
+
+vec4 encodeRelief(vec2 gradient, float shade, float occlusion) {
+	return vec4(
+		clamp(gradient / RELIEF_SLOPE * 0.5 + 0.5, 0.0, 1.0),
+		clamp(1.0 + shade / RELIEF_SHADE, 0.0, 1.0),
+		clamp(1.0 + occlusion / RELIEF_OCCLUSION, 0.0, 1.0)
+	);
+}
+
 #endif

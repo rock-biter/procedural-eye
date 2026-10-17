@@ -85,7 +85,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 | `?gui=0` | Hides the frame, the HUD, the title, the credit line, the frame rate and the panel (captures). |
 | `?dpr=<ratio>` | Pins the pixel ratio (0.5–2) and turns the adaptive resolution off. |
 | `?debug=1` | Exposes the app object as `window.__EYE_APP__` for console debugging. |
-| `#debug` | Shows the panel (it is not even loaded otherwise). It follows the hash: adding or removing `#debug` on an open page shows or hides it. |
+| `#debug` | Shows the panel (it is not even loaded otherwise). It follows the hash: adding or removing `#debug` on an open page shows or hides it. It also makes the skin evaluate its relief and freckles per pixel, so the panel's edits show at once; without it they are baked ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). This part works with `?gui=0` too. |
 
 ## Controls
 
@@ -158,6 +158,7 @@ The panel shows only while the URL ends in `#debug`, and starts collapsed, below
 | `measure(frames)` | Interactive frames back to back; resolves with frame statistics. |
 | `measureSync(frames)` | The same, each frame finished with a synchronous read; returns mean, median, minimum and maximum ms. |
 | `getCompileMs()` | The time spent compiling programs at start-up. |
+| `setSkinBaked(baked)`, `isSkinBaked()`, `getSkinBakeMs()` | The skin's relief baked or per pixel (what `#debug` switches; the next hash change sets it again); the last bake's time. |
 | `getEyeGeometry()` | `{ apexZ, focusDepth }`. |
 | `getPresetNames()`, `getPresetInfo(name)` | Preset names, labels and reference photographs. |
 | `loadPreset(name, duration)`, `randomEye(ancestry, seed, duration)` | Glide to a preset or to a random eye, as the panel does; `randomEye` returns the sampled features and the color shade. |

@@ -5,7 +5,10 @@
 //
 // Usage: pnpm capture [--presets a,b|all] [--views beauty,normals] [--samples 64]
 //                     [--width 1600] [--height 1000] [--dpr 1] [--out captures]
-//                     [--query extra=1] [--bench <frames>] [--no-build] [--chrome <path>]
+//                     [--query extra=1] [--hash debug] [--bench <frames>] [--no-build]
+//                     [--chrome <path>]
+// --hash debug renders as #debug does: the skin evaluates its relief per pixel
+// instead of reading it baked.
 // --bench also renders that many interactive frames per shot, each finished
 // with a synchronous read, and reports the time per frame and the compile time.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -30,6 +33,7 @@ const { values: options } = parseArgs({
 		dpr: { type: 'string', default: '1' },
 		out: { type: 'string', default: 'captures' },
 		query: { type: 'string', default: '' },
+		hash: { type: 'string', default: '' },
 		'no-build': { type: 'boolean', default: false },
 		chrome: { type: 'string' },
 		timeout: { type: 'string', default: '600' },
@@ -117,7 +121,7 @@ try {
 			if (view !== 'beauty') query.set('view', view)
 			for (const [key, value] of new URLSearchParams(options.query)) query.set(key, value)
 			const started = Date.now()
-			await session.navigate(`${baseUrl}?${query}`)
+			await session.navigate(`${baseUrl}?${query}${options.hash ? `#${options.hash}` : ''}`)
 			await waitFor(async () => await session.evaluate('!!window.__EYE__'), 'the app', 60000)
 			await waitFor(
 				async () => await session.evaluate('window.__EYE__.getAccumulation().converged'),
@@ -154,6 +158,7 @@ try {
 				cpuFrameMs: stats.cpu?.p50 ?? null,
 				frameIntervalMs: stats.frame?.p50 ?? null,
 				compileMs: await session.evaluate('window.__EYE__.getCompileMs()'),
+				skinBakeMs: await session.evaluate('window.__EYE__.getSkinBakeMs()'),
 				benchFrameMs: bench,
 				errors: [...session.errors],
 			}

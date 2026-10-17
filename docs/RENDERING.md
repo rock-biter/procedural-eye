@@ -9,7 +9,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    - **Eyeball**: a surface of revolution in eye space with two index groups, coarsely tessellated (96 segments around, 32 rings on the cap, 24 on the sclera): the programs refine the exact surface, and small triangles would make the GPU shade the 2×2 quads along their edges, which cost the optics program dearly.
      - Group 0, the cornea and limbus cap, uses `eyeball-cap-fragment.glsl`: tear-film reflection, two-surface refraction, the iris trace and shading, the limbus and the limbal ring.
      - Group 1, the sclera beyond the cap, uses `eyeball-sclera-fragment.glsl`: the exact sphere point, then a wet, broken-up reflection over the vessel-mapped diffuse white. Behind the world plane `uGlobeCut` it discards the globe, which lies there under the conjunctiva, inside the back shell ([`docs/ADNEXA.md`](ADNEXA.md#back-shell)).
-   - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi and the palpebral conjunctiva that closes the sac behind them. Its pigment patterns come from a texture baked with the lid mesh ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)).
+   - **Lids**: the skin program, in world space, including the conjunctiva and caruncle that fill the canthi and the palpebral conjunctiva that closes the sac behind them. Its pigment patterns come from a texture baked with the lid mesh; outside `#debug` its relief and freckles do too ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)).
    - **Back shell**: the skin program compiled with `SKIN_SHELL`, closing the skin patch behind ([`docs/ADNEXA.md`](ADNEXA.md#back-shell)). It draws after the lids (a later material), so from the front the depth test skips it; it is not on the shadow layer.
    - **Lashes**: tubes with the lash program.
    - **Tear meniscus and bubbles**: the water program; the bubbles are an `InstancedMesh`.
@@ -116,6 +116,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uCanthi`, `uMarginLength`, `uDefocus` | The medial and lateral canthi in the front plane at rest; the upper and lower margin lengths; the camera's aperture diameter and focus distance, which widen the footprint of the skin's fine relief by the blur circle ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). |
 | `uOcclusion` | How strongly the skin applies its baked ambient occlusion (the `ao` attribute, [`docs/ADNEXA.md`](ADNEXA.md#baked-occlusion)). |
 | `uSkinPattern`, `uSkinPatternBox` | The baked pigment patterns and the front-plane box they cover ([`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js)). |
+| `uSkinRelief`, `uSkinReliefTexel`, `uSkinFreckles`, `uSkinFrecklesTexel` | With `SKIN_BAKED`: the baked relief (the lids', or the shell's in its program) and freckles over the same box, and their texel sizes (mm), which set the mip level they are read at ([`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js)). |
 | `uShellTone` | The back shell's albedo, a share of the skin's (`shell.tone`); its program shares the skin's other uniforms. |
 | `uLashColor`, `uLashShine` | Lash fiber color and cuticle shine. |
 | `uTearTint` | What the water shows of what lies behind. |
@@ -134,6 +135,8 @@ Defines:
 - `IRIS_ATLAS_HEIGHT` and `IRIS_LUT_MELANIN`, `IRIS_LUT_EUMELANIN`, `IRIS_LUT_STROMA`;
 - `PIGMENT_PASS` (atlas bake);
 - `SKIN_SHELL`: the back shell's variant of the skin program (its own pattern coordinates, no margin, freckles or veins);
+- `SKIN_BAKED`: the skin and back shell programs read the baked relief and freckles; set outside `#debug` (`Lids.setBaked()`, [`docs/ADNEXA.md`](ADNEXA.md#skin-shading));
+- `RELIEF_UNDERLAY`, `FRECKLES` (relief bake): the full-screen pass under the lid ring (the shell's relief), the freckles;
 - `DEBUG_VIEW`, from `params.debug.view` and numbered in `src/debug/debugViews.js` and `debug-views.glsl`.
 
 ## Shader Files
@@ -151,8 +154,9 @@ Defines:
 | `lid-follow.glsl` | Lid rotation with the gaze and its inverse for rest-space lookups. |
 | `key-shadow.glsl` | Shadow map lookup: hard, Poisson PCF, or estimated penumbra with a slope-scaled bias for the skin. |
 | `lit-surface.glsl` | Shared lighting of the world-space surfaces (wrap diffuse, GGX with representative points, wet mirror). |
-| `skin-relief.glsl`, `noise3.glsl` | Skin micro-relief with analytic gradients (furrows, fine network, pores, wrinkles, crow's feet), prefiltered by the pixel footprint, and the skin's pigment patterns (mottling, freckles, veins); 3D gradient noise with derivatives. |
+| `skin-relief.glsl`, `noise3.glsl` | Skin micro-relief with analytic gradients (furrows, fine network, pores, wrinkles, crow's feet), prefiltered by the pixel footprint, gathered by `skinMicroRelief()`, and its encoding for the bake; the skin's pigment patterns (mottling, freckles, veins); 3D gradient noise with derivatives. |
 | `skin-pattern-fragment.glsl` | Bake of the pigment patterns that depend only on the rest position (mottling, veins, oily patches). |
+| `skin-relief-bake-vertex.glsl`, `skin-relief-bake-fragment.glsl` | Bake of the skin relief (the lid ring laid onto the front-plane box, or a full-screen pass) and of the freckles. |
 | `debug-views.glsl` | Debug view numbering. |
 | `scattering.glsl`, `veil.glsl`, `dust-vertex.glsl`, `dust-fragment.glsl` | The Henyey–Greenstein phase; the haze; the dust motes' blurred images. |
 | `eyeball-*.glsl`, `skin-*.glsl`, `lash-*.glsl`, `tear-*.glsl`, `shadow-depth-*.glsl` | Scene program entry points. |

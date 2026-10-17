@@ -757,7 +757,7 @@ canvas {
 .snapshot {
 	color: white;
 	font-family: 'Kode Mono', 'JetBrains Mono', ui-monospace, monospace;
-	font-size: 28px;
+	font-size: 12px;
 }
 
 .masthead {
@@ -766,6 +766,7 @@ canvas {
 }
 
 .masthead h1 {
+	display: none;
 	margin: 3px 0 0 -4px;
 	font-family: 'Kode Mono', 'JetBrains Mono', ui-monospace, monospace;
 	font-size: 84px;
@@ -829,17 +830,17 @@ canvas {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 2px 48px;
+	padding: 2px 16px;
 	border: 0;
 	background:
-		linear-gradient(var(--accent), var(--accent)) left top / 12px 1px,
-		linear-gradient(var(--accent), var(--accent)) left top / 1px 12px,
-		linear-gradient(var(--accent), var(--accent)) right top / 12px 1px,
-		linear-gradient(var(--accent), var(--accent)) right top / 1px 12px,
-		linear-gradient(var(--accent), var(--accent)) left bottom / 12px 1px,
-		linear-gradient(var(--accent), var(--accent)) left bottom / 1px 12px,
-		linear-gradient(var(--accent), var(--accent)) right bottom / 12px 1px,
-		linear-gradient(var(--accent), var(--accent)) right bottom / 1px 12px;
+		linear-gradient(var(--accent), var(--accent)) left top / 4px 1px,
+		linear-gradient(var(--accent), var(--accent)) left top / 1px 4px,
+		linear-gradient(var(--accent), var(--accent)) right top / 4px 1px,
+		linear-gradient(var(--accent), var(--accent)) right top / 1px 4px,
+		linear-gradient(var(--accent), var(--accent)) left bottom / 4px 1px,
+		linear-gradient(var(--accent), var(--accent)) left bottom / 1px 4px,
+		linear-gradient(var(--accent), var(--accent)) right bottom / 4px 1px,
+		linear-gradient(var(--accent), var(--accent)) right bottom / 1px 4px;
 	background-repeat: no-repeat;
 	text-transform: inherit;
 	white-space: nowrap;
@@ -893,6 +894,7 @@ canvas {
 		font-size: var(--title-size);
 		line-height: 0.8;
 		white-space: nowrap;
+		display: block;
 	}
 
 	.masthead p,
@@ -1037,6 +1039,10 @@ canvas {
 
 	.info span {
 		color: var(--accent);
+	}
+
+	.snapshot {
+		font-size: 16px;
 	}
 }
 

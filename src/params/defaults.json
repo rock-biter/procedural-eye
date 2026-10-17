@@ -309,14 +309,14 @@
   },
   "dust": {
     "enabled": true,
-    "brightness": 1,
-    "count": 200,
+    "brightness": 0.7,
+    "count": 400,
     "seed": 1,
     "size": 350,
-    "extent": 100,
+    "extent": 200,
     "forward": 0.65,
-    "drift": 0.3,
-    "turbulence": 1.6,
+    "drift": 1.6,
+    "turbulence": 4.6,
     "haze": 0.04
   },
   "camera": {
