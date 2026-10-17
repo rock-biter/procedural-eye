@@ -438,7 +438,31 @@ canvas {
 }
 
 /* The exported bracket is vertical (8.5 × 32). Turn the two copies across
-   the reticle's ends; their motion follows the button's radial orientation. */
+   the reticle's ends; their motion follows the button's radial orientation
+   (the glyph's +y points out from the circle, so the end bracket is the
+   outer one). Hidden, they sit --bracket-hidden from the glyph's center;
+   shown, --bracket-shown (in the glyph's units). */
+.hud-button {
+	--bracket-hidden: 48px;
+	--bracket-shown: 32px;
+}
+
+/* A split HUD (a phone held upright, src/ui/hud.js) draws them 4 px closer
+   on screen (the zoom's glyphs are scaled 1.5) and only the inner one. */
+.hud.split .hud-button {
+	--bracket-hidden: 44px;
+	--bracket-shown: 28px;
+}
+
+.hud.split :is(.zoom-in, .zoom-out) {
+	--bracket-hidden: calc(48px - 4px / 1.5);
+	--bracket-shown: calc(32px - 4px / 1.5);
+}
+
+.hud.split .hud-bracket-end {
+	display: none;
+}
+
 .hud-bracket {
 	position: absolute;
 	left: 50%;
@@ -453,11 +477,11 @@ canvas {
 }
 
 .hud-bracket-start {
-	transform: translateY(-48px) rotate(-90deg);
+	transform: translateY(calc(-1 * var(--bracket-hidden))) rotate(-90deg);
 }
 
 .hud-bracket-end {
-	transform: translateY(48px) rotate(90deg);
+	transform: translateY(var(--bracket-hidden)) rotate(90deg);
 }
 
 .hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
@@ -467,12 +491,12 @@ canvas {
 
 .hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
 	.hud-bracket-start {
-	transform: translateY(-32px) rotate(-90deg);
+	transform: translateY(calc(-1 * var(--bracket-shown))) rotate(-90deg);
 }
 
 .hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
 	.hud-bracket-end {
-	transform: translateY(32px) rotate(90deg);
+	transform: translateY(var(--bracket-shown)) rotate(90deg);
 }
 
 .hud-button:is(:hover, :focus-visible, :active, [aria-pressed='true'], .at-level, .engaged)
@@ -570,12 +594,13 @@ canvas {
    class). */
 .zoom-in.at-level .hud-bracket-start,
 .zoom-out.at-level .hud-bracket-start {
-	transform: translateY(calc(-32px + 16px * var(--zoom-squeeze, 0))) rotate(-90deg);
+	transform: translateY(calc(-1 * var(--bracket-shown) + 16px * var(--zoom-squeeze, 0)))
+		rotate(-90deg);
 }
 
 .zoom-in.at-level .hud-bracket-end,
 .zoom-out.at-level .hud-bracket-end {
-	transform: translateY(calc(32px - 16px * var(--zoom-squeeze, 0))) rotate(90deg);
+	transform: translateY(calc(var(--bracket-shown) - 16px * var(--zoom-squeeze, 0))) rotate(90deg);
 }
 
 .zoom-in.squeezed .hud-bracket,

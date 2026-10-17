@@ -224,12 +224,22 @@ test('the knob sits on the horizontal at the middle of the zoom (split: at the b
 })
 
 test('the zoom value reads between the spinning circle and the outer zoom ring', () => {
-	for (const radius of [150, 460]) {
-		const at = zoomValueRadius(radius)
-		const spin = spinRing(radius, 0)
-		assert.ok(at > spin.teeth.radius + spin.teeth.width / 2 - 1)
-		assert.ok(at < orbitRing(radius, 0.5, 'outer').radius)
+	// Desktop and phone radii, and a split HUD's.
+	for (const [radius, split] of [
+		[150, false],
+		[460, false],
+		[163, true],
+	]) {
+		const at = zoomValueRadius(radius, HUD, split)
+		const spin = spinRing(radius, 0, HUD, split)
+		// The camera angles opposite, a split HUD's less its drop.
+		const angles = at - (split ? HUD.split.readouts.drop : 0)
+		for (const reach of [at, angles]) {
+			assert.ok(reach > spin.teeth.radius + spin.teeth.width / 2 - 1)
+			assert.ok(reach < orbitRing(radius, 0.5, 'outer').radius)
+		}
 	}
+	assert.ok(near(zoomValueRadius(163, HUD, true), 163 * 1.28 + 4))
 })
 
 test('the layers sway with the mouse, alternating ways, the inner ones the most', () => {
@@ -276,12 +286,28 @@ test('three arcs inside the inner ring take the places of each skin tone', () =>
 	assert.ok(near(b - a, (2 * Math.PI) / 3) && near(c - b, (2 * Math.PI) / 3))
 	assert.equal(HUD.arcs.tones.length, 5)
 	assert.deepEqual(toneArcs(460, 5), toneArcs(460, 0))
+	// A split HUD draws them on a smaller circle, at the same places.
+	for (const [i, arc] of toneArcs(163, 2, HUD, true).entries()) {
+		assert.ok(near(arc.radius, 163 * HUD.split.arcs.radiusRatio))
+		assert.ok(arc.radius < toneArcs(163, 2)[i].radius)
+		assert.ok(
+			near(
+				-arc.dashOffset / arc.radius,
+				-toneArcs(163, 2)[i].dashOffset / (163 * HUD.arcs.radiusRatio),
+			),
+		)
+	}
 })
 
 test('the spinning circle lies between the central and the outer ring and turns a step per click', () => {
-	for (const radius of [150, 460]) {
+	// Desktop and phone radii, and a split HUD's.
+	for (const [radius, split] of [
+		[150, false],
+		[460, false],
+		[163, true],
+	]) {
 		const outer = orbitRing(radius, 0.5, 'outer').radius
-		const still = spinRing(radius, 0)
+		const still = spinRing(radius, 0, HUD, split)
 		assert.ok(still.radius > radius + 8 && still.radius < outer - 8)
 		const [dash, gap] = still.dashArray
 		assert.equal(dash, HUD.spin.dash)
@@ -290,7 +316,7 @@ test('the spinning circle lies between the central and the outer ring and turns 
 		assert.ok(near(count, Math.round(count), 1e-9))
 		assert.ok(Math.abs(gap - HUD.spin.gap) < (dash + HUD.spin.gap) / 2)
 		// Each click turns it HUD.spin.step further, clockwise.
-		const three = spinRing(radius, 3)
+		const three = spinRing(radius, 3, HUD, split)
 		assert.ok(near((still.dashOffset - three.dashOffset) / three.radius, 3 * HUD.spin.step))
 		// Its teeth: HUD.spin.teeth ticks out from the line, evenly spaced from
 		// HUD.spin.toothStart, turning with it.
@@ -300,7 +326,7 @@ test('the spinning circle lies between the central and the outer ring and turns 
 		]) {
 			const { teeth } = turned
 			assert.ok(near(teeth.radius - teeth.width / 2, turned.radius))
-			assert.equal(teeth.width, HUD.spin.tooth)
+			assert.equal(teeth.width, split ? HUD.split.spin.tooth : HUD.spin.tooth)
 			const [mark, space] = teeth.dashArray
 			assert.equal(mark, 1)
 			assert.ok(near(((mark + space) * HUD.spin.teeth) / teeth.radius, 2 * Math.PI))

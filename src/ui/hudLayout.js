@@ -48,9 +48,16 @@ export const HUD = Object.freeze({
 	// sits) at `zoom.center`, the bottom on the vertical, zoom out at its
 	// left, zoom in at its right, at least `zoom.minArc` px apart; it keeps
 	// `zoom.clearance` px above the bottom the HUD reserves (the footer,
-	// hud.js reserveBottom()).
+	// hud.js reserveBottom()). The tones' three arcs (HUD.arcs) lie on a
+	// smaller circle, `arcs.radiusRatio` of the central radius, the spinning
+	// circle (HUD.spin) on a wider one, `spin.radiusRatio` of it, its teeth
+	// `spin.tooth` px long. The readouts sit at `readouts.radiusRatio` of it,
+	// the zoom's value `readouts.drop` px further out (lower, at the bottom).
 	split: Object.freeze({
 		overhang: 10,
+		arcs: Object.freeze({ radiusRatio: 0.69 }),
+		spin: Object.freeze({ radiusRatio: 1.185, tooth: 9 }),
+		readouts: Object.freeze({ radiusRatio: 1.28, drop: 4 }),
 		tones: Object.freeze({ center: 135 * DEGREE }),
 		random: Object.freeze({ angle: 0 }),
 		zoom: Object.freeze({ center: 90 * DEGREE, radiusRatio: 1.45, minArc: 208, clearance: 12 }),
@@ -293,9 +300,11 @@ export function orbitRing(radius, level, kind, stretch = false, hud = HUD) {
 // wide with `spin.teeth` 1 px dashes around: solid ticks out from the line,
 // the first at `spin.toothStart`, which their own dash offset turns with the
 // dashes.
-export function spinRing(radius, turns, hud = HUD) {
-	const { radiusRatio, dash, gap, teeth, tooth, toothStart, step } = hud.spin
-	const ring = radius * radiusRatio
+// `split`: on the wider circle of a split HUD (HUD.split.spin).
+export function spinRing(radius, turns, hud = HUD, split = false) {
+	const { dash, gap, teeth, toothStart, step } = hud.spin
+	const tooth = (split ? hud.split.spin : hud.spin).tooth
+	const ring = radius * spinRatio(split, hud)
 	const perTooth = Math.max(1, Math.round((2 * Math.PI * ring) / (dash + gap) / teeth))
 	const period = (2 * Math.PI * ring) / (perTooth * teeth)
 	const turn = turns * step
@@ -318,9 +327,10 @@ export function spinRing(radius, turns, hud = HUD) {
 // single dash `arcs.span` long, which its SVG dash offset centers on the
 // arc's place (a circle's dashes start at its right and run clockwise; a
 // negative offset carries them forward). Tones past the list wrap round.
-export function toneArcs(radius, tone, hud = HUD) {
-	const { radiusRatio, span, tones } = hud.arcs
-	const ring = radius * radiusRatio
+// `split`: on the smaller circle of a split HUD (HUD.split.arcs).
+export function toneArcs(radius, tone, hud = HUD, split = false) {
+	const { span, tones } = hud.arcs
+	const ring = radius * (split ? hud.split.arcs : hud.arcs).radiusRatio
 	const length = span * ring
 	const centers = tones[((tone % tones.length) + tones.length) % tones.length]
 	return centers.map((center) => ({
@@ -338,10 +348,18 @@ export function swayTurn(layer, mouse) {
 	return (layer.turn * (mouse.x + mouse.y / 2)) / 1.5
 }
 
+// The spinning circle's ratio of the central radius, on a split HUD or not.
+function spinRatio(split, hud) {
+	return (split ? hud.split.spin : hud.spin).radiusRatio
+}
+
 // Where the zoom's value reads, as a radius about the HUD's circle of
 // `radius` px: halfway between the spinning circle and the outer zoom ring
-// (on the middle of the knob's track, hud.js).
-export function zoomValueRadius(radius, hud = HUD) {
+// (on the middle of the knob's track, hud.js); on a split HUD (`split`) at
+// HUD.split.readouts' ratio, and `drop` px further out. The camera angles
+// read opposite at the same radius, less the drop.
+export function zoomValueRadius(radius, hud = HUD, split = false) {
+	if (split) return radius * hud.split.readouts.radiusRatio + hud.split.readouts.drop
 	return (radius * (hud.spin.radiusRatio + hud.outer.radiusRatio)) / 2
 }
 

@@ -370,7 +370,7 @@ export function createHud({
 	// The spinning circle for the layout and the clicks so far.
 	const placeSpin = () => {
 		if (!placed) return
-		const turned = spinRing(placed.radius, spinTurns)
+		const turned = spinRing(placed.radius, spinTurns, HUD, placed.split)
 		spin.setAttribute('r', turned.radius)
 		spin.setAttribute('stroke-dasharray', turned.dashArray.join(' '))
 		spin.style.strokeDashoffset = `${turned.dashOffset}px`
@@ -385,7 +385,7 @@ export function createHud({
 	// does not animate.
 	const placeArcs = () => {
 		if (!placed) return
-		const turned = toneArcs(placed.radius, arcTone)
+		const turned = toneArcs(placed.radius, arcTone, HUD, placed.split)
 		arcs.forEach((arc, i) => {
 			if (!arcsPlaced) arc.style.transition = 'none'
 			arc.setAttribute('cx', placed.cx)
@@ -498,6 +498,8 @@ export function createHud({
 		line.setAttribute('cy', circle.cy)
 		line.setAttribute('r', radius)
 		line.setAttribute('stroke-dasharray', dashes(radius))
+		// style.css draws a split HUD's brackets closer, the inner one only.
+		element.classList.toggle('split', split)
 		zoomLine.style.display = split ? '' : 'none'
 		zoomLine.setAttribute('cx', circle.cx)
 		zoomLine.setAttribute('cy', circle.cy)
@@ -515,10 +517,11 @@ export function createHud({
 		placedAngles = angles
 		knob.setTrack({ ...zoomCircle, track: angles.track })
 		const middle = (angles.track[0] + angles.track[1]) / 2
-		const reach = zoomValueRadius(radius)
+		const reach = zoomValueRadius(radius, HUD, split)
 		zoomValue.place(circle, reach, middle, width)
-		cameraAngles.place(circle, reach, middle + Math.PI, width)
-		placed = { ...circle, zoomRadius: zoomCircle.radius, track: angles.track }
+		const drop = split ? HUD.split.readouts.drop : 0
+		cameraAngles.place(circle, reach - drop, middle + Math.PI, width)
+		placed = { ...circle, zoomRadius: zoomCircle.radius, split, track: angles.track }
 		placeSpin()
 		placeArcs()
 		// The sway turns about the center, which moved with the layout.
