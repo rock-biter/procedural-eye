@@ -37,9 +37,9 @@ const point = (radius, angle) => [radius * Math.cos(angle), radius * Math.sin(an
 const chord = (radius, a, b) =>
 	Math.hypot(...point(radius, a).map((v, i) => v - point(radius, b)[i]))
 
-test('desktop: the circle is inscribed in the box, the tones around 180°, the zoom 32° apart around 0°', () => {
+test('desktop: the circle is scaled from the one inscribed in the box, the tones around 180°, the zoom 32° apart around 0°', () => {
 	const { radius, angles } = hudLayout(...SCREENS.desktop, TONES)
-	assert.equal(radius, 460)
+	assert.equal(radius, Math.floor(460 * HUD.scale))
 	assert.ok(near(angles.tones[(TONES - 1) / 2], HUD.tones.center))
 	assert.ok(near(angles.zoomOut - angles.zoomIn, 32 * DEGREE))
 	assert.ok(near((angles.zoomIn + angles.zoomOut) / 2, 0))
@@ -50,7 +50,10 @@ for (const [screen, [width, height]] of Object.entries(SCREENS)) {
 	const { radius, angles } = hudLayout(width, height, TONES)
 
 	test(`${screen}: every button and the knob's track lie inside the box`, () => {
-		assert.ok(radius > 100 && radius <= Math.min(width, height) / 2, `radius ${radius}`)
+		assert.ok(
+			radius > 100 && radius <= (Math.min(width, height) / 2) * HUD.scale,
+			`radius ${radius}`,
+		)
 		const inside = (angle, half) => {
 			const [x, y] = point(radius, angle)
 			return Math.abs(x) <= width / 2 - half && Math.abs(y) <= height / 2 - half

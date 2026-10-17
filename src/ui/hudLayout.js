@@ -8,6 +8,9 @@
 const DEGREE = Math.PI / 180
 
 export const HUD = Object.freeze({
+	// The circle's size: `scale` times the circle inscribed in the box, its
+	// line past the box at the top and bottom, as long as the buttons fit.
+	scale: 1.06,
 	// Hit areas and visible reticle/marker sizes (px). Only the glyph of an
 	// unselected skin tone shrinks; its pointer target stays full size.
 	button: 44,
@@ -34,20 +37,23 @@ export const HUD = Object.freeze({
 	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20, stretch: 5 }),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
 	random: Object.freeze({ angle: 50 * DEGREE, spacing: 60 }),
-	// Ratios keep the inner arcs inside and the outer arcs outside even on
-	// phones, fixed at the former zoom-out sizes throughout the zoom. Level
+	// Ratios of the central radius keep the inner arcs inside and the outer
+	// arcs outside even on phones, fixed throughout the zoom. The four inner
+	// circles, the tones' arcs, the inner zoom ring, the central circle and
+	// the spinning circle, are evenly spaced, 0.11 apart; the outer ring
+	// stays 0.29 out from the spinning circle. Level
 	// with the horizontal at the middle of the zoom, they turn `turn` by
 	// either end, the inner one clockwise as the zoom goes in, the outer one
 	// the other way.
-	inner: Object.freeze({ radiusRatio: 0.88, turn: 45 * DEGREE }),
-	outer: Object.freeze({ radiusRatio: 1.42, turn: -30 * DEGREE }),
+	inner: Object.freeze({ radiusRatio: 0.89, turn: 45 * DEGREE }),
+	outer: Object.freeze({ radiusRatio: 1.4, turn: -30 * DEGREE }),
 	// The circle between the central ring and the outer zoom ring
 	// (`radiusRatio` of the central radius): `dash` px every about
 	// `dash` + `gap` px, and `teeth` solid ticks `tooth` px out from it, evenly
 	// spaced from `toothStart`; each click on Random eye turns it `step`
 	// further, clockwise.
 	spin: Object.freeze({
-		radiusRatio: 1.13,
+		radiusRatio: 1.11,
 		dash: 40,
 		gap: 22.5,
 		teeth: 4,
@@ -60,7 +66,7 @@ export const HUD = Object.freeze({
 	// tone, fair to deep, turns each arc to its own place: `tones` holds their
 	// centers per tone (radians clockwise from the right; −90° is the top).
 	arcs: Object.freeze({
-		radiusRatio: 0.8,
+		radiusRatio: 0.78,
 		span: 36 * DEGREE,
 		tones: Object.freeze(
 			[
@@ -148,11 +154,11 @@ function fits(radius, angles, width, height, hud) {
 	return true
 }
 
-// The circle in a box of `width` × `height` px: inscribed in it (a whole
-// number of px), or smaller until its buttons fit inside it. `{ radius,
-// angles }`, or null for a box too small.
+// The circle in a box of `width` × `height` px: `scale` times the circle
+// inscribed in it (a whole number of px), or smaller until its buttons fit
+// inside it. `{ radius, angles }`, or null for a box too small.
 export function hudLayout(width, height, toneCount, hud = HUD) {
-	for (let radius = Math.floor(Math.min(width, height) / 2); radius > 0; radius--) {
+	for (let radius = Math.floor((Math.min(width, height) / 2) * hud.scale); radius > 0; radius--) {
 		const angles = hudAngles(radius, toneCount, hud)
 		if (fits(radius, angles, width, height, hud)) return { radius, angles }
 	}
