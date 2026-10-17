@@ -38,6 +38,7 @@
 	--snapshot-room: 200px;
 	--elastic: var(--spring);
 	text-transform: uppercase;
+	user-select: none;
 }
 
 @supports (transition-timing-function: linear(0, 1)) {
@@ -792,7 +793,7 @@ canvas {
 /* On narrow screens the credit wraps, aligned left, clear of Snapshot
    (--snapshot-room). */
 .credit {
-	bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
+	bottom: calc(var(--ui-inset) - 4px + env(safe-area-inset-bottom));
 	left: calc(var(--ui-inset) + env(safe-area-inset-left));
 	max-width: calc(100vw - 2 * var(--ui-inset) - var(--snapshot-room));
 	margin: 0;
@@ -905,7 +906,7 @@ canvas {
 
 	.fps {
 		top: auto;
-		bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
+		bottom: calc(var(--ui-inset) - 4px + env(safe-area-inset-bottom));
 	}
 
 	/* Snapshot above the credit line, across the frame; the credit takes
@@ -913,7 +914,7 @@ canvas {
 	.footer {
 		position: fixed;
 		right: calc(var(--ui-inset) + env(safe-area-inset-right));
-		bottom: calc(var(--ui-inset) + env(safe-area-inset-bottom));
+		bottom: calc(var(--ui-inset) - 4px  + env(safe-area-inset-bottom));
 		left: calc(var(--ui-inset) + env(safe-area-inset-left));
 		z-index: 10;
 		display: flex;
