@@ -18,8 +18,9 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    - A frame with NaN or Inf keeps the history.
    - The pass writes no output buffer (`needsSwap` false): the next pass reads the mean from `history`.
    - A fresh frame that the next one restarts anyway (a living eye, a running transition: `EyeApp.restartsEveryFrame`) passes through: the history is not written, `history` is the scene buffer itself, and the samples stay at 0. The full-resolution float copy of every living frame is saved.
-4. **Depth of field** ([`src/render/dofPass.js`](../src/render/dofPass.js)): the interactive gather, faded out as lens samples accumulate, composited over the mean with an opaque alpha (see [Depth of Field](#depth-of-field)).
-5. **Effect pass**, in order:
+4. **Depth of field** ([`src/render/dofPass.js`](../src/render/dofPass.js)): the interactive gather, faded out as lens samples accumulate, composited over the mean with an opaque alpha (see [Depth of Field](#depth-of-field)). The haze joins the image here ([Dust and Haze](#dust-and-haze)).
+5. **Dust** ([`src/render/dustPass.js`](../src/render/dustPass.js)): the motes as their blurred images, added into the composite's buffer (no swap) ([Dust and Haze](#dust-and-haze)).
+6. **Effect pass**, in order:
    1. color grade: white balance from `camera.whiteBalance`, saturation and contrast, in linear light;
    2. chromatic aberration: `post.chromaticAberration` pixels, radially modulated;
    3. vignette (`post.vignette`);
@@ -38,7 +39,7 @@ Scene materials write the **apparent focus distance** (mm from the camera) into 
 - **The cornea**: the distance of what is seen through it or in it. For refraction, that is the paraxial image of the refracted point. For reflection, it is the convex-mirror image R/2 behind the surface. The two are blended by luminance.
 - **Background**: the clear alpha is `FOCUS_AT_INFINITY` (6e4 mm, [`src/renderSetup.js`](../src/renderSetup.js)). It must stay finite in the half-float scene buffer (at most 65504): an infinite alpha made the accumulation drop every background sample, so the background kept earlier frames. The renderer clears without premultiplied alpha, which would multiply that alpha into the clear color.
 
-The accumulation history keeps the alpha for the depth of field. The effects receive alpha 1, because `postprocessing`'s blend functions read alpha as opacity. A future transparent material must not overwrite it (`blendSrcAlpha` Zero, `blendDstAlpha` One). The tear film is drawn opaque for this reason.
+The accumulation history keeps the alpha for the depth of field and the dust's occlusion. The effects receive alpha 1, because `postprocessing`'s blend functions read alpha as opacity. A future transparent material must not overwrite it (`blendSrcAlpha` Zero, `blendDstAlpha` One). The tear film is drawn opaque for this reason, and the dust is not part of the scene: it is drawn after the depth of field, with that blending.
 
 ## Depth of Field
 
@@ -51,6 +52,19 @@ The accumulation history keeps the alpha for the depth of field. The effects rec
   - It reads the sharp mean from the history (in a split frame's half-resolution share, the nearest texel of that share) and writes an opaque alpha for the effects.
   - It keeps the sharp frame where the blur is under a pixel and shows the gather in full from 2.5 px of blur radius on.
   - It fades out over the first 16 accumulated samples (`dof.weight`), so the transition to the true depth of field is seamless.
+
+## Dust and Haze
+
+The air between the camera and the eye and behind it: dust motes and a haze, both off in the debug views and in the reference presets.
+
+- **Motes** ([`src/atmosphere/dustField.js`](../src/atmosphere/dustField.js), `dust-vertex.glsl`): `dust.count` seeded motes (`dust.seed`) at their real size: fibers of a median length `dust.size` (log-normal), thin whatever their length, a few bent, some crossed in pairs, and round flakes a fifth as long. In a macro frame they are a few pixels: only the ones near the focus plane read as specks, the others spread into faint blobs.
+  - **Where**: a cube of side `dust.extent` centered on the globe, fixed in world space. They drift very slowly on an air current (`dust.drift`, across the face, a little backward and settling), wander (`dust.turbulence`, over a minute or two) and turn (under a turn per minute), and wrap along the cube's world axes, fading in from its faces so they never pop. A turning camera (an orbit, the mouse parallax) moves them only by their parallax.
+  - **Image**: a quad per mote, turned with it, around its center line (none for a flake) blurred over the thin-lens blur circle (the formula of `dof-prepare-fragment.glsl`, without the gather's 18 px reach), its own width and a pixel. The pinhole camera of the frame places it (`PhysicalCamera.pinhole`), so the lens samples do not blur it twice: fresh frames and photo mode show the same dust. Blurs wider than 60 px (at 1440 px of height) fade out; off-screen and faded motes are culled in the vertex shader.
+  - **Light**: each emitter's irradiance on a face turned to it (`emitterIrradiance()` of `env-rig.glsl`) times the Henyey–Greenstein phase of the angle between the light and the view (`dust.forward`: forward scattering, so motes in front of a light glow), plus the background's radiance, times `dust.brightness`.
+  - **Shape** (`dust-fragment.glsl`): the kernel (1 − s²)² around the center line; the mote keeps its image's light, divided by the kernel's integral, so a blurred one is wider and fainter.
+  - **Occlusion**: the scene's focus distance in the accumulated mean (alpha; the half-resolution share where a split frame left −1) hides the motes behind a surface, with a soft margin. The backdrop's distance hides none.
+  - **Motion**: the dust's clock runs unless the eye is frozen; a converged image is shown again every frame with the moving dust ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)).
+- **Haze** (`veil.glsl`): over a distance d the image keeps T = exp(−σ·d) (σ: `dust.haze` per meter) and the air adds (1 − T) times what it scatters along the pixel's ray: the background's radiance plus the irradiance of the brightest emitters (at most 4, `veilLights()`) times the phase of their angle to the ray. The distance stops at the far side of the dust's cube (`camera.distance` + `dust.extent` / 2), so the backdrop takes a finite haze. `dof-prepare-fragment.glsl` adds it to the color the gather blurs, `dof-composite-fragment.glsl` to the sharp mean; in photo mode the accumulated alpha, a mean of distances, softens it at blurred edges.
 
 ## Split Frames
 
@@ -105,6 +119,15 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uShellTone` | The back shell's albedo, a share of the skin's (`shell.tone`); its program shares the skin's other uniforms. |
 | `uLashColor`, `uLashShine` | Lash fiber color and cuticle shine. |
 | `uTearTint` | What the water shows of what lies behind. |
+| **Dust and haze** | |
+| `uView`, `uProjection`, `uViewport` | The pinhole camera of the frame and the buffer size (px). |
+| `uLens` | The depth of field's lens (`DofPass.setLens()`), for the motes' blur. |
+| `uVolume` | The motes' cube: center (world) and side (mm). |
+| `uTime`, `uWind`, `uTurbulence` | The dust's clock (s); the air current (mm/s, world); the wandering (mm). |
+| `uSize`, `uForward`, `uAmbient`, `uBrightness` | Median fiber length (mm); phase g; background radiance; gain. |
+| `uMaxRadius` | Largest blur radius drawn (px). |
+| `uSharp`, `uHalf` | The accumulated mean and the half-resolution share, for the occlusion. |
+| `uVeil`, `uVeilAmbient`, `uVeilLightDirection`, `uVeilLightIrradiance`, `uVeilLightCount`, `uVeilBasis`, `uVeilTan` | The haze: density (1/mm), far distance, phase g; background radiance; the lights; the camera's axes and the tangents of its half fields of view. |
 
 Defines:
 - `MAX_EMITTERS` and `EMITTER_VEC4S` (from `envRig.js`);
@@ -131,6 +154,7 @@ Defines:
 | `skin-relief.glsl`, `noise3.glsl` | Skin micro-relief with analytic gradients (furrows, fine network, pores, wrinkles, crow's feet), prefiltered by the pixel footprint, and the skin's pigment patterns (mottling, freckles, veins); 3D gradient noise with derivatives. |
 | `skin-pattern-fragment.glsl` | Bake of the pigment patterns that depend only on the rest position (mottling, veins, oily patches). |
 | `debug-views.glsl` | Debug view numbering. |
+| `scattering.glsl`, `veil.glsl`, `dust-vertex.glsl`, `dust-fragment.glsl` | The Henyey–Greenstein phase; the haze; the dust motes' blurred images. |
 | `eyeball-*.glsl`, `skin-*.glsl`, `lash-*.glsl`, `tear-*.glsl`, `shadow-depth-*.glsl` | Scene program entry points. |
 | `fullscreen-vertex.glsl` (at the near plane with `NEAR_PLANE`), `shading-spread-fragment.glsl`, `shading-block-fragment.glsl`, `accumulate-fragment.glsl`, `dof-prepare-fragment.glsl`, `dof-tiles-fragment.glsl`, `dof-dilate-fragment.glsl`, `dof-gather-fragment.glsl`, `dof-composite-fragment.glsl`, `color-grade-fragment.glsl`, `film-grain-fragment.glsl` | Pass and effect programs. |
 

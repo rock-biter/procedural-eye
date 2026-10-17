@@ -6,6 +6,7 @@
 
 - **Optics**: the anterior cornea is a conic joined to the sclera sphere; rays refract through both corneal surfaces into the anterior chamber; mirror reflections intersect the emitters of an analytic light rig exactly.
 - **Iris**: a signed-distance field raymarched after the corneal refraction. The stroma is carved by crypts and bridged by radial vessels and collagen arcs, and colored by a spectral Kubelka–Munk model of its layers ([`docs/IRIS.md`](docs/IRIS.md)).
+- **Air**: dust fibers and flakes at their real size, blurred by the thin lens, and a light haze that grows with the distance give the space around the eye its depth.
 - **Animation**: the eye lives (pupil light reflex with hippus, saccades, microsaccades, drift, lids following the gaze) until photo mode freezes it.
 - **Photo mode**: a physical thin-lens camera and progressive accumulation give true macro depth of field.
 
@@ -18,7 +19,7 @@
 | Install, commands, dependencies, source conventions, URL flags, the console API, or debugging | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
 | Bootstrap, frame loop, module ownership, parameter routing, presets, the random eye, or coordinate spaces | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Eye geometry, corneal optics, reflections of the lids, the light rig, the key-light shadow, or the physical camera | [`docs/OPTICS.md`](docs/OPTICS.md) |
-| Materials, uniforms, GLSL, the render pipeline, accumulation, depth of field, or post-processing | [`docs/RENDERING.md`](docs/RENDERING.md) |
+| Materials, uniforms, GLSL, the render pipeline, accumulation, depth of field, the dust and the haze, or post-processing | [`docs/RENDERING.md`](docs/RENDERING.md) |
 | The iris model (structure, raymarching, shading, color, dilation) | [`docs/IRIS.md`](docs/IRIS.md) |
 | Eyelids, skin, lashes, tear film, or the scleral vessels | [`docs/ADNEXA.md`](docs/ADNEXA.md) |
 | Pupil dynamics, eye movements, lid follow, or photo mode | [`docs/ANIMATION.md`](docs/ANIMATION.md) |
@@ -58,7 +59,8 @@ pnpm brand
 - [`src/animation/`](src/animation/): pupil dynamics, eye movements and the animator.
 - [`src/lighting/`](src/lighting/): the analytic light rig, color temperature, the rig uniforms and the key-light shadow map.
 - [`src/camera/`](src/camera/): thin-lens optics and sampling, the physical camera and the pointer controls.
-- [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field and PNG metadata.
+- [`src/atmosphere/`](src/atmosphere/): the dust field (seeded motes in a cube around the eye) and the lights the haze scatters.
+- [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field, the dust pass and PNG metadata.
 - [`src/debug/`](src/debug/) holds the panel and the debug view numbering; [`src/ui/`](src/ui/) the HUD around the eye, its layout and its SVG assets; [`src/shaders/`](src/shaders/) holds every GLSL file.
 - _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
 - [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/).
@@ -77,6 +79,7 @@ pnpm brand
   | `irisThickness()` in [`src/iris/irisFeatures.js`](src/iris/irisFeatures.js) | the copy in `iris-bake-fragment.glsl` |
   | the lid follow weights of [`src/adnexa/lidGeometry.js`](src/adnexa/lidGeometry.js) | `lid-follow.glsl` |
   | [`src/random.js`](src/random.js) `pcg()` | `pcgHash()` |
+  | `hgPhase()` in [`src/atmosphere/dustField.js`](src/atmosphere/dustField.js) | `scattering.glsl` |
 - Scene materials write the apparent focus distance in alpha. Only the accumulation history keeps it; the effects receive opaque alpha (see [`docs/RENDERING.md`](docs/RENDERING.md)).
 - In shaders:
   - use the `ZERO` loop bound (ANGLE-Metal compile times);

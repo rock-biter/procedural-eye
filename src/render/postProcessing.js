@@ -15,11 +15,13 @@ import {
 	VignetteEffect,
 } from 'postprocessing'
 import { HalfFloatType, SRGBColorSpace, Uniform, Vector2, Vector3 } from 'three'
+import { veilLights } from '../atmosphere/dustField'
 import { kelvinToLinearRgb, luminance } from '../lighting/colorTemperature'
 import colorGradeFragmentShader from '../shaders/color-grade-fragment.glsl'
 import filmGrainFragmentShader from '../shaders/film-grain-fragment.glsl'
 import AccumulationPass from './accumulationPass'
 import DofPass from './dofPass'
+import DustPass from './dustPass'
 import ScenePass from './scenePass'
 
 const TONE_MAPPING_MODES = {
@@ -66,8 +68,13 @@ class FilmGrainEffect extends Effect {
 	}
 }
 
+// The air current the dust drifts on (world space, unit): across the face,
+// a little backward and settling.
+const WIND = new Vector3(1, -0.3, -0.45).normalize()
+
 export default class PostProcessing {
-	constructor(renderer, scene, camera) {
+	// `envUniforms`: the light rig in world space, which lights the dust.
+	constructor(renderer, scene, camera, envUniforms) {
 		this.renderer = renderer
 		this.composer = new EffectComposer(renderer, {
 			frameBufferType: HalfFloatType,
@@ -78,6 +85,11 @@ export default class PostProcessing {
 		)
 		this.accumulation = new AccumulationPass()
 		this.dof = new DofPass(() => this.accumulation.history, this.renderPass.half.texture)
+		this.dust = new DustPass(
+			envUniforms,
+			() => this.accumulation.history,
+			this.renderPass.half.texture,
+		)
 		// Split the frames that pass through (params.quality.splitShading).
 		this.splitShading = true
 		this.colorGrade = new ColorGradeEffect()
@@ -100,6 +112,7 @@ export default class PostProcessing {
 		this.composer.addPass(this.renderPass)
 		this.composer.addPass(this.accumulation)
 		this.composer.addPass(this.dof)
+		this.composer.addPass(this.dust)
 		this.composer.addPass(this.effectPass)
 	}
 
@@ -125,6 +138,43 @@ export default class PostProcessing {
 		)
 		this.vignette.darkness = post.vignette
 		this.grain.intensity = post.grain
+	}
+
+	// The dust and the haze of this frame. `pinhole`: the camera before the
+	// sample's jitter (src/camera/physicalCamera.js); `emitters`: the light
+	// rig's; `time`: the dust's clock (s); `beauty`: whether the debug view is
+	// the image, the only one with dust and haze.
+	updateAtmosphere({ params, pinhole, emitters, time, beauty }) {
+		const dust = params.dust
+		const { lights, ambient } = veilLights(params.lighting, emitters)
+		const projection = pinhole.projection.elements
+		this.dof.setVeil({
+			density: beauty ? dust.haze / 1000 : 0,
+			far: params.camera.distance + dust.extent / 2,
+			g: dust.forward,
+			lights,
+			ambient,
+			cameraMatrix: pinhole.matrixWorld,
+			tanX: 1 / projection[0],
+			tanY: 1 / projection[5],
+		})
+		const pass = this.dust
+		pass.setSeed(dust.seed)
+		pass.count = dust.enabled && beauty ? dust.count : 0
+		const u = pass.uniforms
+		u.uView.value.copy(pinhole.view)
+		u.uProjection.value.copy(pinhole.projection)
+		u.uLens.value.copy(this.dof.prepare.uniforms.uLens.value)
+		// The cube is centered on the globe (the world origin), not on the
+		// target, which moves with the living eye's framing.
+		u.uVolume.value.set(0, 0, 0, dust.extent)
+		u.uTime.value = time
+		u.uWind.value.copy(WIND).multiplyScalar(dust.drift)
+		u.uTurbulence.value = dust.turbulence
+		u.uSize.value = dust.size / 1000
+		u.uForward.value = dust.forward
+		u.uAmbient.value.fromArray(ambient)
+		u.uBrightness.value = dust.brightness
 	}
 
 	render() {

@@ -8,17 +8,22 @@
 // samples instead, so the gather fades out over the first samples. A split
 // frame (src/render/scenePass.js) shaded part of the image at half resolution
 // only: alpha −1 marks the pixels it left out of the full-resolution one.
+// The haze (veil.glsl) joins the color in the prepare pass and the sharp mean
+// in the composite.
 import { Pass } from 'postprocessing'
 import {
 	HalfFloatType,
 	LinearFilter,
+	Matrix3,
 	NearestFilter,
 	ShaderMaterial,
 	Uniform,
 	Vector2,
+	Vector3,
 	Vector4,
 	WebGLRenderTarget,
 } from 'three'
+import { VEIL_LIGHTS } from '../atmosphere/dustField'
 import compositeShader from '../shaders/dof-composite-fragment.glsl'
 import dilateShader from '../shaders/dof-dilate-fragment.glsl'
 import gatherShader from '../shaders/dof-gather-fragment.glsl'
@@ -56,8 +61,20 @@ export default class DofPass extends Pass {
 		// The largest blur radius per tile, then over its neighbors.
 		this.tiles = createHalfTarget(NearestFilter)
 		this.tileMax = createHalfTarget(NearestFilter)
+		// The haze, shared by the prepare and composite programs (setVeil()).
+		this.veil = {
+			uZero: new Uniform(0),
+			uVeil: new Uniform(new Vector4()),
+			uVeilAmbient: new Uniform(new Vector3()),
+			uVeilLightDirection: new Uniform(Array.from({ length: VEIL_LIGHTS }, () => new Vector3())),
+			uVeilLightIrradiance: new Uniform(Array.from({ length: VEIL_LIGHTS }, () => new Vector3())),
+			uVeilLightCount: new Uniform(0),
+			uVeilBasis: new Uniform(new Matrix3()),
+			uVeilTan: new Uniform(new Vector2(1, 1)),
+		}
 		this.prepare = new ShaderMaterial({
 			uniforms: {
+				...this.veil,
 				uSource: new Uniform(null),
 				uHalf: new Uniform(half),
 				uLens: new Uniform(new Vector4()),
@@ -100,6 +117,7 @@ export default class DofPass extends Pass {
 		})
 		this.composite = new ShaderMaterial({
 			uniforms: {
+				...this.veil,
 				uSharp: new Uniform(null),
 				uHalf: new Uniform(half),
 				uBlurred: new Uniform(this.target.texture),
@@ -127,6 +145,23 @@ export default class DofPass extends Pass {
 		const distance = FOCUS_AT_INFINITY / 2
 		this.tileReduce.uniforms.uBackdropRadius.value =
 			(0.5 * lens.x * (distance - lens.y) * lens.w) / (distance * lens.z)
+	}
+
+	// The haze: `density` (1/mm, 0 for none), the distance it stops growing at
+	// (`far`, mm), the phase's `g`, `lights` and `ambient` (veilLights() in
+	// src/atmosphere/dustField.js) and the camera (its world matrix and the
+	// tangents of its half fields of view).
+	setVeil({ density, far, g, lights, ambient, cameraMatrix, tanX, tanY }) {
+		const u = this.veil
+		u.uVeil.value.set(density, far, g, 0)
+		u.uVeilAmbient.value.fromArray(ambient)
+		u.uVeilLightCount.value = lights.length
+		lights.forEach((light, i) => {
+			u.uVeilLightDirection.value[i].fromArray(light.direction)
+			u.uVeilLightIrradiance.value[i].fromArray(light.irradiance)
+		})
+		u.uVeilBasis.value.setFromMatrix4(cameraMatrix)
+		u.uVeilTan.value.set(tanX, tanY)
 	}
 
 	render(renderer, inputBuffer, outputBuffer) {

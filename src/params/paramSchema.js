@@ -373,6 +373,23 @@ export const BASE_PARAM_SCHEMA = {
 			photographer: toggle(true),
 		},
 	},
+	// The air around the eye (src/atmosphere/dustField.js, src/render/dustPass.js):
+	// fibers and flakes of dust at their real size in a cube around the eye,
+	// blurred by the lens, lit by the rig with a forward-scattering phase,
+	// drifting very slowly; and the haze, a veil of light scattered by the air
+	// that grows with the distance.
+	dust: {
+		enabled: fading(toggle(true, 'uniform', 'dust'), 'brightness'),
+		brightness: num(1, 0, 10, 0.01),
+		count: discrete(num(1000, 0, 2000, 1, '', 'uniform', 'motes')),
+		seed: discrete(num(1, 1, 9999, 1)),
+		size: num(350, 50, 1500, 10, 'µm', 'uniform', 'median fiber length'),
+		extent: num(160, 60, 1000, 10, 'mm', 'uniform', 'cube side'),
+		forward: num(0.65, 0, 0.95, 0.01, '', 'uniform', 'forward scattering'),
+		drift: num(0.3, 0, 10, 0.05, 'mm/s', 'uniform', 'air drift'),
+		turbulence: num(0.6, 0, 5, 0.05, 'mm'),
+		haze: num(0.04, 0, 3, 0.005, '1/m', 'uniform', 'haze density'),
+	},
 	camera: {
 		focalLength: num(110, 35, 200, 1, 'mm', 'uniform', 'focal length'),
 		fNumber: num(8, 1.4, 32, 0.1, '', 'uniform', 'f-number'),

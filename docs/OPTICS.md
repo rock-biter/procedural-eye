@@ -108,3 +108,4 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
   - They move the camera across the aperture (radius f / 2N, concentric-disk samples) and shear the projection so the focus plane stays fixed, plus a subpixel jitter.
   - The mean of the samples is the physically correct depth of field, reflections and refraction included.
 - **Interactive frames**: they approximate the same blur with a gather ([`docs/RENDERING.md`](RENDERING.md#depth-of-field)).
+- **Dust**: the motes draw their images blurred by the thin lens analytically, placed by the camera before the sample's jitter (`pinhole`), so they look the same in both modes ([`docs/RENDERING.md`](RENDERING.md#dust-and-haze)).
