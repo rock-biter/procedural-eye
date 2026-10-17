@@ -276,7 +276,7 @@ canvas {
 	fill: none;
 	stroke: #fff;
 	stroke-width: 1;
-	opacity: 0.5;
+	opacity: 0.3;
 }
 
 /* The circle between the central ring and the outer zoom ring: long
@@ -284,7 +284,7 @@ canvas {
    quickly, with the --elastic settle. */
 .hud-spin {
 	stroke-width: 1;
-	opacity: 0.4;
+	opacity: 0.2;
 	transition:
 		stroke-dashoffset 0.6s var(--elastic),
 		stroke 0.4s,
@@ -293,10 +293,19 @@ canvas {
 
 /* A layer in use lights up in the accent (src/ui/hud.js `activate()`): the
    zoom rings, the zoom value and the knob's marker, the arcs, the spinning
-   circle, the camera angles, eased from white and back. */
+   circle, the camera angles, eased from white and back. The circles also
+   show 0.2 more lit. */
 .hud-spin.active,
 .hud-arc.active {
 	stroke: var(--accent);
+}
+
+.hud-spin.active {
+	opacity: 0.4;
+}
+
+.hud-arc.active {
+	opacity: 0.5;
 }
 
 .hud-readout.active,
@@ -332,7 +341,7 @@ canvas {
    accent; a change of skin tone carries each to its new place, elastically. */
 .hud-arc {
 	stroke-width: 2;
-	opacity: 0.5;
+	opacity: 0.3;
 	transition:
 		stroke-dashoffset 1s var(--elastic),
 		stroke 0.4s,
@@ -356,21 +365,21 @@ canvas {
 /* Their opacity at rest (the strokes are opaque, the outer ring's arcs 0.75
    of its ticks); lit, they also show more (`.active`). */
 .hud-orbit-inner {
-	opacity: 0.5;
+	opacity: 0.3;
 }
 
 .hud-orbit-outer {
-	opacity: 0.5;
+	opacity: 0.3;
 }
 
 .hud-orbit.active {
 	opacity: 0.8;
 }
 
-/* A split HUD (a phone held upright, src/ui/hud.js) draws every circle 0.3
-   fainter: the central circle and the zoom's, the spinning circle and its
-   teeth, the tones' arcs and the zoom rings. Lit, the spinning circle and
-   the arcs also show 0.2 more, the zoom rings 0.3 more. */
+/* A split HUD (a phone held upright, src/ui/hud.js) draws every circle 0.1
+   fainter still at rest: the central circle and the zoom's, the spinning
+   circle and its teeth, the tones' arcs and the zoom rings. Lit, the
+   spinning circle and the arcs show 0.2 more, the zoom rings 0.3 more. */
 .hud.split .hud-line {
 	opacity: 0.2;
 }
