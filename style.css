@@ -441,24 +441,22 @@ canvas {
    the reticle's ends; their motion follows the button's radial orientation
    (the glyph's +y points out from the circle, so the end bracket is the
    outer one). Hidden, they sit --bracket-hidden from the glyph's center;
-   shown, --bracket-shown (in the glyph's units). */
+   shown, --bracket-shown (in the glyph's units): 4 px closer on screen
+   than the 48 and 32 they were drawn for, which the zoom's glyphs, scaled
+   1.5, take as 4 / 1.5 units. */
 .hud-button {
-	--bracket-hidden: 48px;
-	--bracket-shown: 32px;
-}
-
-/* A split HUD (a phone held upright, src/ui/hud.js) draws them 4 px closer
-   on screen (the zoom's glyphs are scaled 1.5) and only the inner one. */
-.hud.split .hud-button {
 	--bracket-hidden: 44px;
 	--bracket-shown: 28px;
 }
 
-.hud.split :is(.zoom-in, .zoom-out) {
+.zoom-in,
+.zoom-out {
 	--bracket-hidden: calc(48px - 4px / 1.5);
 	--bracket-shown: calc(32px - 4px / 1.5);
 }
 
+/* A split HUD (a phone held upright, src/ui/hud.js) draws only the inner
+   one. */
 .hud.split .hud-bracket-end {
 	display: none;
 }
