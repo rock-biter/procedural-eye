@@ -184,20 +184,20 @@
     "bubbles": 14
   },
   "lashes": {
-    "seed": 6775,
-    "upperCount": 150,
-    "lowerCount": 80,
+    "seed": 8152,
+    "upperCount": 139,
+    "lowerCount": 82,
     "upperLength": 9,
     "lowerLength": 5.5,
-    "thickness": 0.08,
+    "thickness": 0.14,
     "upperLift": 22,
     "lowerLift": 18,
     "upperCurl": 0.45,
     "lowerCurl": 0.35,
-    "clumping": 0.5,
+    "clumping": 1,
     "randomness": 0.6,
-    "color": "#1d140f",
-    "shine": 0.5
+    "color": "#4c342a",
+    "shine": 0
   },
   "skin": {
     "color": "#b88264",
@@ -206,7 +206,7 @@
     "wetness": 0.5,
     "pores": 0.5,
     "wrinkles": 0,
-    "translucency": 0,
+    "translucency": 0.2,
     "freckles": 0.85,
     "veins": 0.4,
     "pigmentation": 0.4,
@@ -242,9 +242,9 @@
       "azimuth": 38,
       "elevation": 28,
       "distance": 700,
-      "width": 600,
-      "height": 450,
-      "intensity": 9,
+      "width": 390,
+      "height": 260,
+      "intensity": 25,
       "temperature": 5600,
       "softness": 0.08
     },
@@ -256,7 +256,7 @@
       "distance": 900,
       "width": 300,
       "height": 900,
-      "intensity": 2.2,
+      "intensity": 0.7,
       "temperature": 5200,
       "softness": 0.15
     },
@@ -299,20 +299,20 @@
       "treeLine": 0.6
     },
     "camera": {
-      "enabled": true,
+      "enabled": false,
       "lensRadius": 36,
       "bodyWidth": 150,
       "bodyHeight": 110,
-      "photographer": true
+      "photographer": false
     }
   },
   "camera": {
     "focalLength": 110,
     "fNumber": 17,
     "sensorHeight": 24,
-    "distance": 193,
-    "azimuth": -52.1,
-    "elevation": -21.8,
+    "distance": 381.438769,
+    "azimuth": -60.5,
+    "elevation": -37.6,
     "targetX": 0,
     "targetY": 0,
     "targetZ": -2.15,
@@ -324,9 +324,10 @@
     "out": 480,
     "mobileIn": 268,
     "mobileOut": 811,
-    "start": 0.5,
+    "start": 0.36,
     "mobileStart": 0.5,
-    "duration": 0.7
+    "duration": 0.7,
+    "elasticity": 0.12
   },
   "controls": {
     "parallax": 3,
@@ -338,8 +339,8 @@
   "post": {
     "toneMapping": "agx",
     "grain": 0.035,
-    "vignette": 0.5,
-    "chromaticAberration": 0.4,
+    "vignette": 0.53,
+    "chromaticAberration": 0.9,
     "saturation": 1,
     "contrast": 1
   },
@@ -351,6 +352,7 @@
     "irisShadowSteps": 10,
     "irisAoSteps": 5,
     "interactiveShadowSteps": 4,
-    "interactiveAoSteps": 3
+    "interactiveAoSteps": 3,
+    "splitShading": true
   }
 }
