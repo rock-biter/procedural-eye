@@ -387,15 +387,18 @@ export const BASE_PARAM_SCHEMA = {
 	},
 	// The Zoom out and Zoom in buttons (main.js), which also bound the wheel:
 	// the camera distances they glide to and how long a zoom takes. Landscape
-	// (desktop) screens zoom in to `in`, closer than portrait (mobile) ones,
-	// which zoom in to camera.distance and, much narrower, out farther.
+	// (desktop) screens zoom in to `in` and out to `out`; portrait (mobile)
+	// ones, much narrower, from `mobileIn` to `mobileOut`, both farther.
 	// Landscape screens start `start` of the way from their zoom in to their
-	// zoom out on the zoom's log scale (0.5: the knob on the horizontal).
+	// zoom out on the zoom's log scale (0.5: the knob on the horizontal),
+	// portrait ones `mobileStart` of the way.
 	zoom: {
 		in: num(180, 60, 1000, 0.5, 'mm', 'uniform', 'desktop zoom in distance'),
 		out: num(480, 60, 1000, 0.5, 'mm', 'uniform', 'zoom out distance'),
-		mobileOut: num(720, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom out distance'),
+		mobileIn: num(268, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom in distance'),
+		mobileOut: num(811, 60, 1000, 0.5, 'mm', 'uniform', 'mobile zoom out distance'),
 		start: num(0.5, 0, 1, 0.01, '', 'uniform', 'desktop start (zoom in → out, log)'),
+		mobileStart: num(0.5, 0, 1, 0.01, '', 'uniform', 'mobile start (zoom in → out, log)'),
 		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),
 		elasticity: num(0.12, 0, 0.25, 0.01, '', 'uniform', 'zoom drag overshoot'),
 	},

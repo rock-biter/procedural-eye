@@ -322,8 +322,10 @@
   "zoom": {
     "in": 180,
     "out": 480,
-    "mobileOut": 720,
+    "mobileIn": 268,
+    "mobileOut": 811,
     "start": 0.5,
+    "mobileStart": 0.5,
     "duration": 0.7
   },
   "controls": {
