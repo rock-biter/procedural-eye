@@ -309,6 +309,7 @@
       "photographer": false
     }
   },
+
   "dust": {
     "enabled": true,
     "brightness": 0.7,
@@ -320,6 +321,38 @@
     "drift": 1.6,
     "turbulence": 4.6,
     "haze": 0.04
+  },
+  "shafts": {
+    "enabled": true,
+    "azimuth": -18,
+    "elevation": 7,
+    "distance": 590,
+    "intensity": 2.77,
+    "light": 8,
+    "dust": 40,
+    "air": 8,
+    "color": "#ffba79",
+    "count": 8,
+    "seed": 1,
+    "width": 2.2,
+    "elongation": 2.7,
+    "widthVariation": 0.35,
+    "spread": 72,
+    "offsetX": 13,
+    "offsetY": -15,
+    "angle": 133,
+    "alignment": 0.32,
+    "length": 276,
+    "shadow": 1,
+    "sway": 5.1,
+    "flicker": 0,
+    "speed": 0.82
+  },
+  "backdrop": {
+    "shadow": 0.8,
+    "distance": 70,
+    "tilt": 0,
+    "softness": 16
   },
   "camera": {
     "focalLength": 110,

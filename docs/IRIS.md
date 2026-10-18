@@ -114,7 +114,7 @@ Fresh interactive frames use `quality.interactiveShadowSteps` and `quality.inter
 `iris-shade.glsl`:
 
 - **Light** reaches the iris through the cornea ([`docs/OPTICS.md`](OPTICS.md#ray-path-through-the-cornea)).
-  - The key light is shadowed by the lids and lashes where it enters the cornea, then by the relief (soft shadow).
+  - The key light is shadowed by the lids and lashes where it enters the cornea, then by the relief (soft shadow); the light shafts crossing it there add to it ([`docs/RENDERING.md`](RENDERING.md#light-shafts)).
   - Ambient light is the background irradiance, occluded by the relief and dimmed under the lids.
 - **Materials**: the nearest parts dominate, with weights exp(−Δd / 8 µm) over stroma, radial vessels, arcs and ruff.
 - **Albedo**: a lookup of the color model by ABL melanin, eumelanin share and the stroma thickness under the point (the height above the epithelium).

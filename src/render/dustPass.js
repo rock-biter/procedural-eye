@@ -7,7 +7,9 @@
 // fresh frames and in photo mode alike. The pinhole camera of the frame
 // places it, so the accumulated lens samples do not blur it twice. The
 // scene's focus distance in the accumulated mean hides the motes behind a
-// surface. It renders into the input buffer without swapping, with additive
+// surface; the key's coverage darkens the ones behind the lids and the face,
+// as seen from the key, and the light shafts' cookie brightens the ones in a
+// beam the casters do not hide. It renders into the input buffer without swapping, with additive
 // blending that keeps the buffer's alpha.
 import { Pass } from 'postprocessing'
 import {
@@ -40,14 +42,17 @@ const MAX_RADIUS = 60
 export default class DustPass extends Pass {
 	// `envUniforms`: the rig in world space (LightRig.worldUniforms); `focus`:
 	// () => the accumulated mean (alpha: focus distance); `half`: the
-	// half-resolution share of split frames.
-	constructor(envUniforms, focus, half) {
+	// half-resolution share of split frames; `keyUniforms`: the shadow
+	// coverages' (src/lighting/shadowCoverage.js) and the light shafts' cookie
+	// and light on the dust (src/lighting/shaftLight.js, `uniforms` and `dust`).
+	constructor(envUniforms, focus, half, keyUniforms) {
 		super('DustPass')
 		this.focus = focus
 		this.needsSwap = false
 		this.seed = null
 		this.uniforms = {
 			...envUniforms,
+			...keyUniforms,
 			uZero: new Uniform(0),
 			uView: new Uniform(new Matrix4()),
 			uProjection: new Uniform(new Matrix4()),
@@ -62,6 +67,7 @@ export default class DustPass extends Pass {
 			uAmbient: new Uniform(new Vector3()),
 			uBrightness: new Uniform(1),
 			uMaxRadius: new Uniform(MAX_RADIUS),
+			uDustShadow: new Uniform(0),
 			uSharp: new Uniform(null),
 			uHalf: new Uniform(half),
 		}

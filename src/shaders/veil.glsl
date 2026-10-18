@@ -20,11 +20,16 @@ uniform int uVeilLightCount;
 uniform mat3 uVeilBasis; // the camera's axes in world space
 uniform vec2 uVeilTan; // tangents of the half fields of view (x, y)
 
+// The direction (world) of the pinhole camera's ray through the pixel at `uv`.
+vec3 veilRay(vec2 uv) {
+	return normalize(uVeilBasis * vec3((uv * 2.0 - 1.0) * uVeilTan, -1.0));
+}
+
 // `color` seen at `distance` (mm) through the pixel at `uv`.
 vec3 applyVeil(vec3 color, float distance, vec2 uv) {
 	if (uVeil.x <= 0.0) return color;
 	float transmittance = exp(-uVeil.x * clamp(distance, 0.0, uVeil.y));
-	vec3 ray = normalize(uVeilBasis * vec3((uv * 2.0 - 1.0) * uVeilTan, -1.0));
+	vec3 ray = veilRay(uv);
 	vec3 air = uVeilAmbient;
 	for (int i = ZERO; i < uVeilLightCount; i++) {
 		air += uVeilLightIrradiance[i] * hgPhase(dot(uVeilLightDirection[i], ray), uVeil.z);

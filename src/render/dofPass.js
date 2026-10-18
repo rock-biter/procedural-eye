@@ -8,8 +8,8 @@
 // samples instead, so the gather fades out over the first samples. A split
 // frame (src/render/scenePass.js) shaded part of the image at half resolution
 // only: alpha −1 marks the pixels it left out of the full-resolution one.
-// The haze (veil.glsl) joins the color in the prepare pass and the sharp mean
-// in the composite.
+// The haze (veil.glsl) and the light shafts (light-shafts.glsl) join the
+// color in the prepare pass and the sharp mean in the composite.
 import { Pass } from 'postprocessing'
 import {
 	HalfFloatType,
@@ -24,6 +24,7 @@ import {
 	WebGLRenderTarget,
 } from 'three'
 import { VEIL_LIGHTS } from '../atmosphere/dustField'
+import { MAX_SHAFTS } from '../atmosphere/lightShafts'
 import compositeShader from '../shaders/dof-composite-fragment.glsl'
 import dilateShader from '../shaders/dof-dilate-fragment.glsl'
 import gatherShader from '../shaders/dof-gather-fragment.glsl'
@@ -49,8 +50,10 @@ function createHalfTarget(filter) {
 
 export default class DofPass extends Pass {
 	// `focus`: () => the accumulated mean (rgb; alpha: the focus distance);
-	// `half`: the half-resolution share of split frames.
-	constructor(focus, half) {
+	// `half`: the half-resolution share of split frames; `shafts`: the light
+	// shafts' uniforms (src/lighting/shaftLight.js, its `uniforms` and `air`)
+	// and the shadow coverages' (src/lighting/shadowCoverage.js).
+	constructor(focus, half, shafts) {
 		super('DofPass')
 		this.focus = focus
 		// Whether `prepared` holds the last frame's radii at the current size.
@@ -75,10 +78,12 @@ export default class DofPass extends Pass {
 		this.prepare = new ShaderMaterial({
 			uniforms: {
 				...this.veil,
+				...shafts,
 				uSource: new Uniform(null),
 				uHalf: new Uniform(half),
 				uLens: new Uniform(new Vector4()),
 			},
+			defines: { MAX_SHAFTS },
 			vertexShader,
 			fragmentShader: prepareShader,
 			depthTest: false,
@@ -118,11 +123,13 @@ export default class DofPass extends Pass {
 		this.composite = new ShaderMaterial({
 			uniforms: {
 				...this.veil,
+				...shafts,
 				uSharp: new Uniform(null),
 				uHalf: new Uniform(half),
 				uBlurred: new Uniform(this.target.texture),
 				uWeight: new Uniform(1),
 			},
+			defines: { MAX_SHAFTS },
 			vertexShader,
 			fragmentShader: compositeShader,
 			depthTest: false,

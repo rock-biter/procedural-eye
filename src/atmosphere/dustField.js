@@ -51,7 +51,7 @@ export function createMotes(seed, count = MAX_MOTES) {
 
 // Irradiance (relative units) at the target from one emitter facing it: its
 // radiance times its emitting area over the squared distance.
-function emitterIrradiance(item, target) {
+export function emitterIrradiance(item, target) {
 	if (item.type === EMITTER_TYPE.LENS || item.type === EMITTER_TYPE.BLOCKER) return null
 	const toLight = vec3.sub(item.center, target)
 	const distance2 = Math.max(vec3.dot(toLight, toLight), 1)

@@ -6,7 +6,7 @@ An exploratory demo of a digital eye configurator: a hyper-realistic, fully proc
 - **The iris** is raymarched as a 3D field of crypts, vessels and collagen arcs, and colored by a spectral model of its pigments.
 - **The frame around it**: eyelids with skin and lashes, the tear meniscus and the scleral vessels.
 - **Light and life**: an analytic light rig gives exact reflections; the pupil reacts to light, the eye moves like a living one and blinks now and then.
-- **Air**: tiny fibers and flakes of dust drift very slowly around the eye, sharp near the focus and soft away from it, over a light haze that deepens with distance.
+- **Air**: tiny fibers and flakes of dust drift very slowly around the eye, sharp near the focus and soft away from it, over a light haze that deepens with distance; a few soft shafts of light cross it, and the skin patch casts a soft shadow below.
 - **Photo mode**: a thin-lens camera with progressive accumulation renders real macro depth of field.
 
 Every structure and color is a parameter.

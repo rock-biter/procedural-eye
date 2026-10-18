@@ -73,8 +73,11 @@ class FilmGrainEffect extends Effect {
 const WIND = new Vector3(1, -0.3, -0.45).normalize()
 
 export default class PostProcessing {
-	// `envUniforms`: the light rig in world space, which lights the dust.
-	constructor(renderer, scene, camera, envUniforms) {
+	// `envUniforms`: the light rig in world space, which lights the dust;
+	// `keyCoverage`: the key's shadow coverage (src/lighting/shadowCoverage.js),
+	// which shadows the dust's key light; `shafts`: the light shafts
+	// (src/lighting/shaftLight.js) with their own coverage.
+	constructor(renderer, scene, camera, envUniforms, { keyCoverage, shafts }) {
 		this.renderer = renderer
 		this.composer = new EffectComposer(renderer, {
 			frameBufferType: HalfFloatType,
@@ -84,11 +87,18 @@ export default class PostProcessing {
 			this.dof.preparedLast ? this.dof.prepared.texture : null,
 		)
 		this.accumulation = new AccumulationPass()
-		this.dof = new DofPass(() => this.accumulation.history, this.renderPass.half.texture)
+		this.shafts = shafts
+		const coverage = { ...keyCoverage.uniforms, ...shafts.coverage.uniforms }
+		this.dof = new DofPass(() => this.accumulation.history, this.renderPass.half.texture, {
+			...coverage,
+			...shafts.uniforms,
+			...shafts.air,
+		})
 		this.dust = new DustPass(
 			envUniforms,
 			() => this.accumulation.history,
 			this.renderPass.half.texture,
+			{ ...coverage, ...shafts.uniforms, ...shafts.dust },
 		)
 		// Split the frames that pass through (params.quality.splitShading).
 		this.splitShading = true
@@ -140,10 +150,11 @@ export default class PostProcessing {
 		this.grain.intensity = post.grain
 	}
 
-	// The dust and the haze of this frame. `pinhole`: the camera before the
-	// sample's jitter (src/camera/physicalCamera.js); `emitters`: the light
-	// rig's; `time`: the dust's clock (s); `beauty`: whether the debug view is
-	// the image, the only one with dust and haze.
+	// The dust, the haze and the light shafts' origin of this frame. `pinhole`:
+	// the camera before the sample's jitter (src/camera/physicalCamera.js);
+	// `emitters`: the light rig's; `time`: the dust's clock (s); `beauty`:
+	// whether the debug view is the image, the only one with dust and haze (the
+	// shafts' light follows it on its own, src/lighting/shaftLight.js).
 	updateAtmosphere({ params, pinhole, emitters, time, beauty }) {
 		const dust = params.dust
 		const { lights, ambient } = veilLights(params.lighting, emitters)
@@ -158,6 +169,7 @@ export default class PostProcessing {
 			tanX: 1 / projection[0],
 			tanY: 1 / projection[5],
 		})
+		this.shafts.air.uShaftOrigin.value.setFromMatrixPosition(pinhole.matrixWorld)
 		const pass = this.dust
 		pass.setSeed(dust.seed)
 		pass.count = dust.enabled && beauty ? dust.count : 0
@@ -175,6 +187,7 @@ export default class PostProcessing {
 		u.uForward.value = dust.forward
 		u.uAmbient.value.fromArray(ambient)
 		u.uBrightness.value = dust.brightness
+		u.uDustShadow.value = dust.shadow
 	}
 
 	render() {

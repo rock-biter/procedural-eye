@@ -6,7 +6,7 @@
 
 - **Optics**: the anterior cornea is a conic joined to the sclera sphere; rays refract through both corneal surfaces into the anterior chamber; mirror reflections intersect the emitters of an analytic light rig exactly.
 - **Iris**: a signed-distance field raymarched after the corneal refraction. The stroma is carved by crypts and bridged by radial vessels and collagen arcs, and colored by a spectral Kubelka–Munk model of its layers ([`docs/IRIS.md`](docs/IRIS.md)).
-- **Air**: dust fibers and flakes at their real size, blurred by the thin lens, and a light haze that grows with the distance give the space around the eye its depth.
+- **Air**: dust fibers and flakes at their real size, blurred by the thin lens, a light haze that grows with the distance and a few soft light shafts give the space around the eye its depth; the patch casts a soft shadow on an unseen floor.
 - **Animation**: the eye lives (pupil light reflex with hippus, saccades, microsaccades, drift, lids following the gaze, blinks) until photo mode freezes it.
 - **Photo mode**: a physical thin-lens camera and progressive accumulation give true macro depth of field.
 
@@ -57,10 +57,10 @@ pnpm brand
 - [`src/adnexa/`](src/adnexa/): the fissure, the surfaces around the eye (support, conjunctiva, face), lid geometry, the back shell closing the skin patch, the lash generator and the fissure map, plus the lid, lash and tear-film meshes.
 - [`src/sclera/`](src/sclera/): the vessel generator and the polar vessel map.
 - [`src/animation/`](src/animation/): pupil dynamics, eye movements and the animator.
-- [`src/lighting/`](src/lighting/): the analytic light rig, color temperature, the rig uniforms and the key-light shadow map.
+- [`src/lighting/`](src/lighting/): the analytic light rig, color temperature, the rig uniforms, the key-light shadow map, the soft shadow coverages and the light shafts' light.
 - [`src/camera/`](src/camera/): thin-lens optics and sampling, the physical camera and the pointer controls.
-- [`src/atmosphere/`](src/atmosphere/): the dust field (seeded motes in a cube around the eye) and the lights the haze scatters.
-- [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field, the dust pass and PNG metadata.
+- [`src/atmosphere/`](src/atmosphere/): the dust field (seeded motes in a cube around the eye), the lights the haze scatters and the light shafts (seeded beams and their cookie).
+- [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field, the dust pass, the backdrop with the floor shadow and PNG metadata.
 - [`src/debug/`](src/debug/) holds the panel and the debug view numbering; [`src/ui/`](src/ui/) the HUD around the eye, its layout and its SVG assets; [`src/shaders/`](src/shaders/) holds every GLSL file.
 - _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
 - [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/).
@@ -80,6 +80,7 @@ pnpm brand
   | the lid follow weights of [`src/adnexa/lidGeometry.js`](src/adnexa/lidGeometry.js) | `lid-follow.glsl` |
   | [`src/random.js`](src/random.js) `pcg()` | `pcgHash()` |
   | `hgPhase()` in [`src/atmosphere/dustField.js`](src/atmosphere/dustField.js) | `scattering.glsl` |
+  | `beamIntegral()` and `erf()` in [`src/atmosphere/lightShafts.js`](src/atmosphere/lightShafts.js) | `applyShafts()` and `shaftErf()` in `light-shafts.glsl` |
 - Scene materials write the apparent focus distance in alpha. Only the accumulation history keeps it; the effects receive opaque alpha (see [`docs/RENDERING.md`](docs/RENDERING.md)).
 - In shaders:
   - use the `ZERO` loop bound (ANGLE-Metal compile times);
