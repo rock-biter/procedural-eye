@@ -247,7 +247,6 @@ export const BASE_PARAM_SCHEMA = {
 		seed: discrete(num(1, 1, 9999, 1, '', 'rebuild', 'seed (skin)')),
 		meniscusLower: num(0.36, 0, 0.8, 0.005, 'mm', 'rebuild', 'lower tear meniscus radius'),
 		meniscusUpper: num(0.2, 0, 0.6, 0.005, 'mm', 'rebuild', 'upper tear meniscus radius'),
-		bubbles: discrete(num(14, 0, 60, 1, '', 'rebuild', 'tear bubbles')),
 	},
 	lashes: {
 		seed: discrete(num(1, 1, 9999, 1, '', 'rebuild')),

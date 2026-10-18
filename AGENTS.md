@@ -45,6 +45,7 @@ pnpm lint
 pnpm format
 pnpm build
 pnpm capture
+pnpm compare
 pnpm brand
 ```
 
@@ -63,7 +64,7 @@ pnpm brand
 - [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field, the dust pass, the backdrop with the floor shadow and PNG metadata.
 - [`src/debug/`](src/debug/) holds the panel and the debug view numbering; [`src/ui/`](src/ui/) the HUD around the eye, its layout and its SVG assets; [`src/shaders/`](src/shaders/) holds every GLSL file.
 - _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
-- [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/).
+- [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/compare.mjs`](scripts/compare.mjs) measures captures against a baseline; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/).
 
 ## Project Rules
 

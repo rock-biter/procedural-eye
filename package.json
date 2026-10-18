@@ -13,6 +13,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "capture": "node scripts/capture.mjs",
+    "compare": "node scripts/compare.mjs",
     "brand": "node scripts/brand.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",

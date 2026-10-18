@@ -40,7 +40,7 @@
 | [`src/adnexa/blinkFrames.js`](../src/adnexa/blinkFrames.js) * | The blink's closing frames: the lid ring (with its occlusion), the meniscus and the lashes closed by steps, and the closed fissure map; the spline weights between them. |
 | [`src/adnexa/blinkFrames.worker.js`](../src/adnexa/blinkFrames.worker.js) | Builds the blink's frames off the main thread (the only worker). |
 | [`src/adnexa/lidBlink.js`](../src/adnexa/lidBlink.js) | The blink on the GPU: asks the worker for the frames, puts them on the lid, lash and meniscus meshes as morph targets, sets the weights and `uLidBlink`. |
-| [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, back shell, lash, meniscus and bubble meshes with their materials. |
+| [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, back shell, lash and meniscus meshes with their materials. |
 | [`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js) | The skin's pigment patterns baked on the GPU over the lid mesh at rest. |
 | [`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js) | The skin's relief and freckles baked on the GPU over the same box, read outside `#debug`. |
 | [`src/sclera/vesselGenerator.js`](../src/sclera/vesselGenerator.js) * | Seeded episcleral and conjunctival vessel network. |
@@ -70,7 +70,8 @@
 | [`src/render/scenePass.js`](../src/render/scenePass.js) | The scene into the composer's buffer; living frames split into a full-resolution sharp share and a half-resolution blurred one. |
 | [`src/render/accumulationPass.js`](../src/render/accumulationPass.js) | Progressive mean of still frames in a float history; living frames pass through. |
 | [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare, tile bounds and gather), composited over the accumulated mean; the haze and the light shafts in the air. |
-| [`src/render/backdrop.js`](../src/render/backdrop.js) | The backdrop triangle: the clear color with the patch's soft shadow on a floor ([`docs/RENDERING.md`](RENDERING.md#backdrop-shadow)). |
+| [`src/render/backdrop.js`](../src/render/backdrop.js) | The backdrop triangle, in every view: the clear color, with the patch's soft shadow on a floor in the beauty view ([`docs/RENDERING.md`](RENDERING.md#backdrop-shadow)). |
+| [`src/render/drawOrder.js`](../src/render/drawOrder.js) | The scene's draw order (`renderOrder` per mesh), written out rather than left to the renderer's sort. |
 | [`src/render/dustPass.js`](../src/render/dustPass.js) | The dust motes as their images blurred by the lens, added over the depth of field's output before the effects. |
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |

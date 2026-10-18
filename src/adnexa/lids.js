@@ -19,6 +19,7 @@ import { apertureRadius } from '../camera/cameraOptics'
 import { debugViewDefine } from '../debug/debugViews'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
+import { DRAW_ORDER } from '../render/drawOrder'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
 import { backShellSurface, createBackShell, keepInside } from './backShell'
@@ -66,6 +67,7 @@ export default class Lids {
 		this.material.name = 'Skin'
 		this.mesh = new Mesh(new BufferGeometry(), this.material)
 		this.mesh.name = 'Lids'
+		this.mesh.renderOrder = DRAW_ORDER.lids
 		// Casters of the key light's shadow.
 		this.mesh.layers.enable(SHADOW_LAYER)
 		this.fissure = null
@@ -86,6 +88,8 @@ export default class Lids {
 		this.backMaterial.name = 'BackShell'
 		this.back = new Mesh(new BufferGeometry(), this.backMaterial)
 		this.back.name = 'BackShell'
+		// After the lids: the depth test skips it where they hide it.
+		this.back.renderOrder = DRAW_ORDER.backShell
 		// The baked relief and freckles, read while `baked`; the lid ring they
 		// are baked from, and its version (one per rebuild).
 		this.relief = new SkinRelief(this.uniforms)

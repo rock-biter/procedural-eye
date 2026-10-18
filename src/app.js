@@ -131,7 +131,7 @@ export default class EyeApp {
 		this.lashes = new Lashes(this.lightRig.worldUniforms, keyLight, params.debug.view)
 		setup.scene.add(this.lashes.mesh)
 		this.tearFilm = new TearFilm(this.lightRig.worldUniforms, keyLight)
-		setup.scene.add(this.tearFilm.meniscus, this.tearFilm.bubbles)
+		setup.scene.add(this.tearFilm.meniscus)
 		// The blink: the lid meshes morph through frames a worker builds.
 		this.lidBlink = new LidBlink({
 			lids: this.lids,

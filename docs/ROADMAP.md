@@ -11,7 +11,7 @@
 | 4 | Iris color: spectral Kubelka–Munk lookup, pigment atlas (heterochromia, freckles, periphery), depth-dependent albedo, white balance | Done |
 | 5 | Photo pipeline: interactive gather DOF fading into the accumulated lens samples, area-light jitter, autofocus on the entrance pupil, PNG export with the state in a `tEXt` chunk | Done |
 | 6 | Lids, skin, lashes, key-light shadows | Done |
-| 7 | Reflections of the lids and lashes in the cornea, tear meniscus, bubbles, wet skin | Done |
+| 7 | Reflections of the lids and lashes in the cornea, tear meniscus, wet skin | Done |
 | 8 | Sclera and limbus: vessel network, elliptical limbus, limbal ring, broken-up wet reflection | Done |
 | 9 | Animation: pupil light reflex and hippus, gaze, saccades, microsaccades, drift, lid follow, photo mode | Done |
 | 10 | Presets per reference photograph, random eye from population priors | Done |

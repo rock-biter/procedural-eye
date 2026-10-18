@@ -131,7 +131,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
   - The footprint they are filtered by is the pixel's, widened by the depth of field's blur circle on the skin (`uDefocus`: aperture × defocus / focus distance). The furrows and wrinkles fade where it is wider than about 0.1 mm, the network, the pores and the orifices from 0.015 mm: blurred, they would only average out. Narrower than the footprint, a groove widens and grows shallower, keeping its darkness, so fresh frames do not flicker.
   - `skinMicroRelief()` in `skin-relief.glsl` computes all three, with the tension lines; the skin program and the relief bake both call it.
   - **Baked outside `#debug`**: the relief depends only on the lid mesh at rest, `lids.seed`, `skin.pores` and `skin.wrinkles`. [`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js) bakes it on the GPU (`skin-relief-bake-*.glsl`) over the patterns' front-plane box, and the skin program reads it (`SKIN_BAKED`) instead of hashing some hundred cells per pixel:
-    - **Lid texture**: 4096² RGBA8, about 0.016 mm per texel, mipmapped. It holds the gradient of the whole height (rg), the furrows' and network's albedo term (b) and the occlusion term (a), all linear in the heights (`encodeRelief()`). It is drawn from the lid ring itself, laid onto the box with the rest z as depth (nearest the viewer wins), so the lid frame (`a`, `along`, the tension direction, the skin share) is exact. Under it lies the shell's relief, for the texels the ring leaves uncovered.
+    - **Lid texture**: 4096² RGBA8, about 0.016 mm per texel, mipmapped. It holds the gradient of the whole height (rg), the furrows' and network's albedo term (b) and the occlusion term (a), all linear in the heights (`encodeRelief()`). It is drawn from the lid ring itself, laid onto the box with the rest z as depth (nearest the viewer wins), so the lid frame (`a`, `along`, the tension direction, the skin share) is exact. Under it lies the shell's relief, for the texels the ring leaves uncovered: drawn first, in a render of its own, so the ring always lies over it (drawn together, WebGL's sort put the underlay last, over the whole ring, and the lids read the shell's relief, without their wrinkles or crow's feet).
     - **Shell texture**: the back shell's relief at 2048².
     - **Prefilter**: the bake evaluates the relief with a footprint of one texel. The skin reads it with `textureLod` at the level of 0.7 × its footprint, so the mipmaps take over the prefilter's work. It still applies the relief's fade and the keratinized share; the network's earlier fade is left to the mipmaps.
     - **When it bakes**: at start-up, before the first frame. It bakes again after a lid rebuild or when `lids.seed`, `skin.pores`, `skin.wrinkles` or `skin.freckles` change, once no transition is running (outside `#debug` nothing changes them). A new bake takes about 30 ms; the first, compiling its programs, about 0.6 s.
@@ -191,7 +191,6 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 - **Meniscus** (`createMeniscusMesh()`): a concave water fillet in the corner between the intermarginal strip and the support, along both margins.
   - Its radius is `lids.meniscusLower` (0.36 mm) and `lids.meniscusUpper`. It tapers at the canthi and where the margin leaves the globe (`supportLift()`): the water needs the globe to hold it.
 - **Blink**: the meniscus closes with the margins ([Blink Frames](#blink-frames)).
-- **Bubbles**: `lids.bubbles` tiny spheres caught in the lower meniscus (an instanced mesh, up to 60).
 - **Material** (`tear-fragment.glsl`): water. A smooth mirror of the rig with water's Fresnel, over a faint transmitted tint of what lies behind. It is drawn opaque, to keep the alpha contract ([`docs/RENDERING.md`](RENDERING.md#alpha-contract)).
 
 ## Fissure Map
@@ -217,7 +216,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 - **Limbus**: near it, vessels may end in small loops (the limbal arcade).
 - **Outer edge**: a branch that turns back past the map's outer edge stops; it would be under the lids.
 
-[`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) rasterizes the network with Canvas2D into a 2048×512 polar texture (u = φ / 2π, repeating; v over ψ).
+[`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) rasterizes the network with Canvas2D into a 2048×512 polar texture (u = φ / 2π, repeating; v over ψ). The canvas's first row is ψ min and the texture is not flipped (`flipY` false), so v = 0 lies at the limbus, where `sclera.glsl` reads it; three's default flip had put the limbus' end of the network at the periphery.
 - **Red channel**: superficial vessels, sharp.
 - **Green channel**: deep vessels, blurred as seen through the conjunctiva and Tenon's capsule.
 

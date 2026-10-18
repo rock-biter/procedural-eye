@@ -19,7 +19,7 @@ void main() {
 	float above = dot(normal, cameraPosition) - uShadowPlane.w;
 	float facing = -dot(normal, ray);
 	float shade = 1.0;
-	if (above > 0.0 && facing > 1e-4) {
+	if (uShadowStrength > 0.0 && above > 0.0 && facing > 1e-4) {
 		vec3 point = cameraPosition + ray * (above / facing);
 		shade -= uShadowStrength * smoothstep(0.005, 0.03, facing) * shaftCover(point);
 	}

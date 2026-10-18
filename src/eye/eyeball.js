@@ -8,6 +8,7 @@ import { IRIS_ATLAS_SIZE } from '../iris/irisAtlas'
 import { IRIS_COLOR_LUT } from '../iris/irisColor'
 import { GLOBE_CUT } from '../adnexa/backShell'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
+import { DRAW_ORDER } from '../render/drawOrder'
 import capFragmentShader from '../shaders/eyeball-cap-fragment.glsl'
 import scleraFragmentShader from '../shaders/eyeball-sclera-fragment.glsl'
 import vertexShader from '../shaders/eyeball-vertex.glsl'
@@ -85,7 +86,7 @@ export default class Eyeball {
 		this.mesh.name = 'Eyeball'
 		// Drawn after the lids and lashes: the depth test then skips the costly
 		// optics wherever they cover the eye.
-		this.mesh.renderOrder = 1
+		this.mesh.renderOrder = DRAW_ORDER.eyeball
 	}
 
 	// New profile (any 'rebuild' parameter): new tessellation.

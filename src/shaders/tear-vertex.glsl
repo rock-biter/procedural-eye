@@ -1,5 +1,4 @@
-// Tear meniscus and bubbles: world space. The meniscus blinks with the lids
-// (lid-morph.glsl); the bubbles, in the lower one, have no frames.
+// Tear meniscus: world space. It blinks with the lids (lid-morph.glsl).
 #include ./lid-follow.glsl
 #include ./lid-morph.glsl
 

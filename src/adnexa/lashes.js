@@ -4,6 +4,7 @@ import { BufferAttribute, BufferGeometry, Color, Mesh, ShaderMaterial, Uniform }
 import { debugViewDefine } from '../debug/debugViews'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
+import { DRAW_ORDER } from '../render/drawOrder'
 import fragmentShader from '../shaders/lash-fragment.glsl'
 import vertexShader from '../shaders/lash-vertex.glsl'
 import { generateLashes, lashTubes } from './lashGenerator'
@@ -43,7 +44,7 @@ export default class Lashes {
 		this.mesh = new Mesh(new BufferGeometry(), this.material)
 		this.mesh.name = 'Lashes'
 		// Drawn first: the skin and the eye behind them are not shaded.
-		this.mesh.renderOrder = -1
+		this.mesh.renderOrder = DRAW_ORDER.lashes
 		// Casters of the key light's shadow.
 		this.mesh.layers.enable(SHADOW_LAYER)
 		this.lashes = []

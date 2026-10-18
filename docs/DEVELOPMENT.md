@@ -19,6 +19,7 @@ pnpm format:check
 pnpm build          # production bundle in dist/
 pnpm preview
 pnpm capture        # headless captures, contact sheet, optional bench (docs/QUALITY.md)
+pnpm compare        # captures against a baseline: metrics, difference images (docs/QUALITY.md)
 pnpm brand          # renders the favicon, the touch icons and the Open Graph image into public/
 ```
 
