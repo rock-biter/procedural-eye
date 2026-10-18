@@ -219,7 +219,7 @@
   "shell": {
     "clearance": 1.5,
     "band": 1,
-    "tone": 0.6
+    "tone": 0.95
   },
   "sclera": {
     "color": "#e7ddd2",
@@ -320,7 +320,7 @@
     "forward": 0.65,
     "drift": 1.6,
     "turbulence": 4.6,
-    "haze": 0.04
+    "haze": 0.0
   },
   "shafts": {
     "enabled": true,
@@ -368,13 +368,13 @@
     "whiteBalance": 5600
   },
   "zoom": {
-    "in": 230,
-    "out": 480,
+    "in": 300,
+    "out": 540,
     "mobileIn": 426,
     "mobileOut": 811,
     "sensorIn": 12,
     "sensorOut": 24,
-    "start": 0.62,
+    "start": 0.8,
     "mobileStart": 0.42,
     "duration": 0.7,
     "elasticity": 0.12
