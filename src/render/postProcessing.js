@@ -2,14 +2,18 @@
 // buffer (alpha holds the apparent focus distance, written by the materials),
 // the accumulation pass averages still frames, the depth of field blurs fresh
 // ones, then one effect pass applies the lens and color effects in linear
-// light, tone mapping and film grain. A frame that passes through the
-// accumulation is split: what the depth of field blurs is shaded at half
-// resolution (src/render/scenePass.js).
+// light and tone mapping, and a last one antialiases fresh frames (FXAA) and
+// adds the film grain. A frame that passes through the accumulation is split:
+// what the depth of field blurs is shaded at half resolution
+// (src/render/scenePass.js).
 import {
+	BlendFunction,
 	ChromaticAberrationEffect,
 	Effect,
+	EffectAttribute,
 	EffectComposer,
 	EffectPass,
+	FXAAEffect,
 	ToneMappingEffect,
 	ToneMappingMode,
 	VignetteEffect,
@@ -68,6 +72,25 @@ class FilmGrainEffect extends Effect {
 	}
 }
 
+// FXAA of the fresh frames, which have one sample per pixel, in a pass of its
+// own after tone mapping (it reads its neighbors in the pass's input, and an
+// edge between the bright skin and the backdrop blended in HDR stays stepped
+// once tone mapped). Besides the outlines it softens the iris's speckle, the
+// detail finer than a pixel that the photo averages over its samples; SMAA
+// left most of it for ten times the cost (2 to 4 ms at 3440×1440 on the M1).
+// Its opacity fades it out as the accumulated samples antialias the photo by
+// their pixel jitter. It finds the edges in the tone-mapped output in linear
+// light, where its usual sRGB thresholds are about twice as large as in the
+// mid-tones: half of them.
+class FreshFrameFXAA extends FXAAEffect {
+	constructor() {
+		super({ blendFunction: BlendFunction.NORMAL })
+		this.setAttributes(EffectAttribute.CONVOLUTION)
+		this.minEdgeThreshold = 0.0156
+		this.maxEdgeThreshold = 0.0625
+	}
+}
+
 // The air current the dust drifts on (world space, unit): across the face,
 // a little backward and settling.
 const WIND = new Vector3(1, -0.3, -0.45).normalize()
@@ -117,18 +140,24 @@ export default class PostProcessing {
 			this.chromaticAberration,
 			this.vignette,
 			this.toneMapping,
-			this.grain,
 		)
+		// The grain after the antialiasing, which would find it and blend it.
+		this.fxaa = new FreshFrameFXAA()
+		this.antialiasPass = new EffectPass(camera, this.fxaa, this.grain)
+		// Antialias fresh frames (params.quality.antialias).
+		this.antialias = true
 		this.composer.addPass(this.renderPass)
 		this.composer.addPass(this.accumulation)
 		this.composer.addPass(this.dof)
 		this.composer.addPass(this.dust)
 		this.composer.addPass(this.effectPass)
+		this.composer.addPass(this.antialiasPass)
 	}
 
 	setCamera(camera) {
 		this.renderPass.mainCamera = camera
 		this.effectPass.mainCamera = camera
+		this.antialiasPass.mainCamera = camera
 	}
 
 	// `camera`: { focalLength, fNumber, focusDistance, sensorHeight }; the
@@ -148,6 +177,8 @@ export default class PostProcessing {
 		)
 		this.vignette.darkness = post.vignette
 		this.grain.intensity = post.grain
+		// Faded out with the interactive depth of field, as samples accumulate.
+		this.fxaa.blendMode.opacity.value = this.antialias ? this.dof.weight : 0
 	}
 
 	// The dust, the haze and the light shafts' origin of this frame. `pinhole`:

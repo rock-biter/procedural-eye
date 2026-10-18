@@ -654,6 +654,7 @@ export default class EyeApp {
 		this.lashes.update(this.params)
 		const lens = this.params.camera
 		this.post.splitShading = this.params.quality.splitShading
+		this.post.antialias = this.params.quality.antialias
 		this.post.update(this.params, size, {
 			focalLength: lens.focalLength,
 			fNumber: lens.fNumber,

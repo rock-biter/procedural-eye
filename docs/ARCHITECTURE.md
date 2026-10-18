@@ -66,7 +66,7 @@
 | [`src/atmosphere/dustField.js`](../src/atmosphere/dustField.js) * | Seeded dust motes (fibers, flakes, crossed fibers) in a unit cube, the lights the haze scatters, an emitter's irradiance, the Henyey–Greenstein phase. |
 | [`src/atmosphere/lightShafts.js`](../src/atmosphere/lightShafts.js) * | Seeded light blades in their cross-section, their geometry from the source, the cookie bake, a blade's integral along a ray ([`docs/RENDERING.md`](RENDERING.md#light-shafts)). |
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
-| [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, effects. |
+| [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, dust, effects, antialiasing of fresh frames (FXAA) and grain. |
 | [`src/render/scenePass.js`](../src/render/scenePass.js) | The scene into the composer's buffer; living frames split into a full-resolution sharp share and a half-resolution blurred one. |
 | [`src/render/accumulationPass.js`](../src/render/accumulationPass.js) | Progressive mean of still frames in a float history; living frames pass through. |
 | [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare, tile bounds and gather), composited over the accumulated mean; the haze and the light shafts in the air. |

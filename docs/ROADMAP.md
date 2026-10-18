@@ -21,7 +21,7 @@
 
 - **Near-field reflections**: the plan's cube capture with distance impostors was replaced by an analytic model ([`docs/OPTICS.md`](OPTICS.md#reflections-of-the-lids-and-lashes)): a lid sphere, the fissure map and a lash comb. It is exact at the margins and free per frame. The `capture` parameter kind went with it.
 - **Shadows**: accumulation samples jitter the light across the emitter area, which gives the exact penumbra. Interactive frames use PCSS on the skin (the face shadows itself) and a fixed Poisson PCF on the eye's receivers.
-- **Post-processing**: no bloom and no SMAA. The accumulation antialiases the image.
+- **Post-processing**: no bloom. The accumulation antialiases the photo; fresh frames get FXAA, which SMAA did not beat on the iris for ten times the cost ([`docs/RENDERING.md`](RENDERING.md#pipeline)).
 - **Benchmarks**: the planned `scripts/bench.mjs` is `pnpm capture --bench`.
 - **Vessel generation** runs on the main thread: about 11 ms at the maximum counts, on bakes only. No worker is needed.
 

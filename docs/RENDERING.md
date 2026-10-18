@@ -26,8 +26,13 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    1. color grade: white balance from `camera.whiteBalance`, saturation and contrast, in linear light;
    2. chromatic aberration: `post.chromaticAberration` pixels, radially modulated;
    3. vignette (`post.vignette`);
-   4. tone mapping: `post.toneMapping`, with exposure 2^`camera.exposure` through `renderer.toneMappingExposure`;
-   5. static film grain, in display space.
+   4. tone mapping: `post.toneMapping`, with exposure 2^`camera.exposure` through `renderer.toneMappingExposure`.
+7. **Antialiasing pass** (`FreshFrameFXAA` in [`src/render/postProcessing.js`](../src/render/postProcessing.js)), in order:
+   1. FXAA of the fresh frames (`quality.antialias`), which have one sample per pixel: the outlines and the iris's speckle, the detail finer than a pixel that the photo averages over its samples. It fades out with the depth of field's `dof.weight`, as the accumulated samples antialias the photo by their pixel jitter.
+      - **After tone mapping**: an edge between the bright skin and the backdrop blended in HDR stays stepped once tone mapped. It has a pass of its own because it reads its neighbors in the pass's input, like the chromatic aberration.
+      - **Thresholds**: it finds the edges in the tone-mapped output in linear light, where its usual sRGB thresholds are about twice as large in the mid-tones: half of them (0.0156 and 0.0625).
+      - **Why not SMAA**: it cleaned the outlines as well but left most of the iris's speckle, for 2 to 4 ms at 3440×1440 on the M1 against a few tenths of a millisecond.
+   2. static film grain, in display space: after the antialiasing, which would find it and blend it.
 
 The canvas has no depth, alpha or MSAA: everything reaches it through the composer.
 
@@ -110,6 +115,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 - **Key-light shadow**: fresh frames filter a 1024² map, accumulated samples compare a 2048² one.
 - **Split frames**: frames that are not kept shade the blurred share at half resolution ([Split Frames](#split-frames)); kept ones are whole.
 - **Adaptive resolution**: the pixel ratio adapts on fresh frames only (`quality.adaptiveResolution`, `quality.minPixelRatio`).
+- **Antialiasing**: fresh frames get FXAA (`quality.antialias`), accumulated samples their pixel jitter ([Pipeline](#pipeline)).
 
 ## Materials and Uniforms
 
