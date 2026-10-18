@@ -4,67 +4,21 @@ import { BufferAttribute, BufferGeometry, Color, Mesh, ShaderMaterial, Uniform }
 import { debugViewDefine } from '../debug/debugViews'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { SHADOW_LAYER } from '../lighting/keyShadow'
-import { vec3 } from '../math'
 import fragmentShader from '../shaders/lash-fragment.glsl'
 import vertexShader from '../shaders/lash-vertex.glsl'
-import { generateLashes } from './lashGenerator'
+import { generateLashes, lashTubes } from './lashGenerator'
+import { setBlinkFrames, setBlinkPlaceholders } from './lidBlink'
 
-const SIDES = 6
-
-// Tube geometry along every lash: parallel-transported rings, radius tapering
-// over the last third.
+// Tube geometry along every lash (lashTubes(), src/adnexa/lashGenerator.js).
 export function createLashGeometry(lashes) {
-	const ringCount = lashes.reduce((sum, lash) => sum + lash.points.length, 0)
-	const positions = new Float32Array(ringCount * SIDES * 3)
-	const normals = new Float32Array(ringCount * SIDES * 3)
-	const tangents = new Float32Array(ringCount * SIDES * 3)
-	const attributes = new Float32Array(ringCount * SIDES * 2)
-	const follow = new Float32Array(ringCount * SIDES * 2)
-	const indices = []
-	let vertex = 0
-	for (const [index, lash] of lashes.entries()) {
-		const points = lash.points
-		const random = ((index * 2654435761) % 1000) / 1000
-		let reference =
-			Math.abs(vec3.normalize(vec3.sub(points[1], points[0]))[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]
-		const start = vertex
-		for (let k = 0; k < points.length; k++) {
-			const previous = points[Math.max(k - 1, 0)]
-			const next = points[Math.min(k + 1, points.length - 1)]
-			const tangent = vec3.normalize(vec3.sub(next, previous))
-			const side = vec3.normalize(vec3.cross(tangent, reference))
-			const up = vec3.cross(side, tangent)
-			reference = up
-			const u = k / (points.length - 1)
-			const radius = lash.radius * (1 - 0.85 * Math.max(0, (u - 0.6) / 0.4) ** 1.5)
-			for (let j = 0; j < SIDES; j++) {
-				const angle = (j / SIDES) * Math.PI * 2
-				const normal = vec3.add(vec3.scale(side, Math.cos(angle)), vec3.scale(up, Math.sin(angle)))
-				positions.set(vec3.madd(points[k], normal, radius), vertex * 3)
-				normals.set(normal, vertex * 3)
-				tangents.set(tangent, vertex * 3)
-				attributes.set([u, random], vertex * 2)
-				follow.set([lash.side === 'upper' ? 1 : 0, 1], vertex * 2)
-				vertex++
-			}
-		}
-		for (let k = 0; k < points.length - 1; k++) {
-			for (let j = 0; j < SIDES; j++) {
-				const a = start + k * SIDES + j
-				const b = start + k * SIDES + ((j + 1) % SIDES)
-				const c = a + SIDES
-				const d = b + SIDES
-				indices.push(a, c, b, b, c, d)
-			}
-		}
-	}
+	const tubes = lashTubes(lashes)
 	const geometry = new BufferGeometry()
-	geometry.setAttribute('position', new BufferAttribute(positions, 3))
-	geometry.setAttribute('normal', new BufferAttribute(normals, 3))
-	geometry.setAttribute('tangent3', new BufferAttribute(tangents, 3))
-	geometry.setAttribute('lash', new BufferAttribute(attributes, 2))
-	geometry.setAttribute('follow', new BufferAttribute(follow, 2))
-	geometry.setIndex(indices)
+	geometry.setAttribute('position', new BufferAttribute(tubes.positions, 3))
+	geometry.setAttribute('normal', new BufferAttribute(tubes.normals, 3))
+	geometry.setAttribute('tangent3', new BufferAttribute(tubes.tangents, 3))
+	geometry.setAttribute('lash', new BufferAttribute(tubes.lash, 2))
+	geometry.setAttribute('follow', new BufferAttribute(tubes.follow, 2))
+	geometry.setIndex(new BufferAttribute(tubes.indices, 1))
 	geometry.computeBoundingSphere()
 	return geometry
 }
@@ -98,7 +52,23 @@ export default class Lashes {
 	rebuild(params, eye) {
 		this.lashes = generateLashes(params, eye)
 		this.mesh.geometry.dispose()
-		this.mesh.geometry = createLashGeometry(this.lashes)
+		const geometry = createLashGeometry(this.lashes)
+		// The blink's frames (src/adnexa/lidBlink.js); the tangents ride in the
+		// morph colors.
+		setBlinkPlaceholders(geometry, ['position', 'normal', 'tangent3'])
+		this.mesh.geometry = geometry
+		this.mesh.updateMorphTargets()
+	}
+
+	// The blink's frames: positions, normals and tangents per frame
+	// (src/adnexa/blinkFrames.js).
+	setBlinkFrames(frames) {
+		const attributes = (name) => frames.map((frame) => new BufferAttribute(frame[name], 3))
+		setBlinkFrames(this.mesh.geometry, {
+			position: attributes('positions'),
+			normal: attributes('normals'),
+			color: attributes('tangents'),
+		})
 	}
 
 	setDebugView(view) {

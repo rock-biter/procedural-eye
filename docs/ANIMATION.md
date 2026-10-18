@@ -1,9 +1,10 @@
 # Animation
 
-The living eye: the pupil answers the light, the eye fixates and moves, the lids follow. [`src/animation/`](../src/animation/) is pure and seeded. `EyeApp.pose()` ([`src/app.js`](../src/app.js)) applies its result every frame:
+The living eye: the pupil answers the light, the eye fixates and moves, the lids follow and blink. [`src/animation/`](../src/animation/) is pure and seeded. `EyeApp.pose()` ([`src/app.js`](../src/app.js)) applies its result every frame:
 - the pupil diameter to the eyeball uniforms;
 - the gaze rotation to the eye rig;
-- the lid angles to `uLidFollow`.
+- the lid angles to `uLidFollow`;
+- the blink's closure to the lid meshes' morph weights and `uLidBlink` (`LidBlink.set()`).
 
 The measurements behind the models are in [`docs/RESEARCH.md`](RESEARCH.md).
 
@@ -12,14 +13,14 @@ The measurements behind the models are in [`docs/RESEARCH.md`](RESEARCH.md).
 | Mode | When | Pose |
 | --- | --- | --- |
 | Living | `animation.enabled` on, live | The animator steps with the frame time, and every frame restarts the accumulation. |
-| Photo | Space, the **Photo** action, or `?photo=` at start | The clock stops and the eye keeps its instant; samples accumulate until `quality.photoSamples`. A frozen start takes one step: the steady state. The dust stops too. |
-| Still | `animation.enabled` off | The eye is posed by its parameters alone whenever the image restarts: the pupil is `iris.pupilDiameter`, the line of sight is `animation.yaw` / `animation.pitch`, and nothing moves. The camera can circle a still subject. |
+| Photo | Space, the **Photo** action, or `?photo=` at start | The clock stops and the eye keeps its instant, but a blink under way ends: the photo shows the lids open. Samples accumulate until `quality.photoSamples`. A frozen start takes one step: the steady state, lids open. The dust stops too. |
+| Still | `animation.enabled` off | The eye is posed by its parameters alone whenever the image restarts: the pupil is `iris.pupilDiameter`, the line of sight is `animation.yaw` / `animation.pitch`, the lids rest at `lids.closure`, and nothing moves. The camera can circle a still subject. |
 
 The reference presets are still eyes, so their tuned pupil and gaze hold in captures.
 
 The dust drifts in every mode but photo: over a still eye's converged image, it is redrawn every frame without rendering the scene ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)).
 
-**Transitions**: a preset or a random eye glides in ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#transitions)). When it changes where the pose comes from (a still eye coming alive or the reverse, another gaze mode, the reflex toggled), `EyeApp` blends the pose from where it was with the transition's progress: pupil, gaze, lids and framing.
+**Transitions**: a preset or a random eye glides in ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#transitions)). When it changes where the pose comes from (a still eye coming alive or the reverse, another gaze mode, the reflex toggled), `EyeApp` blends the pose from where it was with the transition's progress: pupil, gaze, lids (follow and blink) and framing.
 
 ## Pupil
 
@@ -94,3 +95,21 @@ The lids follow the vertical gaze: the upper margin by 0.9 of the pitch and the 
 - **Rotation**: `lid-follow.glsl` rotates lid-attached vertices about the X axis through the globe center, so they slide over the globe like a shutter. A gaze up turns the globe by −pitch about X (its front rises); the lids turn the same way (`lidFollowAngle()` negates `uLidFollow`), so they rise with it.
 - **Weights**: each vertex is weighted by its `follow` attribute ([`docs/ADNEXA.md`](ADNEXA.md#lid-mesh)): the upper share across the canthi, and full follow near the margin fading to none up the skin.
 - **Consumers**: the skin, lashes, tear film and shadow-depth programs share the rotation. Lookups of the fissure map undo it (`lidRestPosition()`).
+
+## Blink
+
+[`src/animation/blink.js`](../src/animation/blink.js): `BlinkModel` gives the blink's closure, 0 with the lids where `lids.closure` rests them, 1 closed. It draws from its own seeded stream, so the looks and the pupil are those of an eye that does not blink.
+
+- **Rate**: spontaneous blinks come `animation.blinkRate` times a minute (15 by default, 15.5 at rest in Argilés 2015; 0 turns blinking off).
+  - The intervals are log-normal (σ 0.7, a coefficient of variation of about 0.8), as measured (Borges 2010): now and then a blink follows another within a second, sometimes the eye stays open for ten.
+  - The timer runs in mean intervals at the current rate, so a new rate applies at once.
+  - A blink can start before the lids are fully open (a burst), from where they are.
+- **Kinematics** (`BLINK`), stretched by `animation.blinkSlowdown` (1 by default, physiological):
+  - closing: 0.10 s, eased in and out (the lid's speed rises and falls);
+  - closed: 30 ms, for a complete blink;
+  - opening: nine tenths of the way in 0.21 s, the last tenth creeping on to 0.5 s (Kwon 2013's late opening). At its peak the closing is about twice as fast.
+- **Depth**: 15% of the blinks stop short, between 0.5 and 0.9 of the way (Argilés 2015 *(the depth estimated)*), and open again at once.
+- **Gaze-evoked blinks**: a gaze shift (a saccade to a new target, not a microsaccade) brings a blink with it, with a chance rising from 0 at 12° to 0.9 past 36° (nearly every shift over 33° in Evinger 1994, *(the ramp estimated)*). It counts as the spontaneous one, which is rescheduled. With the default look range few shifts reach it; following the cursor across the canvas does.
+- **When**: only a living eye blinks. A still eye and a frozen start are open. Entering photo mode ends a blink under way, so a photo shows the lids open; after it the eye goes on open.
+- **Frames**: the lids, lashes and meniscus morph through closed frames that a worker builds after every rebuild ([`docs/ADNEXA.md`](ADNEXA.md#blink-frames)). Until they arrive (a few seconds after start or after a lid change) the lids stay open; the blink's clock runs on.
+- **On demand**: `window.__EYE__.blink()` starts one ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#console-api)).

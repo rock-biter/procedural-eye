@@ -24,7 +24,8 @@
 // The columns are laid out on the open fissure. As the lids close
 // (`lids.closure`), each column's margin slides to the closing margin and the
 // lid stretches over the globe, while the face stays put: the mesh keeps its
-// layout at any closure (a blink can morph between two of them).
+// layout at any closure, so a blink morphs through a few of them
+// (src/adnexa/blinkFrames.js).
 import { smoothstep, smootherstep, vec3 } from '../math'
 import { createFissure } from './fissure'
 import {

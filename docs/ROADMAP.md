@@ -34,8 +34,12 @@
   - The lids pass in front of the globe toward the canthi. Where the margin leaves the globe, the meniscus fades, and a small gap under the margin shows the palpebral conjunctiva behind it.
   - The palpebral conjunctiva is a curtain hanging straight back from the margins, not the lid's back surface curving into the fornix: it closes the conjunctival sac, but its shape behind the canthi is a stand-in. From grazing views (80° to the side, 60° up or down) a few hundredths of a square millimeter of the pockets still show the background.
 - **Face**: a thin-plate spline through anatomical landmarks, kept as a hint (softer than the measured brow, nose and cheek projections) and without eyebrow hairs. The skin is a patch about 65 × 68 mm around the eye, closed behind by the back shell (a flat band along its edge and a darker dome, [`docs/ADNEXA.md`](ADNEXA.md#back-shell)), not by a head: wide or grazing framings show its edge and the shell.
-- **Baked occlusion**: it is baked with the lids at rest; as the lids follow the gaze it stays where it was baked, and an animated blink would need a closed bake to morph with.
-- **Blink**: `lids.closure` closes the lids as a rebuild (a still pose). The mesh keeps its layout at any closure, so an animated blink can morph between an open and a closed mesh in the vertex shader; that, the cornea pushing the closing lid out, and Bell's phenomenon are not implemented.
+- **Baked occlusion**: it is baked with the lids at rest; as the lids follow the gaze it stays where it was baked. The blink's frames bake their own.
+- **Blink** ([`docs/ANIMATION.md`](ANIMATION.md#blink)):
+  - The lid meshes morph through four closed frames; between them the fold over the crease is a blend of two (up to 0.35 mm off the rebuilt lid, in motion only).
+  - The eye does not move with the blink: neither its small turn down and in (1–5° in voluntary and reflex blinks, Collewijn 1985) nor Bell's phenomenon.
+  - The cornea does not push the closing lid out: over its edge the lid's skin is only kept off the globe, which shows as a lighter arc on a closed lid (as with `lids.closure` 1).
+  - The frames take a couple of seconds in a worker after a lid rebuild; until they arrive the eye does not blink.
 - **Skin**:
   - The fine relief is evaluated in the front plane, so it stretches where the skin turns away from it, deep in the canthi.
   - There are no vellus hairs.

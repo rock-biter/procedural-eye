@@ -17,6 +17,7 @@ import { createRandom } from '../random'
 import fragmentShader from '../shaders/tear-fragment.glsl'
 import vertexShader from '../shaders/tear-vertex.glsl'
 import { createFissure } from './fissure'
+import { setBlinkFrames, setBlinkPlaceholders } from './lidBlink'
 import { createMeniscusMesh } from './lidGeometry'
 import { supportAt } from './periocular'
 
@@ -60,9 +61,12 @@ export default class TearFilm {
 		geometry.setAttribute('normal', new BufferAttribute(data.normals, 3))
 		geometry.setAttribute('follow', new BufferAttribute(data.follow, 2))
 		geometry.setIndex(new BufferAttribute(data.indices, 1))
+		// The blink's frames (src/adnexa/lidBlink.js).
+		setBlinkPlaceholders(geometry, ['position', 'normal'])
 		geometry.computeBoundingSphere()
 		this.meniscus.geometry.dispose()
 		this.meniscus.geometry = geometry
+		this.meniscus.updateMorphTargets()
 
 		// Bubbles in the lower meniscus, more toward the canthi.
 		const random = createRandom(`bubbles:${params.lashes.seed}`)
@@ -89,6 +93,16 @@ export default class TearFilm {
 		this.bubbles.count = count
 		this.bubbles.instanceMatrix.needsUpdate = true
 		this.bubbles.computeBoundingSphere()
+	}
+
+	// The meniscus' blink frames: positions and normals per frame
+	// (src/adnexa/blinkFrames.js).
+	setBlinkFrames(frames) {
+		const attributes = (name) => frames.map((frame) => new BufferAttribute(frame[name], 3))
+		setBlinkFrames(this.meniscus.geometry, {
+			position: attributes('positions'),
+			normal: attributes('normals'),
+		})
 	}
 
 	dispose() {

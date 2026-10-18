@@ -4,7 +4,7 @@
 
 Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)):
 
-1. **Key-light shadow pass** ([`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js)): the lids and lashes (layer 1) into a float depth map from emitter 0, 2048² for accumulation samples and 1024² for interactive frames ([`docs/OPTICS.md`](OPTICS.md#key-light-shadow)).
+1. **Key-light shadow pass** ([`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js)): the lids and lashes (layer 1) into a float depth map from emitter 0, 2048² for accumulation samples and 1024² for interactive frames ([`docs/OPTICS.md`](OPTICS.md#key-light-shadow)). One material draws every caster, with the lid follow and the blink ([Blink Morph](#blink-morph)).
 2. **Scene pass** ([`src/render/scenePass.js`](../src/render/scenePass.js), in place of pmndrs' `RenderPass`, into an RGBA16F buffer with depth). The lashes draw first (`renderOrder` −1) and the eyeball last (`renderOrder` 1): the depth test then skips the costly optics wherever the lids and lashes cover the eye. Frames that pass through the accumulation are split ([Split Frames](#split-frames)).
    - **Eyeball**: a surface of revolution in eye space with two index groups, coarsely tessellated (96 segments around, 32 rings on the cap, 24 on the sclera): the programs refine the exact surface, and small triangles would make the GPU shade the 2×2 quads along their edges, which cost the optics program dearly.
      - Group 0, the cornea and limbus cap, uses `eyeball-cap-fragment.glsl`: tear-film reflection, two-surface refraction, the iris trace and shading, the limbus and the limbal ring.
@@ -13,6 +13,7 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    - **Back shell**: the skin program compiled with `SKIN_SHELL`, closing the skin patch behind ([`docs/ADNEXA.md`](ADNEXA.md#back-shell)). It draws after the lids (a later material), so from the front the depth test skips it; it is not on the shadow layer.
    - **Lashes**: tubes with the lash program.
    - **Tear meniscus and bubbles**: the water program; the bubbles are an `InstancedMesh`.
+   - The lids, the lashes and the meniscus blink ([Blink Morph](#blink-morph)).
 3. **Accumulation** ([`src/render/accumulationPass.js`](../src/render/accumulationPass.js)):
    - Each frame is blended into an RGBA32F history at weight 1/(n+1), read with `texelFetch`. The first frame (weight 1) replaces the history without reading it.
    - A frame with NaN or Inf keeps the history.
@@ -98,12 +99,13 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uEmitters`, `uEmitterCount`, `uRoom`, `uSkyZenith`, `uSkyHorizon`, `uSkyGround`, `uEnvUp` | The light rig: `LightRig.eyeUniforms` for the eyeball, `LightRig.worldUniforms` for the rest. |
 | `uKeyShadowMap`, `uKeyShadowMatrix`, `uKeyShadowParams` | Key-light shadow: map (the interactive or the accumulation one), world → shadow clip, (filter radius, bias, enabled). |
 | `uLidFollow` | Rotation of the upper and lower lid with the gaze (radians). |
+| `uLidBlink` | The blink's closure (0 open, 1 closed): the eye's fissure lookups blend toward the closed fissure by it. The lid meshes morph by their own weights ([Blink Morph](#blink-morph)). |
 | **Eyeball** | |
 | `uCameraEye`, `uPixelAngle` | Camera position in eye space (per sample); radians per pixel (ray cones). |
 | `uLimbus`, `uLimbusOverlap` | Limbus opacity range, ring width and strength, vertical overlap. |
 | `uScleraColor`, `uSclera`, `uScleraVessels`, `uScleraPsi` | Sclera base color; (redness, yellowing, irregularity); vessel map and its ψ range. |
 | `uGlobeCut` | The world z (mm) behind which the sclera program discards the globe (`GLOBE_CUT` × the sclera radius). |
-| `uFissureMap`, `uFissureExtent` | Signed distance to the fissure and its extent. |
+| `uFissureMap`, `uFissureExtent` | Signed distance to the fissure (r where the lids rest, g closed) and its extent. |
 | `uLidReflection`, `uLidRadiance`, `uLashRadiance` | Lid and lash reflections ([`docs/OPTICS.md`](OPTICS.md#reflections-of-the-lids-and-lashes)). |
 | `uIrisAtlas`, `uIrisPigment`, `uIrisColorLut` | Structure atlas, pigment atlas, color lookup ([`docs/IRIS.md`](IRIS.md)). |
 | `uIrisRest`, `uIrisThicknessResponse`, `uIrisSeed` | Rest space and the seed of the analytic parts. |
@@ -139,6 +141,15 @@ Defines:
 - `RELIEF_UNDERLAY`, `FRECKLES` (relief bake): the full-screen pass under the lid ring (the shell's relief), the freckles;
 - `DEBUG_VIEW`, from `params.debug.view` and numbered in `src/debug/debugViews.js` and `debug-views.glsl`.
 
+## Blink Morph
+
+The lids, the lashes and the tear meniscus blink by three.js morph targets ([`src/adnexa/lidBlink.js`](../src/adnexa/lidBlink.js)); the frames themselves are in [`docs/ADNEXA.md`](ADNEXA.md#blink-frames).
+
+- **Targets**: `BLINK_FRAMES` (4) absolute frames per geometry (`morphTargetsRelative` false, so the open mesh weighs 1 − the frames' weights). Positions and normals, and in the colors' slot the lids' occlusion (x) and the lashes' tangents. three packs them into a float `DataArrayTexture` per geometry and sets `morphTargetsTexture`, `morphTargetsTextureSize`, `morphTargetInfluences` and `morphTargetBaseInfluence` per object, with the defines `USE_MORPHTARGETS`, `MORPHTARGETS_COUNT` and `MORPHTARGETS_TEXTURE_STRIDE`: about 19 MB for the lids, 4 MB for the lashes.
+- **Blend**: `lidMorph()` (`lid-morph.glsl`, a `ZERO` loop) adds the frames whose weight is not 0, before the lid follow and in its rest frame. The weights are a Catmull–Rom spline's (`blinkWeights()`): four at most, some negative; all 0 when the lids are open, so an open eye fetches nothing.
+- **Consumers**: `skin-vertex.glsl` (the skin patterns keep the open position, so they stay on the skin as it stretches), `lash-vertex.glsl`, `tear-vertex.glsl` and `shadow-depth-vertex.glsl`. The shadow pass draws every caster with one material: the renderer sets the morph uniforms per object, so it morphs them too. The back shell and the bubbles have no targets.
+- **Placeholders**: each new geometry carries its own attributes as frames, so its programs are compiled with the morph targets from the start (`compileAsync()`) and keep their variant when the real frames arrive. Swapping them in disposes the geometry (three caches a geometry's morph texture), which uploads it anew on the next frame. The relief bake's lid ring has its own attributes for that reason.
+
 ## Shader Files
 
 | File | Role |
@@ -152,6 +163,7 @@ Defines:
 | `iris-bake-fragment.glsl` | Structure and pigment atlas bake. |
 | `sclera.glsl` | Sclera albedo with vessels, conjunctival micro-relief, fissure distance, lid occlusion and lid reflections. |
 | `lid-follow.glsl` | Lid rotation with the gaze and its inverse for rest-space lookups. |
+| `lid-morph.glsl` | The blink: `lidMorph()` blends a vertex's position, normal or color with its morph targets. |
 | `key-shadow.glsl` | Shadow map lookup: hard, Poisson PCF, or estimated penumbra with a slope-scaled bias for the skin. |
 | `lit-surface.glsl` | Shared lighting of the world-space surfaces (wrap diffuse, GGX with representative points, wet mirror). |
 | `skin-relief.glsl`, `noise3.glsl` | Skin micro-relief with analytic gradients (furrows, fine network, pores, wrinkles, crow's feet), prefiltered by the pixel footprint, gathered by `skinMicroRelief()`, and its encoding for the bake; the skin's pigment patterns (mottling, freckles, veins); 3D gradient noise with derivatives. |

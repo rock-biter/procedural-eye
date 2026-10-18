@@ -75,6 +75,8 @@ export const BASE_PARAM_SCHEMA = {
 		saccadeSlowdown: num(5, 1, 12, 0.1, '×', 'uniform', 'saccade slowdown'),
 		microMovements: num(0.3, 0, 1, 0.01, '', 'uniform', 'micro-movements'),
 		lidFollow: num(1, 0, 1.5, 0.01, '', 'uniform', 'lid follow'),
+		blinkRate: num(15, 0, 40, 0.5, '/min', 'uniform', 'blink rate'),
+		blinkSlowdown: num(1, 1, 4, 0.1, '×', 'uniform', 'blink slowdown'),
 	},
 	globe: {
 		scleraRadius: num(12, 11.2, 12.8, 0.05, 'mm', 'rebuild'),
@@ -220,7 +222,7 @@ export const BASE_PARAM_SCHEMA = {
 		lowerMedialAngle: num(22, 10, 50, 0.5, 'deg', 'rebuild', 'lower medial angle'),
 		upperAngle: num(30, 10, 60, 0.5, 'deg', 'rebuild', 'upper lateral angle'),
 		lowerAngle: num(22, 10, 60, 0.5, 'deg', 'rebuild', 'lower lateral angle'),
-		closure: num(0, 0, 1, 0.01, '', 'rebuild', 'closure (blink)'),
+		closure: num(0, 0, 1, 0.01, '', 'rebuild', 'closure at rest'),
 		// Lids (src/adnexa/lidGeometry.js).
 		marginThickness: num(2, 1.2, 3, 0.05, 'mm', 'rebuild', 'margin thickness'),
 		marginRadius: num(0.7, 0.2, 1.2, 0.01, 'mm', 'rebuild', 'margin edge radius'),

@@ -48,8 +48,10 @@ export class GazeModel {
 		// micro-movements (0: none, 1: physiological).
 		this.slowdown = 1
 		this.micro = 1
-		// Saccades to a new target so far (microsaccades excluded).
+		// Saccades to a new target so far (microsaccades excluded), and the
+		// amplitude of the last one (°).
 		this.shifts = 0
+		this.shiftAmplitude = 0
 	}
 
 	setTarget(yaw, pitch) {
@@ -77,7 +79,10 @@ export class GazeModel {
 			elapsed: 0,
 			duration: saccadeDuration(amplitude) * this.slowdown,
 		}
-		if (!micro) this.shifts++
+		if (!micro) {
+			this.shifts++
+			this.shiftAmplitude = amplitude
+		}
 	}
 
 	gaussian() {

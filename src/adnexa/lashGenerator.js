@@ -10,6 +10,8 @@ import { createFissure } from './fissure'
 import { LID_PROFILE, lidPoint } from './lidGeometry'
 
 export const LASH_SEGMENTS = 14
+// Sides of each lash's tube.
+const SIDES = 6
 
 // Local frame of the lid surface at (t, s): the point, the outward skin
 // normal, the direction across the lid away from the fissure, and along it.
@@ -142,4 +144,68 @@ export function generateLashes(params, eye) {
 		}
 	}
 	return lashes.map((lash, i) => ({ ...lash, points: centerlines[i] }))
+}
+
+// Tube geometry along every lash: parallel-transported rings, radius tapering
+// over the last third. Attributes: positions, normals, tangents (along the
+// lash), `lash` = (place along it, 0 root to 1 tip; a random per lash) and
+// `follow` = (upper lid, 1), and the triangles. `references`: the vector each
+// lash's first ring is oriented by (returned); pass those of the open lids
+// for a closing one, so the rings of the blink's frames correspond.
+export function lashTubes(lashes, references = null) {
+	const ringCount = lashes.reduce((sum, lash) => sum + lash.points.length, 0)
+	const positions = new Float32Array(ringCount * SIDES * 3)
+	const normals = new Float32Array(ringCount * SIDES * 3)
+	const tangents = new Float32Array(ringCount * SIDES * 3)
+	const attributes = new Float32Array(ringCount * SIDES * 2)
+	const follow = new Float32Array(ringCount * SIDES * 2)
+	const indices = []
+	const used = []
+	let vertex = 0
+	for (const [index, lash] of lashes.entries()) {
+		const points = lash.points
+		const random = ((index * 2654435761) % 1000) / 1000
+		const first = vec3.normalize(vec3.sub(points[1], points[0]))
+		let reference = references?.[index] ?? (Math.abs(first[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])
+		used.push(reference)
+		const start = vertex
+		for (let k = 0; k < points.length; k++) {
+			const previous = points[Math.max(k - 1, 0)]
+			const next = points[Math.min(k + 1, points.length - 1)]
+			const tangent = vec3.normalize(vec3.sub(next, previous))
+			const side = vec3.normalize(vec3.cross(tangent, reference))
+			const up = vec3.cross(side, tangent)
+			reference = up
+			const u = k / (points.length - 1)
+			const radius = lash.radius * (1 - 0.85 * Math.max(0, (u - 0.6) / 0.4) ** 1.5)
+			for (let j = 0; j < SIDES; j++) {
+				const angle = (j / SIDES) * Math.PI * 2
+				const normal = vec3.add(vec3.scale(side, Math.cos(angle)), vec3.scale(up, Math.sin(angle)))
+				positions.set(vec3.madd(points[k], normal, radius), vertex * 3)
+				normals.set(normal, vertex * 3)
+				tangents.set(tangent, vertex * 3)
+				attributes.set([u, random], vertex * 2)
+				follow.set([lash.side === 'upper' ? 1 : 0, 1], vertex * 2)
+				vertex++
+			}
+		}
+		for (let k = 0; k < points.length - 1; k++) {
+			for (let j = 0; j < SIDES; j++) {
+				const a = start + k * SIDES + j
+				const b = start + k * SIDES + ((j + 1) % SIDES)
+				const c = a + SIDES
+				const d = b + SIDES
+				indices.push(a, c, b, b, c, d)
+			}
+		}
+	}
+	return {
+		positions,
+		normals,
+		tangents,
+		lash: attributes,
+		follow,
+		indices: new Uint32Array(indices),
+		references: used,
+	}
 }

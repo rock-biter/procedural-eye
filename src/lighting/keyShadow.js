@@ -52,16 +52,19 @@ export default class KeyShadow {
 		this.matrix = new Matrix4()
 		// The renderer's clear state, restored after the shadow pass.
 		this.clearColor = new Color()
-		// Shared with every material near the lids: the shadow map, and the
-		// lids' gaze follow (lid-follow.glsl), which the casters need too.
+		// Shared with every material near the lids: the shadow map, the lids'
+		// gaze follow (lid-follow.glsl), which the casters need too, and the
+		// blink's closure (the eye's shaders: sclera.glsl; the casters morph by
+		// their own weights, lid-morph.glsl).
 		this.uniforms = {
 			uKeyShadowMap: new Uniform(this.target.texture),
 			uKeyShadowMatrix: new Uniform(this.matrix),
 			uKeyShadowParams: new Uniform(new Vector4(0, 0, 0, 0)),
 			uLidFollow: new Uniform(new Vector2()),
+			uLidBlink: new Uniform(0),
 		}
 		this.material = new ShaderMaterial({
-			uniforms: { uLidFollow: this.uniforms.uLidFollow },
+			uniforms: { uZero: new Uniform(0), uLidFollow: this.uniforms.uLidFollow },
 			vertexShader,
 			fragmentShader,
 			side: DoubleSide,

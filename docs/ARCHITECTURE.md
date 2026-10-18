@@ -37,6 +37,9 @@
 | [`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js) * | Ambient occlusion baked into the lid and conjunctiva vertices (horizon-based, over a front height field; by depth into the sac). |
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
+| [`src/adnexa/blinkFrames.js`](../src/adnexa/blinkFrames.js) * | The blink's closing frames: the lid ring (with its occlusion), the meniscus and the lashes closed by steps, and the closed fissure map; the spline weights between them. |
+| [`src/adnexa/blinkFrames.worker.js`](../src/adnexa/blinkFrames.worker.js) | Builds the blink's frames off the main thread (the only worker). |
+| [`src/adnexa/lidBlink.js`](../src/adnexa/lidBlink.js) | The blink on the GPU: asks the worker for the frames, puts them on the lid, lash and meniscus meshes as morph targets, sets the weights and `uLidBlink`. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, back shell, lash, meniscus and bubble meshes with their materials. |
 | [`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js) | The skin's pigment patterns baked on the GPU over the lid mesh at rest. |
 | [`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js) | The skin's relief and freckles baked on the GPU over the same box, read outside `#debug`. |
@@ -45,7 +48,8 @@
 | **Animation** ([`docs/ANIMATION.md`](ANIMATION.md)) | |
 | [`src/animation/pupilDynamics.js`](../src/animation/pupilDynamics.js) * | Watson–Yellott steady state, Pamplona dynamics, hippus. |
 | [`src/animation/gaze.js`](../src/animation/gaze.js) * | Saccades, microsaccades, drift, Listing's law. |
-| [`src/animation/animator.js`](../src/animation/animator.js) * | Pupil, gaze and lid follow per step; the still pose. |
+| [`src/animation/blink.js`](../src/animation/blink.js) * | Spontaneous and gaze-evoked blinks: when, how deep, the closure over time. |
+| [`src/animation/animator.js`](../src/animation/animator.js) * | Pupil, gaze, lid follow and blink per step; the still pose. |
 | **Lighting and camera** ([`docs/OPTICS.md`](OPTICS.md)) | |
 | [`src/lighting/envRig.js`](../src/lighting/envRig.js) * | Builds and packs the analytic emitters; background terms; scene luminance. |
 | [`src/lighting/colorTemperature.js`](../src/lighting/colorTemperature.js) * | Black-body and sRGB color conversions. |
@@ -82,8 +86,9 @@
      - the eye geometry (`createEyeGeometry()`);
      - the entrance-pupil depth the camera aims at;
      - the eyeball mesh;
-     - the lid mesh with the back shell, its skin patterns (baked on the GPU) and the fissure map (baked in JS into a half-float texture), only when the lids, `shell.clearance`, `shell.band` or the eye geometry changed: together they take about 0.8 s;
-     - the lashes and the tear film.
+     - the lid mesh with the back shell, its skin patterns (baked on the GPU) and the fissure map (baked in JS into the first channel of a half-float texture), only when the lids, `shell.clearance`, `shell.band` or the eye geometry changed: together they take about 0.8 s;
+     - the lashes and the tear film;
+     - the blink's frames no longer fit: `LidBlink.invalidate()` keeps the lids open until a living eye asks for new ones (step 4).
 
      A rebuild always bakes too.
    - `bake`:
@@ -96,7 +101,8 @@
 3. **Controls**: `CameraControls.update()` steps a coasting orbit (which restarts the accumulation as a drag does) and the mouse parallax, which restarts it while it moves ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
 4. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
    - A living eye steps the animator and restarts the accumulation.
-   - In photo mode it keeps its instant.
+   - A living eye that blinks (`animation.blinkRate` above 0) asks for the blink's frames when they are stale: `LidBlink.prepare()` posts the params to the worker, which builds them in about 2.3 s (in Node on an M1; a quarter of a second when only the lashes or the meniscus changed) while the frame loop runs on. The pose's blink sets the meshes' morph weights and `uLidBlink` (`LidBlink.set()`), 0 until the frames arrive ([`docs/ANIMATION.md`](ANIMATION.md#blink)).
+   - In photo mode it keeps its instant, with the lids open.
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.
 5. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image. Out of photo mode the dust still drifts over it (`dustDrifts`): `renderDisplay()` shows the mean again with this instant's dust, at most 30 times a second, without the scene pass or a sample (the composite, the dust and the effects). The dust's clock (`dustTime`) runs with the frame time unless the eye is frozen.
@@ -176,7 +182,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 
 - **World**: millimeters, with the globe center at the origin in primary gaze; +Y is up and a camera at azimuth 0 looks down −Z.
   - The lids, lashes and tear film live in world space; they do not turn with the gaze.
-  - Lid-attached vertices rotate about the X axis through the globe center to follow the vertical gaze (`lid-follow.glsl`).
+  - Lid-attached vertices rotate about the X axis through the globe center to follow the vertical gaze (`lid-follow.glsl`). Before that, in the same rest frame, the blink morphs them (`lid-morph.glsl`).
 - **Eye space** ([`docs/OPTICS.md`](OPTICS.md#eye-space)) moves with the gaze.
   - `EyeRig.pivot` sits at the globe's center, the world origin, which the eye turns about ([`docs/OPTICS.md`](OPTICS.md#eye-space)); `EyeRig.eyeSpace` carries the eyeball.
   - The eyeball shaders work entirely in eye space. The light rig is packed into both spaces every frame.
@@ -184,4 +190,4 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 - **Polar maps**:
   - the iris atlases, with u = θ / 2π and v = rest ρ;
   - the vessel map, with u = φ / 2π and v over ψ ∈ `SCLERA_PSI` (angle from the optical axis);
-  - the fissure map, over the front plane at the lids' rest position.
+  - the fissure map, over the front plane at the lids' rest position: where they rest and closed.

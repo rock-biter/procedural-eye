@@ -28,6 +28,7 @@ import {
 	createPalpebralMesh,
 	LID_PROFILE,
 } from './lidGeometry'
+import { setBlinkFrames, setBlinkPlaceholders } from './lidBlink'
 import { bakeLidOcclusion } from './lidOcclusion'
 import SkinPattern from './skinPattern'
 import SkinRelief from './skinRelief'
@@ -149,20 +150,35 @@ export default class Lids {
 		})
 		geometry.setIndex(new BufferAttribute(join(indices), 1))
 		// The lid ring alone (the first part), for the relief bake: the same
-		// buffers, drawn up to its last triangle.
+		// arrays, drawn up to its last triangle. Its own attributes: the blink's
+		// frames dispose of the merged geometry's buffers (setBlinkFrames()).
 		this.ring.dispose()
 		this.ring = new BufferGeometry()
 		for (const name of ['position', 'lid', 'relief']) {
-			this.ring.setAttribute(name, geometry.getAttribute(name))
+			const attribute = geometry.getAttribute(name)
+			this.ring.setAttribute(name, new BufferAttribute(attribute.array, attribute.itemSize))
 		}
-		this.ring.setIndex(geometry.getIndex())
+		this.ring.setIndex(new BufferAttribute(geometry.getIndex().array, 1))
 		this.ring.setDrawRange(0, data.indices.length)
 		this.version++
 		geometry.computeVertexNormals()
+		// The blink's frames: placeholders until src/adnexa/lidBlink.js brings
+		// them; the occlusion rides in the morph colors.
+		setBlinkPlaceholders(geometry, ['position', 'normal', 'ao'])
 		geometry.computeBoundingSphere()
 		geometry.computeBoundingBox()
 		this.mesh.geometry.dispose()
 		this.mesh.geometry = geometry
+		this.mesh.updateMorphTargets()
+		// Where the parts lie in the merged mesh: the ring's columns and rows,
+		// and the palpebral conjunctiva's first vertex and rows.
+		const around = data.rim.length / 3
+		this.layout = {
+			around,
+			across: data.positions.length / 3 / around,
+			curtain: (data.positions.length + fornix.positions.length) / 3,
+			rows: curtain.positions.length / 3 / around,
+		}
 		// The patterns cover the mesh at rest, with a texel or so to spare.
 		const { min, max } = geometry.boundingBox
 		this.pattern.bake(
@@ -175,6 +191,41 @@ export default class Lids {
 		this.uniforms.uCanthi.value.set(medial[0], medial[1], lateral[0], lateral[1])
 		this.uniforms.uMarginLength.value.fromArray(lengths)
 		this.rebuildBack(createBackShell(data, back, params.shell))
+	}
+
+	// The blink's frames of the lid ring (positions, normals and occlusion per
+	// frame, src/adnexa/blinkFrames.js) as the merged mesh's morph targets. The
+	// conjunctiva stays; the palpebral conjunctiva hangs from the posterior
+	// margin, so each of its columns moves with its margin's vertex (the ring's
+	// first row), and keeps its occlusion.
+	setBlinkFrames(frames) {
+		const geometry = this.mesh.geometry
+		const base = geometry.getAttribute('position').array
+		const baseNormals = geometry.getAttribute('normal').array
+		const baseAo = geometry.getAttribute('ao').array
+		const { around, across, curtain, rows } = this.layout
+		const positions = []
+		const normals = []
+		const occlusion = []
+		for (const frame of frames) {
+			const p = base.slice()
+			p.set(frame.positions)
+			for (let i = 0; i < around; i++) {
+				const margin = i * across * 3
+				for (let j = 0; j < rows; j++) {
+					const v = (curtain + i * rows + j) * 3
+					for (let c = 0; c < 3; c++) p[v + c] += frame.positions[margin + c] - base[margin + c]
+				}
+			}
+			const n = baseNormals.slice()
+			n.set(frame.normals)
+			const ao = baseAo.slice()
+			ao.set(frame.ao)
+			positions.push(new BufferAttribute(p, 3))
+			normals.push(new BufferAttribute(n, 3))
+			occlusion.push(new BufferAttribute(ao, 1))
+		}
+		setBlinkFrames(geometry, { position: positions, normal: normals, color: occlusion })
 	}
 
 	// The back shell's mesh from its data (src/adnexa/backShell.js).

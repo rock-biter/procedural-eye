@@ -7,7 +7,7 @@
 - **Optics**: the anterior cornea is a conic joined to the sclera sphere; rays refract through both corneal surfaces into the anterior chamber; mirror reflections intersect the emitters of an analytic light rig exactly.
 - **Iris**: a signed-distance field raymarched after the corneal refraction. The stroma is carved by crypts and bridged by radial vessels and collagen arcs, and colored by a spectral Kubelka–Munk model of its layers ([`docs/IRIS.md`](docs/IRIS.md)).
 - **Air**: dust fibers and flakes at their real size, blurred by the thin lens, and a light haze that grows with the distance give the space around the eye its depth.
-- **Animation**: the eye lives (pupil light reflex with hippus, saccades, microsaccades, drift, lids following the gaze) until photo mode freezes it.
+- **Animation**: the eye lives (pupil light reflex with hippus, saccades, microsaccades, drift, lids following the gaze, blinks) until photo mode freezes it.
 - **Photo mode**: a physical thin-lens camera and progressive accumulation give true macro depth of field.
 
 [`README.md`](README.md) is the short human-facing introduction. This file is the entry point for coding agents and routes detailed work to the owning guide.
@@ -22,7 +22,7 @@
 | Materials, uniforms, GLSL, the render pipeline, accumulation, depth of field, the dust and the haze, or post-processing | [`docs/RENDERING.md`](docs/RENDERING.md) |
 | The iris model (structure, raymarching, shading, color, dilation) | [`docs/IRIS.md`](docs/IRIS.md) |
 | Eyelids, skin, lashes, tear film, or the scleral vessels | [`docs/ADNEXA.md`](docs/ADNEXA.md) |
-| Pupil dynamics, eye movements, lid follow, or photo mode | [`docs/ANIMATION.md`](docs/ANIMATION.md) |
+| Pupil dynamics, eye movements, lid follow, blinks, or photo mode | [`docs/ANIMATION.md`](docs/ANIMATION.md) |
 | Anatomical and optical data, parameter ranges, and references | [`docs/RESEARCH.md`](docs/RESEARCH.md) |
 | Checks, the capture script, visual verification, or performance measurement | [`docs/QUALITY.md`](docs/QUALITY.md) |
 | Phases, known gaps, and future work | [`docs/ROADMAP.md`](docs/ROADMAP.md) |

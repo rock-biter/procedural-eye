@@ -1,6 +1,6 @@
 # Adnexa and Sclera
 
-The eyelids, their skin and lashes, the visible tear film, the back shell that closes the skin patch behind, and the scleral vessels. They live in world space, except the vessels, which are drawn on the eyeball in eye space. They do not turn with the gaze, but the lids follow its vertical component ([`docs/ANIMATION.md`](ANIMATION.md#lid-follow)). Every generator is pure and seeded; the data behind the defaults is in [`docs/RESEARCH.md`](RESEARCH.md).
+The eyelids, their skin and lashes, the visible tear film, the back shell that closes the skin patch behind, and the scleral vessels. They live in world space, except the vessels, which are drawn on the eyeball in eye space. They do not turn with the gaze, but the lids follow its vertical component ([`docs/ANIMATION.md`](ANIMATION.md#lid-follow)) and blink ([`docs/ANIMATION.md`](ANIMATION.md#blink), [Blink Frames](#blink-frames)). Every generator is pure and seeded; the data behind the defaults is in [`docs/RESEARCH.md`](RESEARCH.md).
 
 ## Fissure
 
@@ -69,7 +69,7 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 - **Closure**:
   - As the lids close, each column's margin slides to the closing margin. The lid stretches over the globe up to 12 mm from the margin, and the fold above the crease unfolds by 4 mm.
   - The face is built from the open lids, so it stays put.
-  - The mesh keeps its layout at any closure, so a blink can morph between two meshes ([`docs/ROADMAP.md`](ROADMAP.md)).
+  - The mesh keeps its layout at any closure, so the blink morphs through closed copies of it ([Blink Frames](#blink-frames)).
 
 Each vertex carries:
 - `lid` = (t, s, millimeters from the margin, upper share);
@@ -89,7 +89,19 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 - **Horizon**: each vertex looks for the horizon over that field in 8 directions, out to 3 mm, against its tangent plane; nearer occluders count more (horizon-based ambient occlusion, Bavoil 2008).
 - **Where**: the lid band (up to 10 mm from the margin), the conjunctiva and the palpebral conjunctiva; the face beyond it stays open. It darkens the canthi's pockets most, then the posterior margins against the globe and the crease.
 - **Into the sac**: the field sees the palpebral conjunctiva only edge-on, so its vertices darken with their depth below the margin instead, by e^(−depth / 0.8 mm) (`OCCLUSION.sac`).
-- **Rest**: it is baked with the lids at rest and does not follow the gaze. The skin program scales it by `skin.occlusion`.
+- **Rest**: it is baked with the lids at rest and does not follow the gaze. The blink's frames bake their own ([Blink Frames](#blink-frames)). The skin program scales it by `skin.occlusion`.
+
+### Blink Frames
+
+`createBlinkFrames()` ([`src/adnexa/blinkFrames.js`](../src/adnexa/blinkFrames.js)) closes what blinks by `BLINK_FRAMES` (4) even steps, from where `lids.closure` rests the lids to closed (`blinkClosures()`). The lid meshes morph through them ([`docs/RENDERING.md`](RENDERING.md#blink-morph)), with the weights of the blink's closure ([`docs/ANIMATION.md`](ANIMATION.md#blink)).
+
+- **Lid ring**: the lid mesh rebuilt at each closure, with its normals (area-weighted, as three.js computes them) and its occlusion, baked as the rest's over the lid band against the conjunctiva. The closed frame is the lid of `lids.closure` 1.
+- **Around it**: the conjunctiva stays; each column of the palpebral conjunctiva moves with its margin's vertex (the ring's first row), so the sac stays closed.
+- **Meniscus and lashes**: rebuilt on the closing margins. Each lash's rings keep the orientation of the open lash's (`lashTubes()`'s `references`), so the frames' vertices correspond and a blended tube keeps its width.
+- **Fissure map**: the fissure closed, the map's second channel ([Fissure Map](#fissure-map)).
+- **What stays**: the other attributes (`lid`, `relief`, `follow`) and the skin patterns are the open mesh's: the patterns are evaluated at the rest position, so they stretch with the skin.
+- **Spline**: a Catmull–Rom spline through the open mesh and the frames keeps the margin within 0.08 mm of the lid rebuilt at that closure, where a straight blend from open to closed would stray up to 1.5 mm, into the cornea. The rest of the lid stays within 0.35 mm: the fold over the crease unfolds as the lid closes, so its groove sweeps across the rows, and between two frames it is their blend.
+- **Cost**: about 2.3 s (in Node on an M1), mostly the four lid rings and their occlusion; a quarter of a second for the meniscus and the lashes alone. A worker builds them ([`src/adnexa/blinkFrames.worker.js`](../src/adnexa/blinkFrames.worker.js), [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)).
 
 ### Conjunctiva
 
@@ -110,7 +122,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 
 ### Skin Shading
 
-`skin-fragment.glsl` with `lit-surface.glsl` and `skin-relief.glsl`. Every pattern is evaluated at the rest position in the front plane, so it stays on the skin when the lids follow the gaze. Nothing is periodic: patterns are hashed per cell and seeded by `lids.seed`.
+`skin-fragment.glsl` with `lit-surface.glsl` and `skin-relief.glsl`. Every pattern is evaluated at the rest position in the front plane (the open mesh's), so it stays on the skin when the lids follow the gaze or blink. Nothing is periodic: patterns are hashed per cell and seeded by `lids.seed`.
 
 - **Micro-relief** (heights in mm with analytic gradients):
   - the primary furrows: three families of straight grooves 60° apart, broken into segments, that cross into rhomboid and triangular plateaus, the family along the skin tension lines the deepest. The tension lines run along the margin on the lids and radially out of the lateral canthus;
@@ -169,7 +181,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
   - It then curls further that way (`upperCurl` / `lowerCurl`), with `randomness` in lift, sideways deviation and curl.
 - **Clumps**: runs of 2–5 neighbors whose tips draw together (`clumping`).
 
-[`src/adnexa/lashes.js`](../src/adnexa/lashes.js) sweeps tapered tubes along the 14-segment centerlines. The lash material (`lash-fragment.glsl`) uses Kajiya–Kay diffuse and two shifted specular lobes along the hair: a white one off the cuticle (`lashes.shine`) and a dimmer, colored one through the fiber. Tips are lighter. Lashes and lids cast the key-light shadow (layer 1).
+`lashTubes()` sweeps tapered tubes along the 14-segment centerlines, and [`src/adnexa/lashes.js`](../src/adnexa/lashes.js) makes them a geometry. The lash material (`lash-fragment.glsl`) uses Kajiya–Kay diffuse and two shifted specular lobes along the hair: a white one off the cuticle (`lashes.shine`) and a dimmer, colored one through the fiber. Tips are lighter. Lashes and lids cast the key-light shadow (layer 1).
 
 ## Tear Film
 
@@ -177,6 +189,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 
 - **Meniscus** (`createMeniscusMesh()`): a concave water fillet in the corner between the intermarginal strip and the support, along both margins.
   - Its radius is `lids.meniscusLower` (0.36 mm) and `lids.meniscusUpper`. It tapers at the canthi and where the margin leaves the globe (`supportLift()`): the water needs the globe to hold it.
+- **Blink**: the meniscus closes with the margins ([Blink Frames](#blink-frames)).
 - **Bubbles**: `lids.bubbles` tiny spheres caught in the lower meniscus (an instanced mesh, up to 60).
 - **Material** (`tear-fragment.glsl`): water. A smooth mirror of the rig with water's Fresnel, over a faint transmitted tint of what lies behind. It is drawn opaque, to keep the alpha contract ([`docs/RENDERING.md`](RENDERING.md#alpha-contract)).
 
@@ -184,11 +197,11 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 
 [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) bakes the signed distance to the fissure outline, in the front plane at the lids' rest position.
 - **Map**: 256², covering ±20 × ±16 mm, positive inside the opening.
-- **Upload**: `EyeApp` uploads it as a half-float texture on every rebuild.
-- **Lookup**: shaders look it up through `lidRestPosition()`, which undoes the lid follow rotation.
+- **Channels**: a half-float RG texture. `EyeApp` writes r, the lids where they rest, on every lid rebuild; g, the fissure closed, comes with the blink's frames ([Blink Frames](#blink-frames)).
+- **Lookup**: shaders look it up through `lidRestPosition()`, which undoes the lid follow rotation, and blend r toward g by the blink's closure (`uLidBlink`, `fissureDistances()` in `sclera.glsl`). Only the upper margin moves, linearly, so the blend is the distance to the closing margin.
 - **Uses**:
   - lid occlusion of the globe and of the iris's ambient light;
-  - redder sclera near the lids;
+  - redder sclera near the lids (at rest: the tissue does not change with a blink);
   - the lid and lash reflections in the cornea ([`docs/OPTICS.md`](OPTICS.md#reflections-of-the-lids-and-lashes)).
 
 ## Scleral Vessels

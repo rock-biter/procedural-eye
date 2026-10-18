@@ -28,7 +28,7 @@ Do not use stale context: read the current version of every documentation file b
 | Renderer, materials, uniforms, GLSL, accumulation, depth of field, debug views, or post-processing | [`docs/RENDERING.md`](../../../docs/RENDERING.md) |
 | The iris model (structure, tracing, shading, color, dilation) | [`docs/IRIS.md`](../../../docs/IRIS.md) |
 | Lids, skin, lashes, tear film, fissure map, or scleral vessels | [`docs/ADNEXA.md`](../../../docs/ADNEXA.md) |
-| Pupil dynamics, eye movements, lid follow, or photo mode | [`docs/ANIMATION.md`](../../../docs/ANIMATION.md) |
+| Pupil dynamics, eye movements, lid follow, blinks, or photo mode | [`docs/ANIMATION.md`](../../../docs/ANIMATION.md) |
 | Measured data, parameter ranges, or references | [`docs/RESEARCH.md`](../../../docs/RESEARCH.md) |
 | Tests, build checks, captures, performance measurements, or CI | [`docs/QUALITY.md`](../../../docs/QUALITY.md) |
 | Phases, technical debt, or future features | [`docs/ROADMAP.md`](../../../docs/ROADMAP.md) |

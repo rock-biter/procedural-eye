@@ -1,12 +1,14 @@
-// The living eye (pure): pupil light reflex with hippus and eye movements,
-// stepped by the frame loop. step() returns the pupil diameter, the optical
-// axis orientation (yaw, pitch in degrees; the visual axis, which aims at the
-// target, lies `kappa` degrees nasal of it), the lids' follow angles and the
-// line of sight the camera frames (`framing`: the settled gaze, without the
+// The living eye (pure): pupil light reflex with hippus, eye movements and
+// blinks, stepped by the frame loop. step() returns the pupil diameter, the
+// optical axis orientation (yaw, pitch in degrees; the visual axis, which
+// aims at the target, lies `kappa` degrees nasal of it), the lids' follow
+// angles, the blink's closure (src/animation/blink.js) and the line of sight
+// the camera frames (`framing`: the settled gaze, without the
 // micro-movements; the center of the looks while the eye looks around,
 // straight ahead while it follows the cursor, so it moves within a still
 // frame).
 import { createRandom, gaussian } from '../random'
+import { BlinkModel } from './blink'
 import { GazeModel } from './gaze'
 import { PupilDynamics, watsonYellottDiameter } from './pupilDynamics'
 
@@ -20,6 +22,8 @@ export default class Animator {
 		this.pupil = null
 		this.gaze = new GazeModel(this.random)
 		this.gazeStarted = false
+		// Blinks draw from their own stream, so they leave the looks as they were.
+		this.blink = new BlinkModel(createRandom(`blink:${seed}`))
 		// Looking around: the offset of the current look from the center and
 		// the time left on it.
 		this.look = { yaw: 0, pitch: 0 }
@@ -74,6 +78,10 @@ export default class Animator {
 		this.gazeStarted = true
 		this.gaze.setTarget(yaw, pitch)
 		const gaze = this.gaze.step(dt)
+		// A large gaze shift may bring a blink with it.
+		if (this.gaze.shifts !== this.shifts)
+			this.blink.gazeShift(this.gaze.shiftAmplitude, a.blinkRate)
+		const blink = this.blink.step(dt, a.blinkRate, a.blinkSlowdown)
 
 		// The light along the line of sight, and the pupil change of the look.
 		const look = this.stepLookPupil(dt, a, pitch)
@@ -89,7 +97,7 @@ export default class Animator {
 		let framing = { yaw, pitch }
 		if (a.gaze === 'cursor') framing = { yaw: 0, pitch: 0 }
 		else if (a.gaze === 'wander') framing = { yaw: a.yaw, pitch: a.pitch }
-		return pose(params, pupilDiameter, gaze.yaw, gaze.pitch, nasalSign, framing)
+		return pose(params, pupilDiameter, gaze.yaw, gaze.pitch, nasalSign, framing, blink)
 	}
 
 	// The next look around animation.yaw / pitch: held for about
@@ -149,7 +157,7 @@ export default class Animator {
 }
 
 // The step result for a line of sight (yaw, pitch in degrees).
-function pose(params, pupilDiameter, yaw, pitch, nasalSign, framing) {
+function pose(params, pupilDiameter, yaw, pitch, nasalSign, framing, blink = 0) {
 	const pitchRadians = (pitch * Math.PI) / 180
 	const follow = params.animation.lidFollow
 	return {
@@ -158,6 +166,7 @@ function pose(params, pupilDiameter, yaw, pitch, nasalSign, framing) {
 		yaw: yaw - nasalSign * params.eye.kappa,
 		pitch,
 		lidFollow: [0.9 * pitchRadians * follow, 0.35 * pitchRadians * follow],
+		blink,
 		framing,
 	}
 }

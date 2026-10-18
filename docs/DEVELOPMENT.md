@@ -53,6 +53,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 - **Modules**
   - Systems that own three.js objects are ES modules with default-export classes.
   - Pure modules (geometry, optics, sampling, params, priors, generators, color model, animation) import no three.js objects or browser state, and are tested in Node.
+  - A worker is a `*.worker.js` module that wraps pure ones (ESLint gives it the worker globals); the system that owns it creates it with `new Worker(new URL(…, import.meta.url), { type: 'module' })`, which Vite bundles. The blink's frames are built so ([`src/adnexa/blinkFrames.worker.js`](../src/adnexa/blinkFrames.worker.js)).
 - **Parameters**: every tunable value is a leaf of `PARAM_SCHEMA` ([`src/params/paramSchema.js`](../src/params/paramSchema.js)) with a range, unit and `kind`. Code reads values from the params object, never from duplicated constants.
   - The default values live in [`src/params/defaults.json`](../src/params/defaults.json) ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#parameters-presets-and-the-random-eye)). To change them, tune the eye in the panel, press **Export defaults JSON**, and replace the file with the download.
   - A new leaf needs only its fallback `default` in the schema; the next export writes it into the file.
@@ -156,6 +157,7 @@ The panel shows only while the URL ends in `#debug`, and starts collapsed, below
 | `getTargetParams()`, `isTransitioning()` | The params a running transition is heading for (the current ones otherwise); whether one runs. |
 | `capture()` | The current accumulated image as a PNG data URL (a living eye keeps no frame: it renders one first). |
 | `toggleFrozen()`, `isFrozen()` | Photo mode. |
+| `blink()`, `isBlinkReady()` | Starts a blink of a living eye now; whether the blink's frames are built (until then the lids stay open, and `blink()` returns `false`). |
 | `measure(frames)` | Interactive frames back to back; resolves with frame statistics. |
 | `measureSync(frames)` | The same, each frame finished with a synchronous read; returns mean, median, minimum and maximum ms. |
 | `getCompileMs()` | The time spent compiling programs at start-up. |

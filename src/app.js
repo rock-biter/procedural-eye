@@ -13,7 +13,7 @@ import {
 	HalfFloatType,
 	LinearFilter,
 	Quaternion,
-	RedFormat,
+	RGFormat,
 	Vector3,
 } from 'three'
 import Animator from './animation/animator'
@@ -24,6 +24,7 @@ import PhysicalCamera from './camera/physicalCamera'
 import { entrancePupil } from './eye/cornealOptics'
 import Lashes from './adnexa/lashes'
 import { bakeFissureMap, FISSURE_MAP } from './adnexa/fissureMap'
+import LidBlink from './adnexa/lidBlink'
 import Lids from './adnexa/lids'
 import TearFilm from './adnexa/tearFilm'
 import Eyeball from './eye/eyeball'
@@ -88,11 +89,13 @@ export default class EyeApp {
 		this.irisColorLut = new IrisColorLut()
 		this.keyShadow = new KeyShadow()
 		this.scleraMaps = new ScleraMaps()
+		// The fissure map: r where the lids rest, g closed (the blink's,
+		// src/adnexa/lidBlink.js).
 		this.fissureMap = new DataTexture(
-			new Uint16Array(FISSURE_MAP.size * FISSURE_MAP.size),
+			new Uint16Array(FISSURE_MAP.size * FISSURE_MAP.size * 2),
 			FISSURE_MAP.size,
 			FISSURE_MAP.size,
-			RedFormat,
+			RGFormat,
 			HalfFloatType,
 		)
 		this.fissureMap.minFilter = LinearFilter
@@ -120,6 +123,14 @@ export default class EyeApp {
 		setup.scene.add(this.lashes.mesh)
 		this.tearFilm = new TearFilm(this.lightRig.worldUniforms, this.keyShadow.uniforms)
 		setup.scene.add(this.tearFilm.meniscus, this.tearFilm.bubbles)
+		// The blink: the lid meshes morph through frames a worker builds.
+		this.lidBlink = new LidBlink({
+			lids: this.lids,
+			lashes: this.lashes,
+			tearFilm: this.tearFilm,
+			fissureMap: this.fissureMap,
+			uniform: this.keyShadow.uniforms.uLidBlink,
+		})
 		this.physicalCamera = new PhysicalCamera()
 		this.post = new PostProcessing(
 			setup.renderer,
@@ -229,16 +240,18 @@ export default class EyeApp {
 		// change, not for a new lash seed.
 		const { clearance, band } = this.params.shell
 		const lidKey = JSON.stringify([this.params.lids, clearance, band, this.eye])
-		if (lidKey !== this.lidKey) {
+		const lids = lidKey !== this.lidKey
+		if (lids) {
 			this.lidKey = lidKey
 			this.lids.rebuild(this.params, this.eye, this.setup.renderer)
 			const distances = bakeFissureMap(this.params.lids, this.eye.nasalSign)
 			const data = this.fissureMap.image.data
-			for (let i = 0; i < distances.length; i++) data[i] = DataUtils.toHalfFloat(distances[i])
+			for (let i = 0; i < distances.length; i++) data[i * 2] = DataUtils.toHalfFloat(distances[i])
 			this.fissureMap.needsUpdate = true
 		}
 		this.lashes.rebuild(this.params, this.eye)
 		this.tearFilm.rebuild(this.params, this.eye)
+		this.lidBlink.invalidate(lids)
 	}
 
 	createIrisSpace() {
@@ -360,7 +373,20 @@ export default class EyeApp {
 
 	toggleFrozen() {
 		this.frozen = !this.frozen
+		// A photo keeps the eye open: a blink under way ends.
+		if (this.frozen) {
+			this.animator.blink.reset()
+			this.lidBlink.set(0)
+			if (this.lastPose) this.lastPose.blink = 0
+		}
 		this.notifyChange('frozen')
+	}
+
+	// Starts a blink now (a living eye whose blink frames are built).
+	blink() {
+		if (!this.params.animation.enabled || this.frozen) return false
+		this.animator.blink.start()
+		return this.lidBlink.ready
 	}
 
 	// The eye's pose for this frame. A living eye steps the animation and keeps
@@ -418,6 +444,9 @@ export default class EyeApp {
 		this.gaze.fromArray(gazeQuaternion(result.yaw, result.pitch))
 		this.eyeRig.setGaze(this.gaze)
 		this.keyShadow.uniforms.uLidFollow.value.fromArray(result.lidFollow)
+		// A living eye that blinks needs the blink's frames.
+		if (animation.enabled && animation.blinkRate > 0) this.lidBlink.prepare(this.params)
+		this.lidBlink.set(result.blink)
 		this.animationStarted = true
 	}
 
@@ -645,6 +674,9 @@ export default class EyeApp {
 			capture: () => this.capture(),
 			toggleFrozen: () => this.toggleFrozen(),
 			isFrozen: () => this.frozen,
+			// Blinks now; false while the blink's frames are not built yet.
+			blink: () => this.blink(),
+			isBlinkReady: () => this.lidBlink.ready,
 			measure: (frames) => this.measure(frames),
 			measureSync: (frames) => this.measureSync(frames),
 			getCompileMs: () => this.compileMs,
@@ -666,6 +698,7 @@ function blendPose(a, b, k) {
 		yaw: mix(a.yaw, b.yaw),
 		pitch: mix(a.pitch, b.pitch),
 		lidFollow: [mix(a.lidFollow[0], b.lidFollow[0]), mix(a.lidFollow[1], b.lidFollow[1])],
+		blink: mix(a.blink, b.blink),
 		framing: {
 			yaw: mix(a.framing.yaw, b.framing.yaw),
 			pitch: mix(a.framing.pitch, b.framing.pitch),

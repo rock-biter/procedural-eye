@@ -51,7 +51,7 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 
 - **Skin**:
   - The ray, in world space, is intersected with a sphere around the globe of radius `globe.scleraRadius` + 0.6·`lids.lidThickness`.
-  - Where the hit lies under the lids (negative fissure distance, [`docs/ADNEXA.md`](ADNEXA.md#fissure-map)), it sees the skin.
+  - Where the hit lies under the lids (negative fissure distance, [`docs/ADNEXA.md`](ADNEXA.md#fissure-map)), it sees the skin. The distance follows the blink, so the reflected lid comes down with the lid.
   - The skin radiance is `uLidRadiance`: the skin color lit by the rig's luminance.
 - **Lashes**:
   - Just past the margins, a comb of dark strands, 4.5 per mm, gives the lashes (`uLashRadiance`).
@@ -87,7 +87,7 @@ The lids and lashes are too close to the eye to be part of the light rig. `lidRe
 [`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js) renders the shadows of the lids, the lashes and the face around them from emitter 0, when it is a panel or a window.
 
 - **Camera**: an orthographic camera at the light looks at a point 4 mm behind the apex.
-- **Casters**: objects on `SHADOW_LAYER` (1), drawn with the lid follow applied.
+- **Casters**: objects on `SHADOW_LAYER` (1), drawn with the lid follow and the blink applied ([`docs/RENDERING.md`](RENDERING.md#blink-morph)).
 - **Map**: a float depth map covering ±40 mm, the whole skin patch: 2048² for accumulation samples, 1024² for interactive frames, whose filters are wider than its texels and whose taps then stay in the texture cache. The lookup fades out toward its border, so a receiver past it shows no edge.
 - **Filtering** (`key-shadow.glsl`):
   - Accumulation samples move the light to a point on the emitter's area (`sample.light`) and compare hard. The mean of the samples is the true penumbra.

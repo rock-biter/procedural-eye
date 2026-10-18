@@ -13,13 +13,21 @@ uniform vec3 uScleraColor;
 uniform vec4 uSclera; // redness, yellowing, surface irregularity, unused
 uniform sampler2D uScleraVessels; // r: superficial, g: deep vessel density (polar map)
 uniform vec2 uScleraPsi; // ψ range of the vessel map (radians)
-uniform sampler2D uFissureMap; // signed distance to the fissure (mm), front plane
+uniform sampler2D uFissureMap; // signed distance to the fissure (mm), front plane: r open, g closed
 uniform vec2 uFissureExtent; // half width, half height of the map (mm)
+uniform float uLidBlink; // the blink's closure, 0 open (src/adnexa/lidBlink.js)
 
-// Signed distance (mm) of a world point to the fissure: > 0 in the opening.
-float fissureDistance(vec3 world) {
+// Signed distances (mm) of a world point to the fissure, > 0 in the opening:
+// x where the lids rest, y as the blink closes them. The margins close
+// linearly, so the blend is the distance to the closing margin.
+vec2 fissureDistances(vec3 world) {
 	vec2 uv = lidRestPosition(world).xy / (2.0 * uFissureExtent) + 0.5;
-	return texture(uFissureMap, uv).r;
+	vec2 d = texture(uFissureMap, uv).rg;
+	return vec2(d.x, mix(d.x, d.y, uLidBlink));
+}
+
+float fissureDistance(vec3 world) {
+	return fissureDistances(world).y;
 }
 
 uniform vec4 uLidReflection; // lid sphere radius (mm), lash comb density (1/mm), lash reach (mm), unused
@@ -59,7 +67,8 @@ float lidOcclusion(vec3 world) {
 }
 
 // Albedo of the sclera at eye-space point p: the white, yellower with age,
-// pinker toward the lids, with the vessel network over it.
+// pinker toward the lids (`fissure`: the distance to them at rest), with the
+// vessel network over it.
 vec3 scleraAlbedo(vec3 p, float fissure) {
 	float phi = atan(p.y, p.x);
 	float psi = acos(clamp(p.z / length(p), -1.0, 1.0));
@@ -86,10 +95,10 @@ vec3 scleraNormal(vec3 p, vec3 n) {
 
 vec3 scleraDiffuse(vec3 p, vec3 n) {
 	vec3 world = (uEyeToWorld * vec4(p, 1.0)).xyz;
-	float fissure = fissureDistance(world);
-	float occlusion = mix(0.12, 1.0, smoothstep(-0.4, 2.6, fissure));
+	vec2 fissure = fissureDistances(world);
+	float occlusion = mix(0.12, 1.0, smoothstep(-0.4, 2.6, fissure.y));
 	float shadow = keyShadow(world) * mix(0.5, 1.0, occlusion);
-	return scleraAlbedo(p, fissure) * INV_PI * envIrradianceShadowed(p, n, shadow, occlusion);
+	return scleraAlbedo(p, fissure.x) * INV_PI * envIrradianceShadowed(p, n, shadow, occlusion);
 }
 
 #endif
