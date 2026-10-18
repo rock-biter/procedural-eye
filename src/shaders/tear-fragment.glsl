@@ -4,6 +4,7 @@
 #include ./debug-views.glsl
 #include ./lit-surface.glsl
 #include ./key-shadow.glsl
+#include ./shaft-light.glsl
 
 uniform vec3 uTearTint;
 
@@ -17,8 +18,9 @@ void main() {
 	float cosi = saturate(dot(n, v));
 	float fresnel = schlick(cosi, 0.0208);
 	vec3 reflected = envRadiance(vWorldPos, reflect(-v, n));
-	float shadow = keyShadow(vWorldPos);
-	vec3 transmitted = uTearTint * INV_PI * envIrradianceShadowed(vWorldPos, n, shadow, 0.6);
+	vec3 shadow = vec3(keyShadow(vWorldPos));
+	vec3 irradiance = envIrradianceShadowed(vWorldPos, n, shadow, 0.6) + shaftIrradiance(vWorldPos, n, 0.0);
+	vec3 transmitted = uTearTint * INV_PI * irradiance;
 	vec3 color = reflected * fresnel + transmitted * (1.0 - fresnel);
 	gl_FragColor = vec4(color, length(cameraPosition - vWorldPos));
 }

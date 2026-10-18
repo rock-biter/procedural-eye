@@ -111,12 +111,14 @@ vec3 shadeIris(IrisHit hit) {
 		float cosine = dot(n, l);
 		if (cosine <= 0.0 || transmission <= 0.0) continue;
 		vec3 facing = emitterIrradiance(i, pEye, normalize(A.xyz - pEye));
-		float shadow = 1.0;
+		vec3 shadow = vec3(1.0);
 		if (i == 0) {
-			// The lids and lashes shadow the light where it enters the cornea.
+			// The lids and lashes shadow the light where it enters the cornea,
+			// and the light shafts crossing it there add to it.
 			vec3 world = (uEyeToWorld * vec4(entry, 1.0)).xyz;
-			shadow = keyShadow(world);
-			if (shadow > 0.0) shadow *= irisSoftShadow(p + n * 0.003, l, 10.0);
+			float lit = keyShadow(world);
+			if (lit > 0.0) lit *= irisSoftShadow(p + n * 0.003, l, 10.0);
+			shadow = lit * keyBeams(world);
 		}
 		radiance += albedo * INV_PI * facing * transmission * cosine * shadow * mix(0.6, 1.0, ao);
 	}

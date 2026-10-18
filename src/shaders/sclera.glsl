@@ -5,6 +5,7 @@
 
 #include ./env-rig.glsl
 #include ./key-shadow.glsl
+#include ./shaft-light.glsl
 #include ./eye-profile.glsl
 #include ./noise3.glsl
 #include ./lid-follow.glsl
@@ -97,8 +98,12 @@ vec3 scleraDiffuse(vec3 p, vec3 n) {
 	vec3 world = (uEyeToWorld * vec4(p, 1.0)).xyz;
 	vec2 fissure = fissureDistances(world);
 	float occlusion = mix(0.12, 1.0, smoothstep(-0.4, 2.6, fissure.y));
-	float shadow = keyShadow(world) * mix(0.5, 1.0, occlusion);
-	return scleraAlbedo(p, fissure.x) * INV_PI * envIrradianceShadowed(p, n, shadow, occlusion);
+	vec3 shadow = vec3(keyShadow(world) * mix(0.5, 1.0, occlusion));
+	vec3 irradiance = envIrradianceShadowed(p, n, shadow, occlusion);
+	// The light shafts crossing it, in world space.
+	vec3 normal = normalize((uEyeToWorld * vec4(n, 0.0)).xyz);
+	irradiance += shaftIrradiance(world, normal, 0.0) * mix(0.5, 1.0, occlusion);
+	return scleraAlbedo(p, fissure.x) * INV_PI * irradiance;
 }
 
 #endif

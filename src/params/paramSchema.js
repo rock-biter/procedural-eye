@@ -391,6 +391,58 @@ export const BASE_PARAM_SCHEMA = {
 		drift: num(0.3, 0, 10, 0.05, 'mm/s', 'uniform', 'air drift'),
 		turbulence: num(0.6, 0, 5, 0.05, 'mm'),
 		haze: num(0.04, 0, 3, 0.005, '1/m', 'uniform', 'haze density'),
+		shadow: num(0.7, 0, 1, 0.01, '', 'uniform', 'shadow of the patch'),
+	},
+	// The light shafts (src/atmosphere/lightShafts.js, src/lighting/shaftLight.js):
+	// a few blades of the key light from a source `distance` from the globe,
+	// in the key's direction turned by `azimuth` and `elevation`, so they fan
+	// out from it; the patch's shadow on the backdrop comes from there too.
+	// `intensity` is their light as a share of the key's; `light`, `dust` and
+	// `air` how much of it the skin and the eye, the dust motes and the air
+	// show. Each blade is `width` across (σ) and `elongation` times that along
+	// its long side, which lies along `angle` in their cross-section; the
+	// blades are scattered within `spread`, or side by side across their long
+	// sides, like slats, as `alignment` goes to 1. `length` is their σ along
+	// their axis. They `sway` (mm) and `flicker` slowly, at `speed`, with the
+	// dust's clock (frozen in photo mode); moving, they restart the image
+	// every frame, as a living eye does.
+	shafts: {
+		enabled: fading(toggle(true, 'uniform', 'light shafts')),
+		azimuth: num(0, -90, 90, 1, 'deg', 'uniform', 'azimuth from the key'),
+		elevation: num(25, -60, 60, 1, 'deg', 'uniform', 'elevation over the key'),
+		distance: num(260, 120, 2000, 10, 'mm', 'uniform', 'source distance'),
+		intensity: num(1, 0, 3, 0.01, '×', 'uniform', 'beam light (× key)'),
+		light: num(3, 0, 8, 0.01, '', 'uniform', 'on skin and eye'),
+		dust: num(15, 0, 40, 0.1, '', 'uniform', 'on the dust'),
+		air: num(40, 0, 150, 0.5, '1/m', 'uniform', 'in the air'),
+		color: color('#ffffff', 'uniform', 'tint'),
+		count: discrete(num(7, 1, 12, 1, '', 'uniform', 'beams')),
+		seed: discrete(num(1, 1, 9999, 1)),
+		width: num(1.8, 0.5, 20, 0.1, 'mm', 'uniform', 'blade width (σ)'),
+		elongation: num(1.5, 1, 20, 0.1, '×', 'uniform', 'blade length (× width)'),
+		widthVariation: num(0.4, 0, 1, 0.01, '', 'uniform', 'width variation'),
+		spread: num(40, 0, 150, 1, 'mm'),
+		offsetX: num(0, -100, 100, 0.5, 'mm', 'uniform', 'offset across'),
+		offsetY: num(0, -100, 100, 0.5, 'mm', 'uniform', 'offset up'),
+		angle: num(70, 0, 180, 1, 'deg', 'uniform', 'blade angle'),
+		alignment: num(0.25, 0, 1, 0.01, '', 'uniform', 'side by side'),
+		length: num(110, 20, 400, 1, 'mm', 'uniform', 'reach (σ along)'),
+		shadow: num(0.95, 0, 1, 0.01, '', 'uniform', 'cut by the patch'),
+		sway: num(2, 0, 15, 0.1, 'mm', 'uniform', 'sway'),
+		flicker: num(0.3, 0, 1, 0.01, '', 'uniform', 'flicker'),
+		speed: num(1, 0, 3, 0.01, '×', 'uniform', 'motion speed'),
+	},
+	// The backdrop beyond the skin (src/render/backdrop.js): the soft shadow the
+	// skin patch casts from the light shafts' direction (the key's, turned by
+	// shafts.azimuth and shafts.elevation) onto a floor `distance` below the
+	// globe's center, which shows nothing else; `tilt` turns it up about the
+	// world x axis toward a wall behind the face. Only a camera on its side
+	// sees it.
+	backdrop: {
+		shadow: num(0.8, 0, 1, 0.01, '', 'uniform', 'shadow strength'),
+		distance: num(70, 5, 300, 1, 'mm', 'uniform', 'plane below the globe'),
+		tilt: num(0, 0, 90, 1, 'deg', 'uniform', 'plane tilt (0 floor, 90 wall)'),
+		softness: num(16, 2, 30, 0.5, 'mm', 'uniform', 'shadow softness'),
 	},
 	camera: {
 		focalLength: num(110, 35, 200, 1, 'mm', 'uniform', 'focal length'),

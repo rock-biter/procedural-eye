@@ -15,6 +15,7 @@
 #include ./debug-views.glsl
 #include ./lit-surface.glsl
 #include ./key-shadow.glsl
+#include ./shaft-light.glsl
 #include ./skin-relief.glsl
 
 uniform vec3 uSkinColor;
@@ -253,6 +254,8 @@ void main() {
 	// Light scattered under the skin softens the red edge of the shadows.
 	vec3 shadow = mix(vec3(lit), vec3(sqrt(lit), lit, lit * lit), uSkin2.y);
 	vec3 color = litSurface(vWorldPos, n, v, albedo * occlusion, wrap, roughness, 0.028, occlusion, shadow);
+	// The light shafts crossing the skin.
+	color += albedo * occlusion * INV_PI * shaftIrradiance(vWorldPos, n, 0.15);
 	// The tear film makes the margin a mirror. On the skin the moisture follows
 	// the relief, so it reflects roughly (litSurface() above), and the mirror
 	// image fades out within half a millimeter: further out, where the folds of

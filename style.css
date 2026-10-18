@@ -916,7 +916,7 @@ canvas {
 	.footer {
 		position: fixed;
 		right: calc(var(--ui-inset) + env(safe-area-inset-right));
-		bottom: calc(var(--ui-inset) - 4px  + env(safe-area-inset-bottom));
+		bottom: calc(var(--ui-inset) - 4px + env(safe-area-inset-bottom));
 		left: calc(var(--ui-inset) + env(safe-area-inset-left));
 		z-index: 10;
 		display: flex;

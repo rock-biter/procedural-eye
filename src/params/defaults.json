@@ -203,7 +203,7 @@
     "shine": 0
   },
   "skin": {
-    "color": "#b88264",
+    "color": "#a06c48",
     "redness": 0.45,
     "roughness": 0.42,
     "wetness": 0.5,
@@ -309,24 +309,57 @@
       "photographer": false
     }
   },
+
   "dust": {
     "enabled": true,
-    "brightness": 0.7,
-    "count": 400,
+    "brightness": 0.9,
+    "count": 800,
     "seed": 1,
-    "size": 350,
-    "extent": 200,
+    "size": 150,
+    "extent": 160,
     "forward": 0.65,
     "drift": 1.6,
     "turbulence": 4.6,
     "haze": 0.04
+  },
+  "shafts": {
+    "enabled": true,
+    "azimuth": -18,
+    "elevation": 25,
+    "distance": 180,
+    "intensity": 2.77,
+    "light": 8,
+    "dust": 40,
+    "air": 3,
+    "color": "#ffba79",
+    "count": 8,
+    "seed": 1631,
+    "width": 2.2,
+    "elongation": 3.5,
+    "widthVariation": 0.35,
+    "spread": 104,
+    "offsetX": 13,
+    "offsetY": -4.5,
+    "angle": 133,
+    "alignment": 0.32,
+    "length": 276,
+    "shadow": 1,
+    "sway": 10.0,
+    "flicker": 0,
+    "speed": 0.82
+  },
+  "backdrop": {
+    "shadow": 0.8,
+    "distance": 70,
+    "tilt": 0,
+    "softness": 16
   },
   "camera": {
     "focalLength": 110,
     "fNumber": 24,
     "sensorHeight": 24,
     "distance": 381.438769,
-    "azimuth": -60.5,
+    "azimuth": -43,
     "elevation": -37.6,
     "targetX": 0,
     "targetY": 0,
@@ -341,7 +374,7 @@
     "mobileOut": 811,
     "sensorIn": 12,
     "sensorOut": 24,
-    "start": 0.34,
+    "start": 0.62,
     "mobileStart": 0.42,
     "duration": 0.7,
     "elasticity": 0.12

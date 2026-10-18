@@ -9,8 +9,12 @@ const frontal = { focalLength: 100, azimuth: 0, elevation: 0 }
 // Close iris macro framing: about 2:1 on the iris, shallow focus.
 const macro = { camera: { ...frontal, distance: 150, fNumber: 11 } }
 // Still, in clear air: the tuned pupil and gaze hold, and nothing floats
-// between the camera and the eye of the photograph.
-const reference = { animation: { enabled: false }, dust: { enabled: false, haze: 0 } }
+// between the camera and the eye of the photograph, nor crosses it as beams.
+const reference = {
+	animation: { enabled: false },
+	dust: { enabled: false, haze: 0 },
+	shafts: { enabled: false },
+}
 
 export const PRESETS = {
 	default: { label: 'Default (defaults.json)', params: {} },

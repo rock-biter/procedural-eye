@@ -226,12 +226,14 @@ vec3 envIrradiance(vec3 p, vec3 n) {
 	return irradiance;
 }
 
-// The same with the key light (emitter 0) dimmed by `shadow0` and the
-// background by `ambient` (occlusion by the lids).
-vec3 envIrradianceShadowed(vec3 p, vec3 n, float shadow0, float ambient) {
+// The same with the key light (emitter 0) scaled by `shadow0` (its shadow,
+// per channel the light shafts it crosses) and the background by `ambient`
+// (occlusion by the lids).
+vec3 envIrradianceShadowed(vec3 p, vec3 n, vec3 shadow0, float ambient) {
 	vec3 irradiance = backgroundIrradiance(n) * ambient;
 	for (int i = ZERO; i < uEmitterCount; i++) {
-		irradiance += emitterIrradiance(i, p, n) * (i == 0 ? shadow0 : 1.0);
+		vec3 e = emitterIrradiance(i, p, n);
+		irradiance += i == 0 ? e * shadow0 : e;
 	}
 	return irradiance;
 }

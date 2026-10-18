@@ -37,16 +37,19 @@ import { hexToLinearRgb } from './lighting/colorTemperature'
 import { EMITTER_TYPE, sceneLuminance, sphericalDirection } from './lighting/envRig'
 import KeyShadow from './lighting/keyShadow'
 import LightRig from './lighting/lightRig'
+import ShaftLight from './lighting/shaftLight'
 import { applyOverrides, cloneParams, encodeState, getLeaf } from './params/params'
 import { PARAM_SCHEMA } from './params/paramSchema'
+import { SKIN_TONES } from './params/skinTones'
 import { ParamTransition, TRANSITION } from './params/paramTransition'
+import Backdrop from './render/backdrop'
 import PostProcessing from './render/postProcessing'
 import { FOCUS_AT_INFINITY } from './renderSetup'
 import ScleraMaps from './sclera/scleraMaps'
 import { SCLERA_PSI } from './sclera/vesselGenerator'
 
-// The skin tone of the backdrop: the default skin.color (defaults.json).
-const BACKDROP_SKIN = getLeaf(PARAM_SCHEMA, 'skin.color').default
+// The skin tone of the backdrop: the light tone, which the page was matched to.
+const BACKDROP_SKIN = SKIN_TONES.find((tone) => tone.name === 'light').color
 
 export default class EyeApp {
 	// `frozen`: start with the animation clock stopped (captures).
@@ -88,6 +91,16 @@ export default class EyeApp {
 		this.irisAtlas = new IrisAtlas()
 		this.irisColorLut = new IrisColorLut()
 		this.keyShadow = new KeyShadow()
+		this.shaftLight = new ShaftLight()
+		// What the surfaces near the eye take from the key light besides the rig:
+		// its shadow, the lids' follow and blink, and the light shafts' light
+		// with their shadow.
+		const keyLight = {
+			...this.keyShadow.uniforms,
+			...this.shaftLight.uniforms,
+			...this.keyShadow.coverage.uniforms,
+			...this.shaftLight.coverage.uniforms,
+		}
 		this.scleraMaps = new ScleraMaps()
 		// The fissure map: r where the lids rest, g closed (the blink's,
 		// src/adnexa/lidBlink.js).
@@ -107,21 +120,17 @@ export default class EyeApp {
 				pigment: this.irisAtlas.pigmentTexture,
 				colorLut: this.irisColorLut.texture,
 			},
-			this.keyShadow.uniforms,
+			keyLight,
 			{ texture: this.fissureMap, extent: [FISSURE_MAP.halfWidth, FISSURE_MAP.halfHeight] },
 			{ texture: this.scleraMaps.texture, psi: SCLERA_PSI },
 			params.debug.view,
 		)
 		this.eyeRig.eyeSpace.add(this.eyeball.mesh)
-		this.lids = new Lids(this.lightRig.worldUniforms, this.keyShadow.uniforms, params.debug.view)
+		this.lids = new Lids(this.lightRig.worldUniforms, keyLight, params.debug.view)
 		setup.scene.add(this.lids.mesh, this.lids.back)
-		this.lashes = new Lashes(
-			this.lightRig.worldUniforms,
-			this.keyShadow.uniforms,
-			params.debug.view,
-		)
+		this.lashes = new Lashes(this.lightRig.worldUniforms, keyLight, params.debug.view)
 		setup.scene.add(this.lashes.mesh)
-		this.tearFilm = new TearFilm(this.lightRig.worldUniforms, this.keyShadow.uniforms)
+		this.tearFilm = new TearFilm(this.lightRig.worldUniforms, keyLight)
 		setup.scene.add(this.tearFilm.meniscus, this.tearFilm.bubbles)
 		// The blink: the lid meshes morph through frames a worker builds.
 		this.lidBlink = new LidBlink({
@@ -131,12 +140,19 @@ export default class EyeApp {
 			fissureMap: this.fissureMap,
 			uniform: this.keyShadow.uniforms.uLidBlink,
 		})
+		// The backdrop with the soft shadow of the skin patch.
+		this.backdrop = new Backdrop({
+			...this.keyShadow.coverage.uniforms,
+			...this.shaftLight.coverage.uniforms,
+		})
+		setup.scene.add(this.backdrop.mesh)
 		this.physicalCamera = new PhysicalCamera()
 		this.post = new PostProcessing(
 			setup.renderer,
 			setup.scene,
 			this.physicalCamera.camera,
 			this.lightRig.worldUniforms,
+			{ keyCoverage: this.keyShadow.coverage, shafts: this.shaftLight },
 		)
 		// The dust's clock (s), stopped in photo mode, and when it was last
 		// shown over a converged image.
@@ -484,6 +500,7 @@ export default class EyeApp {
 		if (this.controls.update(Math.min(delta / 1000, 0.1), living)) this.invalidate()
 		this.pose(delta / 1000)
 		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
+		if (this.shaftsMove) this.invalidate()
 		if (this.converged) {
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
@@ -546,7 +563,23 @@ export default class EyeApp {
 	}
 
 	get restartsEveryFrame() {
-		return (this.params.animation.enabled && !this.frozen) || this.transition !== null
+		return (
+			(this.params.animation.enabled && !this.frozen) || this.transition !== null || this.shaftsMove
+		)
+	}
+
+	// Whether the light shafts sway or flicker (not in photo mode): the image
+	// restarts every frame, as with a living eye.
+	get shaftsMove() {
+		const { shafts, debug } = this.params
+		return (
+			!this.frozen &&
+			debug.view === 'beauty' &&
+			shafts.enabled &&
+			shafts.intensity > 0 &&
+			(shafts.sway > 0 || shafts.flicker > 0) &&
+			shafts.speed > 0
+		)
 	}
 
 	measureFrame(time) {
@@ -574,16 +607,32 @@ export default class EyeApp {
 			this.backdropColor.setRGB(...this.backdropRadiance()),
 			FOCUS_AT_INFINITY,
 		)
-		// The key light casts the lid and lash shadows (studio panels and windows only).
+		// The key light casts the lid and lash shadows (studio panels and windows
+		// only) and the light shafts, whose direction casts the patch's soft
+		// shadow on the backdrop.
 		const key = this.lightRig.emitters[0]
-		const casts = key && key.type <= EMITTER_TYPE.WINDOW
-		this.keyShadow.render(
-			this.setup.renderer,
-			this.setup.scene,
-			casts ? key : null,
-			[0, 0, this.eye.apexZ - 4],
-			sample,
-		)
+		const caster = key && key.type <= EMITTER_TYPE.WINDOW ? key : null
+		const renderer = this.setup.renderer
+		const shadowCenter = [0, 0, this.eye.apexZ - 4]
+		// The soft coverages are kept while the lids, the light and these hold.
+		const coverage = {
+			globeRadius: this.eye.scleraRadius,
+			softness: this.params.backdrop.softness,
+			lids: this.lidKey,
+		}
+		this.keyShadow.render(renderer, this.setup.scene, caster, shadowCenter, sample, coverage)
+		const beauty = this.params.debug.view === 'beauty'
+		this.shaftLight.update(this.params, caster, beauty, this.dustTime)
+		if (!sample) {
+			this.shaftLight.renderShadow(
+				renderer,
+				this.setup.scene,
+				this.keyShadow,
+				shadowCenter,
+				coverage,
+			)
+		}
+		this.backdrop.update(this.params, this.backdropColor, this.shaftLight.direction, beauty)
 		this.eyeRig.toEye(this.physicalCamera.camera.position, this.cameraEye)
 		const camera = this.physicalCamera.camera
 		const pixelAngle = (camera.fov * Math.PI) / 180 / size.height
@@ -615,7 +664,7 @@ export default class EyeApp {
 		this.post.render()
 	}
 
-	// The backdrop beyond the skin: the tone of the default skin lit (its
+	// The backdrop beyond the skin: the tone of the light skin lit (its
 	// albedo, saturated as the subsurface shading saturates it), skin.backdrop
 	// as bright. It keeps that tone whatever skin.color becomes, so the page
 	// does not change with the skin tones.

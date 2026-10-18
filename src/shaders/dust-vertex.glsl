@@ -3,9 +3,14 @@
 // lens. The motes fill a cube around the eye, fixed in world space, and wrap
 // along its world axes as they drift (src/atmosphere/dustField.js), so a
 // turning camera moves them only by their parallax. A mote keeps the light of
-// its own image: out of focus it spreads into a faint, soft blob.
+// its own image: out of focus it spreads into a faint, soft blob. Behind the
+// lids and the face, as seen from the key, it loses the key's light; inside
+// a light shaft it takes the beams' light too (shaft-light.glsl), unless the
+// casters hide it from the beams' direction (shadow-coverage.glsl).
 #include ./env-rig.glsl
 #include ./scattering.glsl
+#include ./shadow-coverage.glsl
+#include ./shaft-light.glsl
 
 attribute vec4 mote; // position in the unit cube, size factor
 attribute vec4 motion; // wandering phases, rate factor
@@ -24,6 +29,8 @@ uniform float uForward; // phase g
 uniform vec3 uAmbient; // background radiance
 uniform float uBrightness;
 uniform float uMaxRadius; // px
+uniform float uDustShadow; // how much the casters darken the motes behind them
+uniform vec3 uShaftDust; // the beams' light on the motes (0 when off)
 
 varying vec2 vLocal; // px, along and across the mote
 varying vec4 vShape; // half length, blur radius, bend (px), crossed (0 or 1)
@@ -79,14 +86,22 @@ void main() {
 
 	// The light it scatters toward the camera: each emitter's irradiance on a
 	// face turned to it, by the phase of the angle between the light and the
-	// view, and the background's radiance.
+	// view, and the background's radiance. The key's (emitter 0) is shadowed
+	// by the casters; the beams it crosses add theirs, from their direction.
 	mat3 toWorld = transpose(mat3(uView));
 	vec3 p = toWorld * (view - uView[3].xyz);
 	vec3 ray = toWorld * normalize(view);
+	float keyLit = 1.0 - uDustShadow * keyCover(p);
 	vec3 light = vec3(0.0);
 	for (int i = ZERO; i < uEmitterCount; i++) {
 		vec3 l = normalize(uEmitters[i * EMITTER_VEC4S].xyz - p);
-		light += emitterIrradiance(i, p, l) * hgPhase(dot(l, ray), uForward);
+		vec3 scattered = emitterIrradiance(i, p, l) * hgPhase(dot(l, ray), uForward);
+		light += i == 0 ? scattered * keyLit : scattered;
+	}
+	if (max(uShaftDust.r, max(uShaftDust.g, uShaftDust.b)) > 0.0) {
+		float beams = shaftCookie(p) * (1.0 - uDustShadow * shaftCover(p));
+		vec3 toSource = normalize(uShaftSource.xyz - p);
+		light += uShaftDust * beams * hgPhase(dot(toSource, ray), uForward);
 	}
 	float albedo = 0.6 + 0.4 * fract(motion.w * 7.31);
 	vec3 radiance = albedo * (uAmbient + PI * light);

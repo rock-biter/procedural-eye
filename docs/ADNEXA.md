@@ -148,7 +148,8 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
   - GGX specular from each emitter's representative point (`skin.roughness`, lower in oily patches on the lids);
   - a mirror reflection of the rig where it is wet: the margin, fading out within half a millimeter onto the skin (`skin.wetness`). Further out the moisture follows the relief and reflects as the GGX lobe; a mirror there showed the emitters as pale blots in the canthi's folds, where the skin turns grazing;
   - ambient and specular occlusion in the folds and grooves, and the baked occlusion (`ao`, scaled by `skin.occlusion`);
-  - the key-light shadow.
+  - the key-light shadow;
+  - the light shafts crossing the skin, a stripe of light under their own shadow ([`docs/RENDERING.md`](RENDERING.md#light-shafts)).
 
 ## Back Shell
 

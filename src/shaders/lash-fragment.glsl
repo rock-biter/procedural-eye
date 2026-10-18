@@ -4,6 +4,7 @@
 #include ./debug-views.glsl
 #include ./lit-surface.glsl
 #include ./key-shadow.glsl
+#include ./shaft-light.glsl
 
 uniform vec3 uLashColor;
 uniform float uLashShine;
@@ -44,6 +45,8 @@ void main() {
 		float visible = smoothstep(-0.2, 0.3, dot(n, l));
 		color += facing * uLashShine * visible * shadow * (0.08 * primary + 0.05 * secondary * albedo * 12.0);
 	}
+	// The light shafts crossing the lashes.
+	color += albedo * INV_PI * 0.7 * shaftIrradiance(vWorldPos, n, 0.5);
 #if DEBUG_VIEW == DEBUG_NORMALS
 	color = n * 0.5 + 0.5;
 #endif
