@@ -29,8 +29,8 @@ uniform uint uIrisSeed;
 uniform float uIrisMicroBlur;
 
 // The interactive depth of field shows its gather in full from this blur
-// radius (pixels) on (dof-composite-fragment.glsl).
-#define IRIS_GATHERED_BLUR 2.5
+// radius (pixels) on (NEAR_RADIUS + 0.5 in dof-composite-fragment.glsl).
+#define IRIS_GATHERED_BLUR 3.0
 
 // The ray footprint (mm), the mip level of the atlas lookups there, and the
 // radius (mm) over which the depth of field spreads that point, set by the

@@ -127,9 +127,12 @@ export default class DofPass extends Pass {
 				uSharp: new Uniform(null),
 				uHalf: new Uniform(half),
 				uBlurred: new Uniform(this.target.texture),
+				uPrepared: new Uniform(this.prepared.texture),
+				uTileMax: new Uniform(this.tileMax.texture),
+				uLens: this.prepare.uniforms.uLens,
 				uWeight: new Uniform(1),
 			},
-			defines: { MAX_SHAFTS },
+			defines: { MAX_SHAFTS, DOF_TILE: TILE },
 			vertexShader,
 			fragmentShader: compositeShader,
 			depthTest: false,
@@ -147,7 +150,7 @@ export default class DofPass extends Pass {
 			focusDistance - focalLength,
 			heightPx / sensorHeight,
 		)
-		// The radius dof-prepare-fragment.glsl gives a point halfway to the
+		// The radius dofRadius() (dof-radius.glsl) gives a point halfway to the
 		// backdrop's distance: only the backdrop lies farther.
 		const distance = FOCUS_AT_INFINITY / 2
 		this.tileReduce.uniforms.uBackdropRadius.value =

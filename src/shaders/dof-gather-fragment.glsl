@@ -37,8 +37,9 @@ void main() {
 	while (radius < reach) {
 		vec4 tap = textureLod(uPrepared, vUv + direction * uTexel * radius, 0.0);
 		float sampleSize = min(abs(tap.a), MAX_RADIUS);
-		// What lies behind the pixel cannot blur over it more than the pixel itself.
-		if (tap.a > center.a) sampleSize = min(sampleSize, centerSize * 2.0);
+		// What lies behind the pixel shows through its blur circle, and blurs
+		// over it no farther than twice that.
+		if (tap.a > center.a) sampleSize = clamp(sampleSize, centerSize, centerSize * 2.0);
 		float m = smoothstep(radius - 0.5, radius + 0.5, sampleSize);
 		color += mix(color / total, tap.rgb, m);
 		total += 1.0;
