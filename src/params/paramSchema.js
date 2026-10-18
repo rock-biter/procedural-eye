@@ -76,7 +76,7 @@ export const BASE_PARAM_SCHEMA = {
 		microMovements: num(0.3, 0, 1, 0.01, '', 'uniform', 'micro-movements'),
 		lidFollow: num(1, 0, 1.5, 0.01, '', 'uniform', 'lid follow'),
 		blinkRate: num(15, 0, 40, 0.5, '/min', 'uniform', 'blink rate'),
-		blinkSlowdown: num(1, 1, 4, 0.1, '×', 'uniform', 'blink slowdown'),
+		blinkSlowdown: num(1, 0.5, 4, 0.05, '×', 'uniform', 'blink slowdown'),
 	},
 	globe: {
 		scleraRadius: num(12, 11.2, 12.8, 0.05, 'mm', 'rebuild'),

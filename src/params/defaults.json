@@ -19,7 +19,7 @@
     "microMovements": 0.3,
     "lidFollow": 1,
     "blinkRate": 15,
-    "blinkSlowdown": 1
+    "blinkSlowdown": 0.65
   },
   "globe": {
     "scleraRadius": 12

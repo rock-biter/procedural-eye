@@ -14,7 +14,7 @@
 // - Depth: about one blink in seven stops short (14.5%, Argilés 2015).
 // - Gaze-evoked blinks: a large gaze shift brings a blink with it, nearly
 //   always past about 33° (Evinger 1994).
-// `slowdown` stretches every phase.
+// `slowdown` stretches every phase (below 1 it shortens them).
 import { lerp, smoothstep } from '../math'
 import { gaussian } from '../random'
 

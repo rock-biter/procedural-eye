@@ -60,6 +60,8 @@ test('blinks do not depend on the frame rate; the slowdown stretches them', () =
 	for (const [t, closure] of coarse) close(closure, at(fine, t), 1e-6, `t ${t}`)
 	const slow = blinkCurve(1 / 240, { slowdown: 2, seconds: 2 })
 	for (const k of [6, 24, 48, 96]) close(at(slow, (2 * k) / 240), at(fine, k / 240), 1e-6, `t ${k}`)
+	const fast = blinkCurve(1 / 240, { slowdown: 0.5 })
+	for (const k of [6, 12, 24, 48]) close(at(fast, k / 240), at(fine, (2 * k) / 240), 1e-6, `t ${k}`)
 	// An incomplete blink stops short and opens without resting.
 	const partial = blinkCurve(1 / 240, { depth: 0.6 })
 	close(Math.max(...partial.map(([, c]) => c)), 0.6, 1e-9)

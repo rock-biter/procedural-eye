@@ -104,7 +104,7 @@ The lids follow the vertical gaze: the upper margin by 0.9 of the pitch and the 
   - The intervals are log-normal (σ 0.7, a coefficient of variation of about 0.8), as measured (Borges 2010): now and then a blink follows another within a second, sometimes the eye stays open for ten.
   - The timer runs in mean intervals at the current rate, so a new rate applies at once.
   - A blink can start before the lids are fully open (a burst), from where they are.
-- **Kinematics** (`BLINK`), stretched by `animation.blinkSlowdown` (1 by default, physiological):
+- **Kinematics** (`BLINK`, at `animation.blinkSlowdown` 1, the measured spontaneous blink), stretched by `blinkSlowdown`: 0.75 by default, a quarter quicker (a 75 ms closing, within the measured 50–130 ms, *tuned*):
   - closing: 0.10 s, eased in and out (the lid's speed rises and falls);
   - closed: 30 ms, for a complete blink;
   - opening: nine tenths of the way in 0.21 s, the last tenth creeping on to 0.5 s (Kwon 2013's late opening). At its peak the closing is about twice as fast.
