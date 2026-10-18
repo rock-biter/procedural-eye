@@ -203,7 +203,7 @@
     "shine": 0
   },
   "skin": {
-    "color": "#b88264",
+    "color": "#a06c48",
     "redness": 0.45,
     "roughness": 0.42,
     "wetness": 0.5,
@@ -359,7 +359,7 @@
     "fNumber": 24,
     "sensorHeight": 24,
     "distance": 381.438769,
-    "azimuth": -60.5,
+    "azimuth": -43,
     "elevation": -37.6,
     "targetX": 0,
     "targetY": 0,
@@ -374,7 +374,7 @@
     "mobileOut": 811,
     "sensorIn": 12,
     "sensorOut": 24,
-    "start": 0.34,
+    "start": 0.62,
     "mobileStart": 0.42,
     "duration": 0.7,
     "elasticity": 0.12

@@ -1,8 +1,8 @@
 // The skin tones of the skin buttons (the HUD's left side), from fair to
 // deep: values of `skin.color`, the albedo the skin program darkens further
 // with its melanin and blood (docs/ADNEXA.md). A tone changes only the color;
-// the other skin leaves keep their values. The light tone is the color of
-// defaults.json.
+// the other skin leaves keep their values. The medium tone is the color of
+// defaults.json; the light one sets the backdrop's tone (src/app.js).
 export const SKIN_TONES = Object.freeze([
 	{ name: 'fair', label: 'Fair', color: '#deb298' },
 	{ name: 'light', label: 'Light', color: '#b88264' },

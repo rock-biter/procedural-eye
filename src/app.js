@@ -40,6 +40,7 @@ import LightRig from './lighting/lightRig'
 import ShaftLight from './lighting/shaftLight'
 import { applyOverrides, cloneParams, encodeState, getLeaf } from './params/params'
 import { PARAM_SCHEMA } from './params/paramSchema'
+import { SKIN_TONES } from './params/skinTones'
 import { ParamTransition, TRANSITION } from './params/paramTransition'
 import Backdrop from './render/backdrop'
 import PostProcessing from './render/postProcessing'
@@ -47,8 +48,8 @@ import { FOCUS_AT_INFINITY } from './renderSetup'
 import ScleraMaps from './sclera/scleraMaps'
 import { SCLERA_PSI } from './sclera/vesselGenerator'
 
-// The skin tone of the backdrop: the default skin.color (defaults.json).
-const BACKDROP_SKIN = getLeaf(PARAM_SCHEMA, 'skin.color').default
+// The skin tone of the backdrop: the light tone, which the page was matched to.
+const BACKDROP_SKIN = SKIN_TONES.find((tone) => tone.name === 'light').color
 
 export default class EyeApp {
 	// `frozen`: start with the animation clock stopped (captures).
@@ -663,7 +664,7 @@ export default class EyeApp {
 		this.post.render()
 	}
 
-	// The backdrop beyond the skin: the tone of the default skin lit (its
+	// The backdrop beyond the skin: the tone of the light skin lit (its
 	// albedo, saturated as the subsurface shading saturates it), skin.backdrop
 	// as bright. It keeps that tone whatever skin.color becomes, so the page
 	// does not change with the skin tones.
