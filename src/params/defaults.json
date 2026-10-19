@@ -187,19 +187,20 @@
   },
   "lashes": {
     "seed": 8152,
-    "upperCount": 139,
-    "lowerCount": 82,
-    "upperLength": 9,
-    "lowerLength": 5.5,
-    "thickness": 0.14,
+    "upperCount": 150,
+    "lowerCount": 70,
+    "upperLength": 7.5,
+    "lowerLength": 4.0,
+    "thickness": 0.075,
     "upperLift": 22,
     "lowerLift": 32,
-    "upperCurl": 0.45,
-    "lowerCurl": 0.35,
+    "upperCurl": 0.82,
+    "lowerCurl": 0.78,
     "clumping": 1,
-    "randomness": 0.6,
-    "color": "#4c342a",
-    "shine": 0
+    "randomness": 1.5,
+    "color": "#36251e",
+    "shine": 0,
+    "zoomOut": 1.0
   },
   "skin": {
     "color": "#a06c48",
@@ -311,14 +312,14 @@
 
   "dust": {
     "enabled": true,
-    "brightness": 0.9,
-    "count": 800,
+    "brightness": 1.9,
+    "count": 900,
     "seed": 1,
     "size": 150,
     "extent": 160,
     "forward": 0.65,
-    "drift": 1.6,
-    "turbulence": 4.6,
+    "drift": 2.6,
+    "turbulence": 10.6,
     "haze": 0.0
   },
   "shafts": {
@@ -367,7 +368,7 @@
     "whiteBalance": 5600
   },
   "zoom": {
-    "in": 300,
+    "in": 230,
     "out": 540,
     "mobileIn": 426,
     "mobileOut": 811,
