@@ -113,10 +113,13 @@ export function createBlinkFrames(params, { lids: withLids = true } = {}) {
 	const fornix = withLids
 		? { ...createConjunctivaMesh(params.lids, eye, side), bakes: () => false }
 		: null
+	// The lids at rest lay the mesh out (its rows, columns and quads'
+	// diagonals), so the frames' vertices and triangles are theirs.
+	const layout = withLids ? createLidMesh(params.lids, eye, side).layout : null
 	for (const closure of blinkClosures(params.lids.closure)) {
 		const lids = { ...params.lids, closure }
 		if (withLids) {
-			const ring = createLidMesh(lids, eye, side)
+			const ring = createLidMesh(lids, eye, side, { layout })
 			// Baked over the lid band, as src/adnexa/lids.js bakes the rest.
 			const band = { ...ring, bakes: (v) => ring.lid[v * 4 + 2] < 10 }
 			frames.lids.push({

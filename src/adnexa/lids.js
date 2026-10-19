@@ -119,7 +119,7 @@ export default class Lids {
 			clearance,
 		)
 		const curtain = keepInside(
-			createPalpebralMesh(params.lids, eye, eye.nasalSign),
+			createPalpebralMesh(params.lids, eye, eye.nasalSign, { layout: data.layout }),
 			back,
 			clearance,
 		)

@@ -78,11 +78,15 @@ app.controls.zoomSensor = (distance) => {
 }
 
 // ?meshtree=1: the scene graph at the left, each object's visible and each
-// mesh's wireframe (src/debug/meshTree.js), loaded on demand, with or without
-// the HUD.
+// mesh's wireframe, with the frame's draw calls and the scene's vertices
+// (src/debug/meshTree.js), loaded on demand, with or without the HUD.
 if (urlParams.get('meshtree') === '1') {
 	import('./src/debug/meshTree').then(({ createMeshTree }) =>
-		createMeshTree({ scene: setup.scene, onChange: () => app.refreshScene() }),
+		createMeshTree({
+			scene: setup.scene,
+			onChange: () => app.refreshScene(),
+			drawCalls: () => setup.frameStats.drawCalls,
+		}),
 	)
 }
 

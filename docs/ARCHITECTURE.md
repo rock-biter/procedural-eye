@@ -32,7 +32,7 @@
 | **Adnexa and sclera** ([`docs/ADNEXA.md`](ADNEXA.md)) | |
 | [`src/adnexa/fissure.js`](../src/adnexa/fissure.js) * | The palpebral fissure: the margins between the canthi, their closure. |
 | [`src/adnexa/periocular.js`](../src/adnexa/periocular.js) * | The margins' support, the conjunctiva with the lacus, caruncle and plica, the face around the orbit (thin-plate spline). |
-| [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | The lid ring (columns, profile, shell turning into the face) and the patch's edge, the conjunctiva, palpebral conjunctiva and meniscus meshes. |
+| [`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js) * | The lid ring (columns, profile, shell turning into the face, laid out by its curvature) and the patch's edge, the conjunctiva, palpebral conjunctiva and meniscus meshes. |
 | [`src/adnexa/backShell.js`](../src/adnexa/backShell.js) * | The back shell closing the skin patch: the flat band along its edge and the dome following the face behind, as thick as the lids and the globe in front of its cut need; the hidden conjunctiva brought inside it; the globe's cut plane. |
 | [`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js) * | Ambient occlusion baked into the lid and conjunctiva vertices (horizon-based, over a front height field; by depth into the sac). |
 | [`src/adnexa/lashGenerator.js`](../src/adnexa/lashGenerator.js) * | Seeded lash rows, curves and clumps. |
@@ -107,7 +107,7 @@
 3. **Controls**: `CameraControls.update()` steps a coasting orbit (which restarts the accumulation as a drag does) and the mouse parallax, which restarts it while it moves ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
 4. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
    - A living eye steps the animator and restarts the accumulation.
-   - A living eye that blinks (`animation.blinkRate` above 0) asks for the blink's frames when they are stale: `LidBlink.prepare()` posts the params to the worker, which builds them in about 2.3 s (in Node on an M1; a quarter of a second when only the lashes or the meniscus changed) while the frame loop runs on. The pose's blink sets the meshes' morph weights and `uLidBlink` (`LidBlink.set()`), 0 until the frames arrive ([`docs/ANIMATION.md`](ANIMATION.md#blink)).
+   - A living eye that blinks (`animation.blinkRate` above 0) asks for the blink's frames when they are stale: `LidBlink.prepare()` posts the params to the worker, which builds them in about 1.3 s (in Node on an M1; a quarter of a second when only the lashes or the meniscus changed) while the frame loop runs on. The pose's blink sets the meshes' morph weights and `uLidBlink` (`LidBlink.set()`), 0 until the frames arrive ([`docs/ANIMATION.md`](ANIMATION.md#blink)).
    - In photo mode it keeps its instant, with the lids open.
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.

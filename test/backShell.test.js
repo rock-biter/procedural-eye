@@ -28,7 +28,7 @@ function build(lids = params.lids, side = 1, shell = params.shell) {
 	const surface = backShellSurface(lid, eye, shell)
 	const raw = [
 		createConjunctivaMesh(lids, eye, side),
-		createPalpebralMesh(lids, eye, side, { around: SIZE.around }),
+		createPalpebralMesh(lids, eye, side, { layout: lid.layout }),
 	]
 	const copy = (part) => ({
 		...part,
