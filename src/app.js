@@ -387,6 +387,15 @@ export default class EyeApp {
 		this.post.accumulation.reset()
 	}
 
+	// An object shown, hidden or drawn as a wireframe from outside the params
+	// (the mesh tree, ?meshtree=1): the soft coverages are made again from the
+	// casters now shown, and the image restarts.
+	refreshScene() {
+		this.keyShadow.coverage.key = null
+		this.shaftLight.coverage.key = null
+		this.invalidate()
+	}
+
 	toggleFrozen() {
 		this.frozen = !this.frozen
 		// A photo keeps the eye open: a blink under way ends.

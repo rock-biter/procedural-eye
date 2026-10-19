@@ -20,8 +20,9 @@ import { createHud } from './src/ui/hud'
 import { zoomDistance, zoomLevel, zoomProgress, zoomSensor } from './src/ui/hudLayout'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
-// #debug), creates the params, the renderer and the app, the HUD unless
-// ?gui=0, and the panel while the URL ends in #debug.
+// ?meshtree=1, #debug), creates the params, the renderer and the app, the HUD
+// unless ?gui=0, the panel while the URL ends in #debug, and the mesh tree
+// with ?meshtree=1.
 const urlParams = new URLSearchParams(window.location.search)
 const presetName = PRESETS[urlParams.get('preset')] ? urlParams.get('preset') : 'default'
 const state = urlParams.get('state') ? decodeState(urlParams.get('state')) : null
@@ -74,6 +75,15 @@ app.controls.zoomSensor = (distance) => {
 		settings.sensorIn,
 		settings.sensorOut,
 	])
+}
+
+// ?meshtree=1: the scene graph at the left, each object's visible and each
+// mesh's wireframe (src/debug/meshTree.js), loaded on demand, with or without
+// the HUD.
+if (urlParams.get('meshtree') === '1') {
+	import('./src/debug/meshTree').then(({ createMeshTree }) =>
+		createMeshTree({ scene: setup.scene, onChange: () => app.refreshScene() }),
+	)
 }
 
 // The panel's random-eye ancestry and the length of preset and random-eye

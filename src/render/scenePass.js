@@ -87,6 +87,8 @@ export default class ScenePass extends Pass {
 		this.block.frustumCulled = false
 		this.block.renderOrder = DRAW_ORDER.shadingBlock
 		this.block.visible = false
+		// Shown only for its own draws: the mesh tree leaves it alone.
+		this.block.userData.managed = true
 		scene.add(this.block)
 	}
 

@@ -6,7 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom knob, Zoom out and Random eye), the title, the credit line, the viewport size and the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand). Builds the target params of presets, random eyes, zooms and skin tones, and sets the zoom level, including the HUD’s elastic drag, and supplies unclamped progress for its return; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom knob, Zoom out and Random eye), the title, the credit line, the viewport size and the frame rate and, while the URL ends in `#debug`, the collapsed panel with its actions (loaded on demand), and with `?meshtree=1` the mesh tree (also loaded on demand, with or without the HUD). Builds the target params of presets, random eyes, zooms and skin tones, and sets the zoom level, including the HUD’s elastic drag, and supplies unclamped progress for its return; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
 | [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions; poses the eye; drives the accumulation; exposes the API. |
 | [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
 | **Parameters** | |
@@ -75,6 +75,7 @@
 | [`src/render/dustPass.js`](../src/render/dustPass.js) | The dust motes as their images blurred by the lens, added over the depth of field's output before the effects. |
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
+| [`src/debug/meshTree.js`](../src/debug/meshTree.js) | The mesh tree of `?meshtree=1`: the scene graph at the left, with each object's visibility and each mesh's wireframe and vertex count ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#mesh-tree)). |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
 | [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye (two on a portrait box, the zoom on the wider one, kept above the footer by `reserveBottom()`), cut around each button, with flat square reticles, animated selection brackets, two counter-rotating segmented zoom rings and the square zoom marker sliding along it with resisted overshoot and snap on release; `main.js` gives it the actions. |
 | [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's circle (`HUD.scale` times the one inscribed in its box, or smaller until its buttons fit), on a portrait box split from the zoom's wider circle (`HUD.split`, `zoomRadius()`), and every button's angle on them; the knob's track, its angle at a zoom level and back, and the endpoints a released drag snaps to and its bounded elastic overshoot; the unclamped camera progress and bounded zoom level of a camera distance (log scale) and back; the inner and outer segmented rings' fixed radius ratios, their turns at that level and their paths at the layout's size, with dashes in px (`orbitArt()`, `dashFit()`). |
@@ -119,7 +120,7 @@
      1. `PhysicalCamera` places the camera.
      2. The eye rig updates its matrices.
      3. `LightRig` rebuilds the emitters and packs them in eye space and in world space.
-     4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window; on fresh frames it reduces it into the key's soft coverage when the light, `backdrop.softness` or the lids changed.
+     4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window; on fresh frames it reduces it into the key's soft coverage when the light, `backdrop.softness` or the lids changed (`refreshScene()`, after the mesh tree shows or hides an object, drops both coverages).
      5. `ShaftLight` sets the light shafts' source, blades (swaying and flickering on the dust's clock), cookie (baked again when their layout changed or they moved) and light; on fresh frames it redraws their shadow and coverage when its inputs changed. Moving shafts restart the image every frame (`shaftsMove`), as a living eye does. `Backdrop` takes the clear color and the shadow plane.
      6. The eyeball, lid and lash uniforms are refreshed from the params.
      7. The post-processing updates the lens of the depth of field and its fade, then the haze, the shafts' origin and the dust (`updateAtmosphere()`: the pinhole camera, the rig and the dust's clock), then the composer renders.

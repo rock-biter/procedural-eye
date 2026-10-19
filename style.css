@@ -104,6 +104,33 @@ canvas {
 	}
 }
 
+/* The mesh tree (?meshtree=1, src/debug/meshTree.js) at the left: below the
+   title (none without the HUD), above the credit line, scrolling as the
+   panel does. */
+.mesh-tree {
+	--panel-top: calc(var(--ui-inset) + var(--masthead-height, 0px) + 8px);
+	--panel-bottom: calc(var(--ui-inset) + 48px);
+	position: fixed;
+	z-index: 1000;
+	top: calc(var(--panel-top) + env(safe-area-inset-top));
+	left: calc(var(--ui-inset) + env(safe-area-inset-left));
+	width: min(280px, calc(100vw - 2 * var(--ui-inset)));
+	max-height: calc(100vh - var(--panel-top) - var(--panel-bottom));
+	max-height: calc(
+		100dvh - var(--panel-top) - var(--panel-bottom) - env(safe-area-inset-top) -
+			env(safe-area-inset-bottom)
+	);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+}
+
+@media (max-width: 640px) {
+	.mesh-tree {
+		--panel-bottom: calc(var(--ui-inset) + var(--footer-height, 120px) + 8px);
+	}
+}
+
 /* The frame: a cross (25% white) at each corner and dashed lines (15%
    white) along the sides, running across the whole window. The 1px lines
    take the first and last rows and columns of the box; each cross centers
