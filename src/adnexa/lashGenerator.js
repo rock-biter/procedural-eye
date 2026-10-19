@@ -11,7 +11,8 @@ import { LID_PROFILE, lidPoint } from './lidGeometry'
 
 export const LASH_SEGMENTS = 14
 // Sides of each lash's tube.
-const SIDES = 6
+export const LASH_SIDES = 6
+const SIDES = LASH_SIDES
 
 // Local frame of the lid surface at (t, s): the point, the outward skin
 // normal, the direction across the lid away from the fissure, and along it.

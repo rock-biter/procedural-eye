@@ -19,6 +19,7 @@ pnpm format:check
 pnpm build          # production bundle in dist/
 pnpm preview
 pnpm capture        # headless captures, contact sheet, optional bench (docs/QUALITY.md)
+pnpm compare        # captures against a baseline: metrics, difference images (docs/QUALITY.md)
 pnpm brand          # renders the favicon, the touch icons and the Open Graph image into public/
 ```
 
@@ -86,6 +87,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 | `?gui=0` | Hides the frame, the HUD, the title, the credit line, the frame rate and the panel (captures). |
 | `?dpr=<ratio>` | Pins the pixel ratio (0.5–2) and turns the adaptive resolution off. |
 | `?debug=1` | Exposes the app object as `window.__EYE_APP__` for console debugging. |
+| `?meshtree=1` | Shows the mesh tree at the left (loaded on demand, with or without the HUD): see [Mesh Tree](#mesh-tree). |
 | `#debug` | Shows the panel (it is not even loaded otherwise). It follows the hash: adding or removing `#debug` on an open page shows or hides it. It also makes the skin evaluate its relief and freckles per pixel, so the panel's edits show at once; without it they are baked ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). This part works with `?gui=0` too. |
 
 ## Controls
@@ -140,6 +142,10 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 **The frame rate**, top right in the credit line's style, counts the frames the page shows per second, over half a second, with a `requestAnimationFrame` loop of its own in `main.js`. A converged photo draws nothing, so it then shows the display's refresh rate. Above it, the viewport's size in CSS pixels (`widthxheight`, `window.innerWidth` × `window.innerHeight`), updated on every resize.
 
 The panel shows only while the URL ends in `#debug`, and starts collapsed, below the viewport size and the frame rate (and, on phones, below the title, at the height `main.js` measures into `--masthead-height`). When its open folders outgrow the viewport it scrolls, and it stops at the frame (on phones above Snapshot and the credit line, at the height `main.js` measures into `--footer-height`; `style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
+
+### Mesh Tree
+
+With `?meshtree=1` a second Tweakpane panel, **Mesh tree**, lists the main scene's graph at the left ([`src/debug/meshTree.js`](../src/debug/meshTree.js)): one folder per object, titled with its name and type, its children nested inside. Above the tree, read twice a second: **draw calls**, those of the last frame rendered over every pass (shadow maps and coverages, the scene, the depth of field, the dust and the effects; `FrameStats.drawCalls`, so a converged photo keeps its last frame's), and **scene vertices**, the vertices of the meshes drawn, the shadow proxies included (a hidden mesh, or one in a hidden group, leaves the count). The shadow proxies of the lids and the lashes (`LidsShadow`, `LashesShadow`, [`docs/OPTICS.md`](OPTICS.md#key-light-shadow)) are in the tree: drawn only in the shadow passes, hiding one takes its shadow away; the passes draw them with their own material, so their wireframe does not show. Every object has **visible** (`Object3D.visible`: hiding a group hides what it holds) and every mesh **wireframe** (on all its materials, which the app never swaps, so it holds through rebuilds and debug views) and **vertices**, its geometry's vertex count (read once a second, since rebuilds replace the geometry). Each edit calls `EyeApp.refreshScene()`: the soft coverages are made again from the casters now shown (hidden lids or lashes drop their shadows, the floor's included) and the image restarts. The tree is built once, from the graph as it is at start-up. `SplitShadingBlock`, which the scene pass shows only for its own draws (`userData.managed`), is listed collapsed with both toggles disabled. The panel sits below the title (at the top without the HUD) and above the credit line, and scrolls when it outgrows the viewport (`.mesh-tree`, `style.css`).
 
 ## Console API
 

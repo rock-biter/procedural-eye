@@ -7,7 +7,8 @@
 // again when those change. Mipmapped; the skin reads them at the mip level of
 // its footprint.
 //   lids: the lid mesh laid onto the box, nearest the viewer in front, over
-//     an underlay of the shell's relief for the texels it leaves uncovered;
+//     an underlay of the shell's relief for the texels it leaves uncovered
+//     (two renders, the underlay first);
 //   shell: the back shell's relief (its coordinates lie inside the box);
 //   freckles: their coverage.
 import {
@@ -119,23 +120,33 @@ export default class SkinRelief {
 		const height = 1 / box.w
 		this.uniforms.uBox.value.set(box.x, box.y, width, height)
 		const previous = renderer.getRenderTarget()
-		const draw = (name, { quad = null, lids = false }) => {
+		const autoClear = renderer.autoClear
+		renderer.autoClear = false
+		// One mesh per render: the underlay first, then the lid ring over it.
+		// Drawn together, the renderer's sort would pick their order (WebGL's
+		// by material, which drew the underlay last, over the whole ring).
+		const render = (mesh) => {
+			this.quad.visible = mesh === this.quad
+			this.lidMesh.visible = mesh === this.lidMesh
+			renderer.render(this.scene, this.camera)
+		}
+		const draw = (name, { quad, lids = false }) => {
 			const size = SKIN_RELIEF_SIZE[name]
 			this.texel[name] = Math.max(width, height) / size
 			this.uniforms.uFootprint.value = this.texel[name]
-			this.quad.visible = quad !== null
-			if (quad) this.quad.material = quad
-			this.lidMesh.visible = lids
+			this.quad.material = quad
 			// The quad covers every texel; the clear resets the depth.
 			renderer.setRenderTarget(this.targets[name])
 			renderer.clear()
-			renderer.render(this.scene, this.camera)
+			render(this.quad)
+			if (lids) render(this.lidMesh)
 		}
 		this.lidMesh.geometry = geometry
 		draw('lids', { quad: this.underlayMaterial, lids: true })
 		draw('shell', { quad: this.underlayMaterial })
 		draw('freckles', { quad: this.frecklesMaterial })
 		renderer.setRenderTarget(previous)
+		renderer.autoClear = autoClear
 		this.key = key
 		this.bakeMs = performance.now() - started
 		return true

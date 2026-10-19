@@ -1,4 +1,4 @@
-// Tear film water (the meniscus along the lid margins, tear bubbles): a smooth
+// Tear film water (the meniscus along the lid margins): a smooth
 // mirror of the light rig with water's Fresnel, over a faint transmitted tint
 // of what lies behind (the lid margin, the sclera).
 #include ./debug-views.glsl

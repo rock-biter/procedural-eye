@@ -11,7 +11,7 @@
 | 4 | Iris color: spectral Kubelka–Munk lookup, pigment atlas (heterochromia, freckles, periphery), depth-dependent albedo, white balance | Done |
 | 5 | Photo pipeline: interactive gather DOF fading into the accumulated lens samples, area-light jitter, autofocus on the entrance pupil, PNG export with the state in a `tEXt` chunk | Done |
 | 6 | Lids, skin, lashes, key-light shadows | Done |
-| 7 | Reflections of the lids and lashes in the cornea, tear meniscus, bubbles, wet skin | Done |
+| 7 | Reflections of the lids and lashes in the cornea, tear meniscus, wet skin | Done |
 | 8 | Sclera and limbus: vessel network, elliptical limbus, limbal ring, broken-up wet reflection | Done |
 | 9 | Animation: pupil light reflex and hippus, gaze, saccades, microsaccades, drift, lid follow, photo mode | Done |
 | 10 | Presets per reference photograph, random eye from population priors | Done |
@@ -32,6 +32,7 @@
   - Extreme shapes still crease the skin near the medial lower lid: a fissure under 25 mm with a full pretarsal roll (`lowerRoll` near 1).
   - The upper lid's fold cannot overhang its crease: the skin row runs outward without turning back, so hooding (the preseptal skin folding down over the crease, common with age) and the lateral overlap are shaped as steps, not undercuts.
   - The lids pass in front of the globe toward the canthi. Where the margin leaves the globe, the meniscus fades, and a small gap under the margin shows the palpebral conjunctiva behind it.
+  - The surface steps where the anterior edge turns into the skin (`LID_PROFILE.edge`): the skin's relief (the fold over a low crease, the lower lid's roll and fullness) starts there at full height while the edge carries none, up to 0.28 mm with the defaults' crease 1 mm above the margin and about 0.1 mm on the lower lid. The mesh draws it across one row, a little ledge along the lash line.
   - The palpebral conjunctiva is a curtain hanging straight back from the margins, not the lid's back surface curving into the fornix: it closes the conjunctival sac, but its shape behind the canthi is a stand-in. From grazing views (80° to the side, 60° up or down) a few hundredths of a square millimeter of the pockets still show the background.
 - **Face**: a thin-plate spline through anatomical landmarks, kept as a hint (softer than the measured brow, nose and cheek projections) and without eyebrow hairs. The skin is a patch about 65 × 68 mm around the eye, closed behind by the back shell (a flat band along its edge and a darker dome, [`docs/ADNEXA.md`](ADNEXA.md#back-shell)), not by a head: wide or grazing framings show its edge and the shell.
 - **Baked occlusion**: it is baked with the lids at rest; as the lids follow the gaze it stays where it was baked. The blink's frames bake their own.

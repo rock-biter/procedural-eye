@@ -22,6 +22,9 @@ export default class ScleraMaps {
 		this.canvas = createCanvas()
 		this.layer = createCanvas()
 		this.texture = new CanvasTexture(this.canvas)
+		// Row 0, ψ min, at v = 0, where sclera.glsl reads it: three's default
+		// flipY would put the limbus at the periphery.
+		this.texture.flipY = false
 		this.texture.wrapS = RepeatWrapping
 		this.texture.minFilter = LinearMipmapLinearFilter
 		this.texture.magFilter = LinearFilter

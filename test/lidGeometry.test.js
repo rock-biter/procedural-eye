@@ -8,6 +8,7 @@ import {
 	createMeniscusMesh,
 	createPalpebralMesh,
 	followWeight,
+	LID_PROFILE,
 	lidPoint,
 } from '../src/adnexa/lidGeometry'
 import { conjunctivaZ, supportAt, supportZ } from '../src/adnexa/periocular'
@@ -171,13 +172,14 @@ test('the lids do not fold or collapse in view', () => {
 				Math.hypot(x - medial[0], y - medial[1]),
 				Math.hypot(x - lateral[0], y - lateral[1]),
 			) < 1.5
-		const skinRow = Math.ceil(0.15 * (across - 1))
 		for (let i = 0; i < around; i++) {
 			for (let j = 0; j < across - 2; j++) {
 				if (skip(point(i, j))) continue
 				const n = normal(i, j)
 				if (!n) {
-					assert.ok(j < skinRow, `${label}: collapsed skin quad ${i}, ${j}`)
+					// The strip and the edge may collapse where the lids meet.
+					const s = mesh.lid[((i % around) * across + j) * 4 + 1]
+					assert.ok(s <= LID_PROFILE.edge, `${label}: collapsed skin quad ${i}, ${j}`)
 					continue
 				}
 				for (const m of [normal(i + 1, j), normal(i, j + 1)]) {
@@ -257,10 +259,117 @@ test('the lower lid flows into the cheek without a groove under it', () => {
 	}
 })
 
+test('the layout follows the curvature: the mesh keeps within its tolerance of the surface', () => {
+	// A mesh refined by halves (a column and a row between each two of the
+	// layout's) gives the surface between the vertices. Along its normal the
+	// middle of every edge strays from it by the sagitta the layout allows:
+	// 5 µm over the zone's density share squared, 9 µm on the lids, the margin
+	// and the patch's edge, 55 µm on the face far out; a quad's diagonal adds
+	// the bends of both directions. The step between the anterior edge and
+	// the skin is the surface's own, and left out.
+	const half = (a, b) => (a + b) / 2
+	const twice = (xs) => xs.flatMap((x, i) => (i + 1 < xs.length ? [x, half(x, xs[i + 1])] : [x]))
+	const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+	const cross = (a, b) => [
+		a[1] * b[2] - a[2] * b[1],
+		a[2] * b[0] - a[0] * b[2],
+		a[0] * b[1] - a[1] * b[0],
+	]
+	const cases = [
+		[params.lids, 1],
+		[{ ...params.lids, creaseDepth: 1.5, creaseHeight: 5 }, -1],
+		[{ ...params.lids, closure: 0.5 }, 1],
+	]
+	for (const [lids, side] of cases) {
+		const mesh = createLidMesh(lids, eyes[side], side)
+		const { layout } = mesh
+		const columns = layout.columns.flatMap((x, i, all) => [
+			x,
+			half(x, all[i + 1] ?? 1 + all[0]) % 1,
+		])
+		const refined = createLidMesh(lids, eyes[side], side, {
+			layout: {
+				strip: layout.strip * 2,
+				edge: layout.edge * 2,
+				near: twice(layout.near),
+				far: twice([0, ...layout.far]).slice(1),
+				columns,
+			},
+		})
+		const around = layout.columns.length
+		const across = mesh.positions.length / 3 / around
+		const rows = 2 * across - 1
+		// Within a budget of about ten thousand vertices.
+		assert.ok(around * across < 13000, `${around * across} vertices`)
+		const at = (positions, count, height, i, j) => {
+			const k = (((i + count) % count) * height + Math.min(Math.max(j, 0), height - 1)) * 3
+			return [positions[k], positions[k + 1], positions[k + 2]]
+		}
+		const p = (i, j) => at(mesh.positions, around, across, i, j)
+		const q = (i, j) => at(refined.positions, 2 * around, rows, i, j)
+		// The surface at (i, j) of the refined mesh against the middle of the
+		// chord a–b, along the normal there.
+		const off = (a, b, i, j) => {
+			const n = cross(sub(q(i + 1, j), q(i - 1, j)), sub(q(i, j + 1), q(i, j - 1)))
+			const d = sub(q(i, j), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2])
+			return Math.abs(d[0] * n[0] + d[1] * n[1] + d[2] * n[2]) / Math.hypot(...n)
+		}
+		// The outlines: the distance to the chord itself.
+		const outline = (a, b, m) =>
+			Math.hypot(...cross(sub(b, a), sub(m, a))) / Math.hypot(...sub(b, a))
+		const worst = { lids: 0, face: 0, diagonal: 0, margin: 0, rim: 0 }
+		const note = (zone, value) => (worst[zone] = Math.max(worst[zone], value))
+		for (let i = 0; i < around; i++) {
+			for (let j = 0; j < across; j++) {
+				const k = i * across + j
+				const zone = mesh.lid[k * 4 + 2] < 6 ? 'lids' : 'face'
+				note(zone, off(p(i, j), p(i + 1, j), 2 * i + 1, 2 * j))
+				if (j === 0) note('margin', outline(p(i, 0), p(i + 1, 0), q(2 * i + 1, 0)))
+				if (j === across - 1) {
+					note('rim', outline(p(i, j), p(i + 1, j), q(2 * i + 1, rows - 1)))
+					continue
+				}
+				const edge = mesh.lid[k * 4 + 1] < LID_PROFILE.edge
+				if (edge && mesh.lid[(k + 1) * 4 + 1] >= LID_PROFILE.edge) continue
+				note(zone, off(p(i, j), p(i, j + 1), 2 * i, 2 * j + 1))
+				// The quad's diagonal, as its triangles split it.
+				const diagonal = layout.diagonals[i * (across - 1) + j]
+					? off(p(i + 1, j), p(i, j + 1), 2 * i + 1, 2 * j + 1)
+					: off(p(i, j), p(i + 1, j + 1), 2 * i + 1, 2 * j + 1)
+				if (zone === 'lids') note('diagonal', diagonal)
+				else note('face', diagonal)
+			}
+		}
+		const label = `${JSON.stringify(worst)} mm`
+		assert.ok(worst.lids < 0.012 && worst.margin < 0.01 && worst.rim < 0.01, label)
+		assert.ok(worst.diagonal < 0.02 && worst.face < 0.08, label)
+	}
+})
+
+test('the conjunctiva crowds its columns into the canthi, where it shows', () => {
+	const mesh = createConjunctivaMesh(params.lids, eye, 1)
+	const { medial, lateral } = createFissure(params.lids, 1)
+	const across = 24
+	const angles = []
+	for (let v = 0; v < mesh.positions.length / 3; v += across) {
+		angles.push(Math.atan2(mesh.positions[v * 3 + 1], mesh.positions[v * 3]))
+	}
+	// The gap between the columns nearest an angle.
+	const gap = (angle) => {
+		const sorted = angles.map((a) => Math.atan2(Math.sin(a - angle), Math.cos(a - angle)))
+		const below = Math.max(...sorted.filter((a) => a <= 0))
+		const above = Math.min(...sorted.filter((a) => a > 0))
+		return above - below
+	}
+	const top = gap(Math.PI / 2)
+	for (const [x, y] of [medial, lateral]) assert.ok(gap(Math.atan2(y, x)) < top / 4)
+})
+
 test('the mesh keeps its layout as the lids close (a blink can morph between them)', () => {
 	const size = { around: 120, across: 40 }
 	const open = createLidMesh(params.lids, eye, 1, size)
-	const shut = createLidMesh({ ...params.lids, closure: 1 }, eye, 1, size)
+	// Closed, with the layout of the lids at rest, as the blink's frames.
+	const shut = createLidMesh({ ...params.lids, closure: 1 }, eye, 1, { layout: open.layout })
 	assert.equal(open.positions.length, shut.positions.length)
 	assert.deepEqual(open.indices, shut.indices)
 	// The margins move, the face far out stays put.
@@ -349,7 +458,7 @@ test('the palpebral conjunctiva hangs from the margins, faces the opening, darke
 	const around = 280
 	const rows = 12
 	const lids = createLidMesh(params.lids, eye, 1, { around, across: 80 })
-	const curtain = createPalpebralMesh(params.lids, eye, 1, { around, rows })
+	const curtain = createPalpebralMesh(params.lids, eye, 1, { layout: lids.layout, rows })
 	const p = (mesh, index) => Array.from(mesh.positions.subarray(index * 3, index * 3 + 3))
 	for (let i = 0; i < around; i++) {
 		// Its top row is the lid's posterior margin.
@@ -398,7 +507,7 @@ test('no line of sight through the opening near a canthus reaches the background
 	const meshes = [
 		lids,
 		keepInside(createConjunctivaMesh(params.lids, eye, 1), back, clearance),
-		keepInside(createPalpebralMesh(params.lids, eye, 1, { around }), back, clearance),
+		keepInside(createPalpebralMesh(params.lids, eye, 1, { layout: lids.layout }), back, clearance),
 	]
 	const { fissure } = lids
 	const loop = Array.from({ length: 400 }, (_, i) => fissure.loop(i / 400))

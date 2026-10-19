@@ -33,10 +33,10 @@ Everything built on the fissure uses it: the lid mesh, the lash roots, the tear 
 
 ## Lid Mesh
 
-`createLidMesh()` ([`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js)) builds one ring of 560 × 150 quads around the fissure: the upper lid from the medial to the lateral canthus, the lower lid back.
+`createLidMesh()` ([`src/adnexa/lidGeometry.js`](../src/adnexa/lidGeometry.js)) builds one ring of quads around the fissure: the upper lid from the medial to the lateral canthus, the lower lid back. Its columns and rows follow the curvature of the surface ([Layout](#layout)): about 190 × 50 by default.
 
 - **Columns**:
-  - They are laid out on the open fissure, spaced by their length along the loop plus 3 mm per radian of turning, so the corners get enough columns.
+  - They are laid out on the open fissure, along a weight that grows with their length along the loop plus 3 mm per radian of turning; the layout places them along it.
   - The canthi are rounded as the columns go round them, by a cubic Bézier tangent to both margins: the medial angle into a U around the caruncle (1 mm radius), the lateral one into an acute corner (0.5 mm).
 - **Rows**: each column is traced outward in the front plane to the edge of the patch, an ellipse about 65 × 68 mm centered on the pupil (`LID_PATCH`). The outer row is returned as `rim`, the patch's edge, where the [back shell](#back-shell) starts.
   - Near the margin a row follows the margin's normal; far out it follows a ray from the fissure's center, so rows never cross.
@@ -81,9 +81,29 @@ Each vertex carries:
 
 The upper share is 1 on the upper lid and 0 on the lower one, blended across the canthi by the column's direction. All of the relief is in the mesh positions, so the key-light shadow pass, which draws the same mesh with the lid follow, casts the same folds. `lidFace()` returns the face the lids turn into.
 
+### Layout
+
+`lidLayout()` lays the ring out from the curvature of the lids being built, so the vertices gather where the skin bends and thin out where it is flat. A chord of length h across a bend of curvature k strays from the surface by its sagitta, k h² / 8; the layout keeps it under a tolerance of 5 µm (a third of a pixel at the closest zoom, about 0.014 mm per pixel), then thins the density by zone (`LAYOUT.density`):
+
+| Zone | Share of the density | Sagitta at most |
+| --- | --- | --- |
+| The anterior edge and the lids: at least 8 mm past the edge, and 4 mm past where the lid meets the face (its ring: a high crease takes the lid further) | 0.75 | about 9 µm |
+| The face around them, from 6 mm further on | 0.3 | about 55 µm |
+| The patch's edge, its outline, within 1.5 mm | 0.75 | about 9 µm |
+
+A share f of the density lengthens the steps by 1 / f. The steps stay between 0.02 mm (a sharper bend is a kink, not a shape to follow) and 1 mm before the share.
+
+- **Rows**: the intermarginal strip is straight and takes 2 steps, for its occlusion; the anterior edge, a quarter round, takes (π / 2) √(r / 8 tolerance) steps for its widest radius r, times the share. The skin rows come from the bends measured down 64 columns, every 0.01 mm up to 1 mm past the edge (where the canthi bend the skin most) and every 0.04 mm on to 15 mm; the rows per millimeter are the skin's own length per millimeter (it stretches where a closing lid slides over the globe and down a deep crease's walls) over the step its bend allows, the highest of the columns, each peak widened by 0.1 mm (a crease whose height changes along the margin may peak between two probes). Up to 15 mm past the edge the rows lie at the same distances on every column (less on short columns, at most 0.8 of their length, the two blended over 2 mm so the rows do not kink); further out they spread to the patch's edge at the same shares of the rest.
+- **Columns**: across 512 columns, on up to 64 of the rows and always on the patch's edge, each gap between two of them needs as many columns as its widest share of a step (the bend along the rows, the posterior margin's and the patch's outlines included); the columns fall evenly under that need.
+- **Diagonals**: each quad is split along the diagonal closer to the surface. For a bend S along both directions and a twist T over the quad, the middle of one diagonal strays by S + T, the other's by S − T: where they have the same sign the other one is closer (a crease running across the quads at a slant, as the upper lid's does where its height changes along the margin, then lies along a diagonal). Both come from the quad's and its neighbors' vertices.
+- **Counts**: the vertices follow the shape: about 9 600 by default, 12 500 with a deep crease, 11 700 half closed. With the conjunctiva and the palpebral conjunctiva the lid mesh has about 13 200 (it had 100 960 at a fixed 560 × 150).
+- **Blink**: the lids closing keep the layout of the lids at rest, its rows, columns and diagonals, so the frames' vertices and triangles are theirs ([Blink Frames](#blink-frames)).
+- **Cost**: the measurement takes about as long as the mesh; the whole ring builds in about 0.3 s, as at 560 × 150.
+- **Check**: a test builds the mesh refined by halves (a column and a row between each two of the layout's) and measures, along the surface's normal, how far the middle of every edge and diagonal strays from it: within 12 µm on the lids, 10 µm along the posterior margin and the patch's edge, 20 µm on the lids' diagonals and 80 µm far out, under 13 000 vertices, for the defaults, a deep crease on a left eye and a half-closed lid.
+
 ### Baked Occlusion
 
-`bakeLidOcclusion()` ([`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js)) bakes ambient occlusion into the lid and conjunctiva vertices on every rebuild, in about 0.15 s.
+`bakeLidOcclusion()` ([`src/adnexa/lidOcclusion.js`](../src/adnexa/lidOcclusion.js)) bakes ambient occlusion into the lid and conjunctiva vertices on every rebuild, in about 35 ms.
 
 - **Field**: the skin, the conjunctiva and the globe are drawn into a height field seen from the front (0.1 mm cells over ±24 × ±18 mm).
 - **Horizon**: each vertex looks for the horizon over that field in 8 directions, out to 3 mm, against its tangent plane; nearer occluders count more (horizon-based ambient occlusion, Bavoil 2008).
@@ -95,13 +115,13 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 
 `createBlinkFrames()` ([`src/adnexa/blinkFrames.js`](../src/adnexa/blinkFrames.js)) closes what blinks by `BLINK_FRAMES` (4) even steps, from where `lids.closure` rests the lids to closed (`blinkClosures()`). The lid meshes morph through them ([`docs/RENDERING.md`](RENDERING.md#blink-morph)), with the weights of the blink's closure ([`docs/ANIMATION.md`](ANIMATION.md#blink)).
 
-- **Lid ring**: the lid mesh rebuilt at each closure, with its normals (area-weighted, as three.js computes them) and its occlusion, baked as the rest's over the lid band against the conjunctiva. The closed frame is the lid of `lids.closure` 1.
+- **Lid ring**: the lid mesh rebuilt at each closure, with the layout of the lids at rest ([Layout](#layout)), with its normals (area-weighted, as three.js computes them) and its occlusion, baked as the rest's over the lid band against the conjunctiva. The closed frame is the lid of `lids.closure` 1.
 - **Around it**: the conjunctiva stays; each column of the palpebral conjunctiva moves with its margin's vertex (the ring's first row), so the sac stays closed.
 - **Meniscus and lashes**: rebuilt on the closing margins. Each lash's rings keep the orientation of the open lash's (`lashTubes()`'s `references`), so the frames' vertices correspond and a blended tube keeps its width.
 - **Fissure map**: the fissure closed, the map's second channel ([Fissure Map](#fissure-map)).
 - **What stays**: the other attributes (`lid`, `relief`, `follow`) and the skin patterns are the open mesh's: the patterns are evaluated at the rest position, so they stretch with the skin.
 - **Spline**: a Catmull–Rom spline through the open mesh and the frames keeps the margin within 0.08 mm of the lid rebuilt at that closure, where a straight blend from open to closed would stray up to 1.5 mm, into the cornea. The rest of the lid stays within 0.35 mm: the fold over the crease unfolds as the lid closes, so its groove sweeps across the rows, and between two frames it is their blend.
-- **Cost**: about 2.3 s (in Node on an M1), mostly the four lid rings and their occlusion; a quarter of a second for the meniscus and the lashes alone. A worker builds them ([`src/adnexa/blinkFrames.worker.js`](../src/adnexa/blinkFrames.worker.js), [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)).
+- **Cost**: about 1.3 s (in Node on an M1), mostly the lids at rest (for their layout), the four lid rings and their occlusion; a quarter of a second for the meniscus and the lashes alone. A worker builds them ([`src/adnexa/blinkFrames.worker.js`](../src/adnexa/blinkFrames.worker.js), [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)).
 
 ### Conjunctiva
 
@@ -109,13 +129,14 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 
 - **Surface**: an annulus on `conjunctivaZ()`, from 0.9 of the sclera radius out to just past the canthi (16.5 mm medially, 15 mm laterally). At its outer edge it falls back behind the skin. Where the fornix would reach past the back shell, under the lids, it is kept inside it ([Back Shell](#back-shell)).
 - **Seam**: it dips 0.06 mm under the globe where it is the globe, so the sclera meets it in a clean line. Past the fornix's start it leaves the globe only tangentially, so the seam holds only because the globe turns in place, about its own center ([`docs/OPTICS.md`](OPTICS.md#eye-space)): a globe shifted by a tenth of a millimeter would cut through it in facets.
+- **Mesh**: 104 columns × 24 rows (denser toward the globe). It shows only in the canthi, its caruncle and plica medially; elsewhere the lids cover it. Its columns crowd there, up to 8 times as close within about 0.35 rad of each canthus (a Gaussian), and spread out under the lids.
 - **Rendering**: [`src/adnexa/lids.js`](../src/adnexa/lids.js) merges it into the lid mesh. The skin program shades it as wet mucosa (`lid` s = 0, `relief` radial and without grooves). It does not follow the gaze.
 
 ### Palpebral Conjunctiva
 
 `createPalpebralMesh()` closes the conjunctival sac. The lid is a single sheet and the conjunctiva a height field, so without it a line of sight could pass under a posterior margin, between the margin and the eye, and run behind the lids to the background: from the side, from above or below, in the pockets behind both canthi (and along the globe's outline).
 
-- **Surface**: a curtain hanging from each posterior margin straight back, to 1.5 mm under the conjunctiva or the globe, whichever is lower; its deep end in the canthi is kept inside the back shell ([Back Shell](#back-shell)). Its top row is the lid mesh's posterior margin (the same columns), its rows denser near the margin. Straight, not slanting out under the lid: a line of sight running out of a pocket meets it at the margin's outline.
+- **Surface**: a curtain hanging from each posterior margin straight back, to 1.5 mm under the conjunctiva or the globe, whichever is lower; its deep end in the canthi is kept inside the back shell ([Back Shell](#back-shell)). Its top row is the lid mesh's posterior margin (the same columns: it takes the lid's layout), its 6 rows denser near the margin. Straight, not slanting out under the lid: a line of sight running out of a pocket meets it at the margin's outline.
 - **Where it shows**: in the canthi's pockets, where the margins stand in front of the receding globe, and wherever a margin stands off the globe. Where the margin rests on the globe it stays inside it.
 - **Rendering**: merged into the lid mesh like the conjunctiva and shaded as the margin's posterior border (`lid` s = 0), its front faces toward the opening. It follows the gaze with its margin, so the sac stays closed as the lids follow; its bottom lies near the axis the lids turn about, and barely moves.
 - **Check**: a test projects the lids, the conjunctiva and the curtain (kept inside the back shell) and the globe (in front of its cut) in orthographic views up to 60° to the side and 40° up or down, and requires every line of sight that enters the fissure within 5 mm of a canthus to land on a front face. Views further round (80° to the side, 60° up or down) still let a few hundredths of a square millimeter through.
@@ -131,7 +152,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
   - The footprint they are filtered by is the pixel's, widened by the depth of field's blur circle on the skin (`uDefocus`: aperture × defocus / focus distance). The furrows and wrinkles fade where it is wider than about 0.1 mm, the network, the pores and the orifices from 0.015 mm: blurred, they would only average out. Narrower than the footprint, a groove widens and grows shallower, keeping its darkness, so fresh frames do not flicker.
   - `skinMicroRelief()` in `skin-relief.glsl` computes all three, with the tension lines; the skin program and the relief bake both call it.
   - **Baked outside `#debug`**: the relief depends only on the lid mesh at rest, `lids.seed`, `skin.pores` and `skin.wrinkles`. [`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js) bakes it on the GPU (`skin-relief-bake-*.glsl`) over the patterns' front-plane box, and the skin program reads it (`SKIN_BAKED`) instead of hashing some hundred cells per pixel:
-    - **Lid texture**: 4096² RGBA8, about 0.016 mm per texel, mipmapped. It holds the gradient of the whole height (rg), the furrows' and network's albedo term (b) and the occlusion term (a), all linear in the heights (`encodeRelief()`). It is drawn from the lid ring itself, laid onto the box with the rest z as depth (nearest the viewer wins), so the lid frame (`a`, `along`, the tension direction, the skin share) is exact. Under it lies the shell's relief, for the texels the ring leaves uncovered.
+    - **Lid texture**: 4096² RGBA8, about 0.016 mm per texel, mipmapped. It holds the gradient of the whole height (rg), the furrows' and network's albedo term (b) and the occlusion term (a), all linear in the heights (`encodeRelief()`). It is drawn from the lid ring itself, laid onto the box with the rest z as depth (nearest the viewer wins), so the lid frame (`a`, `along`, the tension direction, the skin share) is exact. Under it lies the shell's relief, for the texels the ring leaves uncovered: drawn first, in a render of its own, so the ring always lies over it (drawn together, WebGL's sort put the underlay last, over the whole ring, and the lids read the shell's relief, without their wrinkles or crow's feet).
     - **Shell texture**: the back shell's relief at 2048².
     - **Prefilter**: the bake evaluates the relief with a footprint of one texel. The skin reads it with `textureLod` at the level of 0.7 × its footprint, so the mipmaps take over the prefilter's work. It still applies the relief's fade and the keratinized share; the network's earlier fade is left to the mipmaps.
     - **When it bakes**: at start-up, before the first frame. It bakes again after a lid rebuild or when `lids.seed`, `skin.pores`, `skin.wrinkles` or `skin.freckles` change, once no transition is running (outside `#debug` nothing changes them). A new bake takes about 30 ms; the first, compiling its programs, about 0.6 s.
@@ -165,7 +186,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 - **What is cut or brought inside**:
   - **The globe** behind the world plane `GLOBE_CUT` × the sclera radius in front of its center (2.4 mm by default): the sclera program discards it there ([`docs/RENDERING.md`](RENDERING.md#pipeline)). The globe turns with the gaze, so its mesh reaches 125° from the axis; behind the plane it lies under the conjunctiva, which leaves it at 0.96 of its radius, 3.4 mm in front of the center, and it never shows through the opening.
   - **The conjunctiva and the palpebral conjunctiva** (`keepInside()`): every vertex is raised until it stands the clearance in front of the dome, the palpebral conjunctiva's also at either end of the lids' follow, and its depth into the sac shrinks with the rise. Only what lies under the lids moves: the fornix past the globe's outline (the upper fornix by up to 7 mm, under the brow) and the palpebral conjunctiva's deep end in the medial canthus (about 1 mm). The pockets of the canthi look the same.
-- **Mesh** (`createBackShell()`): the band and the dome's edge ring keep the lid mesh's columns; the inner rings have 128 columns over 40 rings, zipped to the edge ring by angle. The band's edges have their own vertices, so they stay sharp. It is built with the lids (about 0.3 s more), when they, the eye or `shell.clearance` and `shell.band` change. It stays put (no lid follow) and casts no key-light shadow: it lies behind the skin the light falls on.
+- **Mesh** (`createBackShell()`): the band and the dome's edge ring keep the lid mesh's columns, so the band meets the lids vertex for vertex; the band's edges have their own vertices, so they stay sharp. The dome's inner rings and their columns follow its bend (`domeLayout()`, [`src/meshLayout.js`](../src/meshLayout.js)): its chords stray from it by at most 0.1 mm (it shows only from the side or from behind, past the patch's edge), the bend measured along 32 meridians and around each ring; the columns, shared by the inner rings, are zipped to the edge ring by angle. About 1 050 vertices, three quarters of them along the edge (3 rings of the lid mesh's columns), the dome under 500. Its skin coordinates take the arc length along each meridian finely, not along its chords. It is built with the lids (about 60 ms more), when they, the eye or `shell.clearance` and `shell.band` change. It stays put (no lid follow) and casts no key-light shadow: it lies behind the skin the light falls on.
 - **Shading**: the skin program compiled with `SKIN_SHELL`.
   - Its pattern coordinates (`coords`) are the band and the dome unrolled into the front plane, the dome by arc length along its meridians, so the patterns do not stretch where it turns away. They run on from the patch's edge over the band onto the dome and stay inside the patch, where the patterns are baked.
   - It is skin far from the lids (`lid` a = 60 mm): the baked mottling, the furrows, the fine network and the pores. Its tension lines wander over about a centimeter: along the edge they streaked where the shell turns away, and furrows all as shallow crossed into a regular lattice. The relief's gradient is carried onto the surface by the gradients of the coordinates themselves, because the band stands edge-on to the front plane.
@@ -182,16 +203,15 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
   - It then curls further that way (`upperCurl` / `lowerCurl`), with `randomness` in lift, sideways deviation and curl.
 - **Clumps**: runs of 2–5 neighbors whose tips draw together (`clumping`).
 
-`lashTubes()` sweeps tapered tubes along the 14-segment centerlines, and [`src/adnexa/lashes.js`](../src/adnexa/lashes.js) makes them a geometry. The lash material (`lash-fragment.glsl`) uses Kajiya–Kay diffuse and two shifted specular lobes along the hair: a white one off the cuticle (`lashes.shine`) and a dimmer, colored one through the fiber. Tips are lighter. Lashes and lids cast the key-light shadow (layer 1).
+`lashTubes()` sweeps tapered tubes along the 14-segment centerlines, and [`src/adnexa/lashes.js`](../src/adnexa/lashes.js) makes them a geometry. The lash material (`lash-fragment.glsl`) uses Kajiya–Kay diffuse and two shifted specular lobes along the hair: a white one off the cuticle (`lashes.shine`) and a dimmer, colored one through the fiber. Tips are lighter. Lashes and lids cast the key-light shadow through lighter stand-ins, their shadow proxies ([`docs/OPTICS.md`](OPTICS.md#key-light-shadow)).
 
 ## Tear Film
 
 [`src/adnexa/tearFilm.js`](../src/adnexa/tearFilm.js):
 
-- **Meniscus** (`createMeniscusMesh()`): a concave water fillet in the corner between the intermarginal strip and the support, along both margins.
+- **Meniscus** (`createMeniscusMesh()`): a concave water fillet in the corner between the intermarginal strip and the support, along both margins, 128 columns along the loop × 5 across (640 vertices). Its normals are exact, so the mesh only follows its shape: 4 steps across a quarter round of 0.36 mm stray 7 µm from it, 128 columns along margins bending over about 15 mm 3 µm; at the canthi, where the margins turn sharply, it has tapered to nothing.
   - Its radius is `lids.meniscusLower` (0.36 mm) and `lids.meniscusUpper`. It tapers at the canthi and where the margin leaves the globe (`supportLift()`): the water needs the globe to hold it.
 - **Blink**: the meniscus closes with the margins ([Blink Frames](#blink-frames)).
-- **Bubbles**: `lids.bubbles` tiny spheres caught in the lower meniscus (an instanced mesh, up to 60).
 - **Material** (`tear-fragment.glsl`): water. A smooth mirror of the rig with water's Fresnel, over a faint transmitted tint of what lies behind. It is drawn opaque, to keep the alpha contract ([`docs/RENDERING.md`](RENDERING.md#alpha-contract)).
 
 ## Fissure Map
@@ -217,7 +237,7 @@ The upper share is 1 on the upper lid and 0 on the lower one, blended across the
 - **Limbus**: near it, vessels may end in small loops (the limbal arcade).
 - **Outer edge**: a branch that turns back past the map's outer edge stops; it would be under the lids.
 
-[`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) rasterizes the network with Canvas2D into a 2048×512 polar texture (u = φ / 2π, repeating; v over ψ).
+[`src/sclera/scleraMaps.js`](../src/sclera/scleraMaps.js) rasterizes the network with Canvas2D into a 2048×512 polar texture (u = φ / 2π, repeating; v over ψ). The canvas's first row is ψ min and the texture is not flipped (`flipY` false), so v = 0 lies at the limbus, where `sclera.glsl` reads it; three's default flip had put the limbus' end of the network at the periphery.
 - **Red channel**: superficial vessels, sharp.
 - **Green channel**: deep vessels, blurred as seen through the conjunctiva and Tenon's capsule.
 

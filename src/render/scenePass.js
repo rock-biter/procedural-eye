@@ -24,6 +24,7 @@ import {
 	Uniform,
 	WebGLRenderTarget,
 } from 'three'
+import { DRAW_ORDER } from './drawOrder'
 import vertexShader from '../shaders/fullscreen-vertex.glsl'
 import blockShader from '../shaders/shading-block-fragment.glsl'
 import spreadShader from '../shaders/shading-spread-fragment.glsl'
@@ -84,8 +85,10 @@ export default class ScenePass extends Pass {
 		)
 		this.block.name = 'SplitShadingBlock'
 		this.block.frustumCulled = false
-		this.block.renderOrder = -1000
+		this.block.renderOrder = DRAW_ORDER.shadingBlock
 		this.block.visible = false
+		// Shown only for its own draws: the mesh tree leaves it alone.
+		this.block.userData.managed = true
 		scene.add(this.block)
 	}
 

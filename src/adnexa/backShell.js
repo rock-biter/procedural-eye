@@ -15,6 +15,7 @@
 // cut or brought inside instead: the globe behind the cut (in its program),
 // the conjunctiva's fornix and the palpebral conjunctiva's deep end
 // (keepInside()).
+import { bendAt, chordStep, evenlyUnder, runningIntegral, zipRings } from '../meshLayout'
 import { LID_PATCH } from './lidGeometry'
 
 // The plane behind which the globe is not drawn (eyeball-sclera-fragment.glsl),
@@ -38,10 +39,19 @@ const EDGE_ZONE = 0.95
 // every bump.
 const FACE_STEP = 0.5
 const FACE_SMOOTHING = 6
-// Tessellation: rings from the edge to the pole, and columns of the inner
-// rings (the edge ring keeps the lid mesh's columns).
-const RINGS = 40
-const COLUMNS = 128
+// Tessellation of the dome (the band and the dome's edge ring keep the lid
+// mesh's columns): its inner rings and their columns follow its bend, the
+// chords straying from it by at most `tolerance` (mm, src/meshLayout.js; the
+// shell only shows from the side or from behind, past the patch's edge), at
+// least `minRings` and `minColumns`. The bend is measured along `probe.meridians`
+// meridians every 1 / `probe.steps` of the radius, and along each ring at
+// `probe.around` angles.
+const DOME = Object.freeze({
+	tolerance: 0.1,
+	minRings: 3,
+	minColumns: 16,
+	probe: { meridians: 32, steps: 200, around: 256 },
+})
 // Distance from the margin (mm) the skin program reads on the shell: far from
 // it, so nothing of the lids (wetness, the lash line, the fine lines) shows.
 export const SHELL_MARGIN_DISTANCE = 60
@@ -250,6 +260,53 @@ function inward(x, y) {
 	return [nx / length, ny / length]
 }
 
+// The dome's inner rings (normalized radii, from the edge's 1 down to the
+// pole's 0) and their columns' angles, from its bend (DOME).
+function domeLayout(surface) {
+	const { probe, tolerance } = DOME
+	const step = (k) => chordStep(k, tolerance)
+	// Rings: the most rings per unit of radius any meridian asks for, its length
+	// per unit over the step its bend allows.
+	const radii = Array.from({ length: probe.steps + 1 }, (_, i) => 1 - i / probe.steps)
+	const density = new Float64Array(radii.length)
+	for (let m = 0; m < probe.meridians; m++) {
+		const angle = (m / probe.meridians) * TAU
+		const points = radii.map((rho) => surface.point(rho, angle))
+		for (let i = 1; i < radii.length - 1; i++) {
+			const [a, b, c] = [points[i - 1], points[i], points[i + 1]]
+			const length = Math.hypot(c[0] - a[0], c[1] - a[1], c[2] - a[2]) / (2 / probe.steps)
+			density[i] = Math.max(density[i], length / step(bendAt(a, b, c)))
+		}
+	}
+	density[0] = density[1]
+	density[radii.length - 1] = density[radii.length - 2]
+	const depth = radii.map((rho) => 1 - rho)
+	const cumulative = runningIntegral(depth, density)
+	const rings = evenlyUnder(
+		depth,
+		cumulative,
+		Math.max(DOME.minRings, Math.ceil(cumulative.at(-1))),
+	)
+	const rhos = rings.map((d) => 1 - d).slice(1, -1)
+	// Columns: around every ring, as many per gap as its widest share of a
+	// step, the columns shared by the rings.
+	const angles = Array.from({ length: probe.around + 1 }, (_, j) => (j / probe.around) * TAU)
+	const need = new Float64Array(angles.length)
+	for (const rho of rhos) {
+		const points = angles.map((angle) => surface.point(rho, angle))
+		for (let j = 0; j < probe.around; j++) {
+			const at = (n) => points[((n % probe.around) + probe.around) % probe.around]
+			const [a, b, c] = [at(j - 1), at(j), at(j + 1)]
+			const gap = Math.hypot(c[0] - b[0], c[1] - b[1], c[2] - b[2])
+			need[j] = Math.max(need[j], gap / step(bendAt(a, b, c)) / (TAU / probe.around))
+		}
+	}
+	need[probe.around] = need[0]
+	const around = runningIntegral(angles, need)
+	const columns = Math.max(DOME.minColumns, Math.ceil(around.at(-1)))
+	return { rhos, angles: evenlyUnder(angles, around, columns).slice(0, columns) }
+}
+
 // Mesh data of the back shell: the band from the patch's edge (the lid mesh's
 // `rim`) and the dome `surface` (backShellSurface()), front faces outward. Attributes as the lid mesh's (src/adnexa/lidGeometry.js), for the
 // skin program: `lid` = (0, 1, SHELL_MARGIN_DISTANCE, 0), `relief` = (the
@@ -269,7 +326,8 @@ export function createBackShell(lid, surface, shell) {
 		edge.push({ x, y, z, angle: polar(x, y)[1] })
 	}
 	edge.sort((a, b) => a.angle - b.angle)
-	const vertices = 2 * count + count + (RINGS - 1) * COLUMNS + 1
+	const layout = domeLayout(surface)
+	const vertices = 3 * count + layout.rhos.length * layout.angles.length + 1
 	const positions = new Float32Array(vertices * 3)
 	const coords = new Float32Array(vertices * 2)
 	const relief = new Float32Array(vertices * 4)
@@ -300,25 +358,33 @@ export function createBackShell(lid, surface, shell) {
 	const rings = [
 		edge.map((p) => push([p.x, p.y, p.z - shell.band], backCoord(p.x, p.y), outward(p.x, p.y))),
 	]
-	const inner = Array.from({ length: RINGS - 1 }, () => [])
-	for (let j = 0; j < COLUMNS; j++) {
-		const angle = (j / COLUMNS) * TAU
-		// The meridian from the edge (k = 0) to the pole (k = RINGS), and the
-		// arc length from the pole to each of its rings.
-		const points = []
-		for (let k = 0; k <= RINGS; k++) points.push(surface.point(1 - k / RINGS, angle))
-		const lengths = new Float64Array(RINGS + 1)
-		for (let k = RINGS - 1; k >= 0; k--) {
-			const [ax, ay, az] = points[k]
-			const [bx, by, bz] = points[k + 1]
-			lengths[k] = lengths[k + 1] + Math.hypot(ax - bx, ay - by, az - bz)
+	const { rhos, angles } = layout
+	const inner = rhos.map(() => [])
+	const steps = DOME.probe.steps
+	for (const angle of angles) {
+		// The arc length along the meridian from the pole, finely, read at
+		// each ring's radius.
+		const lengths = new Float64Array(steps + 1)
+		let previous = surface.point(0, angle)
+		for (let i = 1; i <= steps; i++) {
+			const point = surface.point(i / steps, angle)
+			lengths[i] =
+				lengths[i - 1] +
+				Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2])
+			previous = point
 		}
-		const [ex, ey] = points[0]
+		const lengthAt = (rho) => {
+			const f = Math.min(rho * steps, steps - 1e-9)
+			const i = Math.floor(f)
+			return lengths[i] + (lengths[i + 1] - lengths[i]) * (f - i)
+		}
+		const [ex, ey] = surface.point(1, angle)
 		const end = backCoord(ex, ey)
-		for (let k = 1; k < RINGS; k++) {
-			const share = lengths[k] / lengths[0]
-			inner[k - 1].push(push(points[k], [end[0] * share, end[1] * share], outward(ex, ey)))
-		}
+		rhos.forEach((rho, k) => {
+			const share = lengthAt(rho) / lengths[steps]
+			const point = surface.point(rho, angle)
+			inner[k].push(push(point, [end[0] * share, end[1] * share], outward(ex, ey)))
+		})
 	}
 	rings.push(...inner)
 	const pole = push(surface.point(0, 0), [0, 0], [1, 0])
@@ -333,16 +399,17 @@ export function createBackShell(lid, surface, shell) {
 	const dome = (a, b, c) => triangles.push(a, c, b)
 	// The edge ring onto the first inner ring: their columns differ, so they
 	// are zipped by angle.
-	zip(
+	zipRings(
 		rings[0],
 		edge.map((p) => p.angle),
 		rings[1],
-		Array.from({ length: COLUMNS }, (_, j) => (j / COLUMNS) * TAU),
+		angles,
 		dome,
 	)
-	for (let k = 1; k < RINGS - 1; k++) {
-		for (let j = 0; j < COLUMNS; j++) {
-			const next = (j + 1) % COLUMNS
+	const columns = angles.length
+	for (let k = 1; k < rings.length - 1; k++) {
+		for (let j = 0; j < columns; j++) {
+			const next = (j + 1) % columns
 			const a = rings[k][j]
 			const b = rings[k][next]
 			const c = rings[k + 1][next]
@@ -351,8 +418,8 @@ export function createBackShell(lid, surface, shell) {
 			dome(a, c, d)
 		}
 	}
-	const last = rings[RINGS - 1]
-	for (let j = 0; j < COLUMNS; j++) dome(last[j], last[(j + 1) % COLUMNS], pole)
+	const last = rings.at(-1)
+	for (let j = 0; j < columns; j++) dome(last[j], last[(j + 1) % columns], pole)
 
 	const profile = new Float32Array(vertices * 4)
 	for (let i = 0; i < vertices; i++) profile.set([0, 1, SHELL_MARGIN_DISTANCE, 0], i * 4)
@@ -366,35 +433,5 @@ export function createBackShell(lid, surface, shell) {
 		indices: new Uint32Array(triangles),
 		thickness: surface.thickness,
 		heightAt: surface.heightAt,
-	}
-}
-
-// Triangles between an outer ring and an inner one, both counter-clockwise
-// (seen from the front), their vertices at the given angles (radians): each
-// triangle counter-clockwise.
-function zip(outer, outerAngles, inner, innerAngles, emit) {
-	const start = outerAngles[0]
-	const relative = (angle) => (((angle - start) % TAU) + TAU) % TAU
-	const a = [...outerAngles.map(relative), TAU]
-	const outerSequence = [...outer, outer[0]]
-	// The inner ring from its column at or just before the outer ring's first.
-	const order = inner
-		.map((_, j) => j)
-		.sort((i, j) => relative(innerAngles[i]) - relative(innerAngles[j]))
-	const lastInner = order[order.length - 1]
-	const b = [relative(innerAngles[lastInner]) - TAU, ...order.map((j) => relative(innerAngles[j]))]
-	const innerSequence = [inner[lastInner], ...order.map((j) => inner[j])]
-	const n = outer.length
-	const m = inner.length
-	let i = 0
-	let j = 0
-	while (i < n || j < m) {
-		if (j >= m || (i < n && a[i + 1] < b[j + 1])) {
-			emit(outerSequence[i], outerSequence[i + 1], innerSequence[j])
-			i++
-		} else {
-			emit(outerSequence[i], innerSequence[j + 1], innerSequence[j])
-			j++
-		}
 	}
 }

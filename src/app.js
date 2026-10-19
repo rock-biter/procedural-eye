@@ -127,11 +127,11 @@ export default class EyeApp {
 		)
 		this.eyeRig.eyeSpace.add(this.eyeball.mesh)
 		this.lids = new Lids(this.lightRig.worldUniforms, keyLight, params.debug.view)
-		setup.scene.add(this.lids.mesh, this.lids.back)
+		setup.scene.add(this.lids.mesh, this.lids.back, this.lids.shadow.mesh)
 		this.lashes = new Lashes(this.lightRig.worldUniforms, keyLight, params.debug.view)
-		setup.scene.add(this.lashes.mesh)
+		setup.scene.add(this.lashes.mesh, this.lashes.shadow.mesh)
 		this.tearFilm = new TearFilm(this.lightRig.worldUniforms, keyLight)
-		setup.scene.add(this.tearFilm.meniscus, this.tearFilm.bubbles)
+		setup.scene.add(this.tearFilm.meniscus)
 		// The blink: the lid meshes morph through frames a worker builds.
 		this.lidBlink = new LidBlink({
 			lids: this.lids,
@@ -385,6 +385,15 @@ export default class EyeApp {
 
 	invalidate() {
 		this.post.accumulation.reset()
+	}
+
+	// An object shown, hidden or drawn as a wireframe from outside the params
+	// (the mesh tree, ?meshtree=1): the soft coverages are made again from the
+	// casters now shown, and the image restarts.
+	refreshScene() {
+		this.keyShadow.coverage.key = null
+		this.shaftLight.coverage.key = null
+		this.invalidate()
 	}
 
 	toggleFrozen() {

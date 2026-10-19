@@ -26,7 +26,13 @@
 // lid stretches over the globe, while the face stays put: the mesh keeps its
 // layout at any closure, so a blink morphs through a few of them
 // (src/adnexa/blinkFrames.js).
+//
+// The layout (lidLayout()) follows the surface's curvature: it is measured
+// on the lids being built, and the columns and rows come closer wherever the
+// skin bends, so that the mesh strays from the surface by at most
+// LAYOUT.tolerance between its vertices.
 import { smoothstep, smootherstep, vec3 } from '../math'
+import { bendAt, chordStep, evenlyUnder, runningIntegral, widen } from '../meshLayout'
 import { createFissure } from './fissure'
 import {
 	conjunctivaZ,
@@ -85,6 +91,44 @@ const MIN_THICKNESS = 0.6
 // all of it on a lid at least `full` mm high. The slope it meets the face at
 // is clamped to `slopes` (mm per mm).
 const LOWER_FRONT = { turn: 1.5, after: 2.5, fullness: 1.5, full: 6.5, slopes: [-0.3, 0.5] }
+// The mesh's layout (lidLayout()). A chord of length h across a bend of
+// curvature k strays from it by its sagitta, k h² / 8: the steps keep it
+// under `tolerance` (mm; 5 µm is a third of a pixel at the closest zoom,
+// about 0.014 mm per pixel), between `minStep` (a bend that sharp is a kink,
+// not a shape to follow) and `maxStep` (mm). The intermarginal strip is
+// straight: `strip` steps carry its occlusion. The skin rows run `near` mm
+// past the anterior edge at the same distances on every column (at most
+// `nearShare` of a column's length: shorter ones scale them down), and on to
+// the patch's edge at the same shares of the rest. The curvature is measured
+// along `probe.rows` columns, every `probe.step` mm (`probe.fine` up to 1 mm
+// past the edge, where the canthi bend the skin most; `probe.far` of the
+// rest), its peaks widened by `probe.reach` mm, and across `probe.columns`
+// columns on up to `probe.rowsAcross` rows. The density the curvature asks
+// for is then thinned by zone (`density`): to `lids` on the anterior edge and
+// over the lids, at least `lidsEnd` mm past the edge and `lidsPast` mm past
+// where the lid meets the face (its `ring`: a high crease takes the lid
+// further); to `far` over the face around them, from `farAfter` mm further
+// on; back to `rim` within `rimBand` mm of the patch's edge, its outline. A
+// share f of the density lengthens the steps by 1 / f and the sagitta by
+// 1 / f²: about 9 µm over the lids, 55 µm far out at the most.
+const LAYOUT = Object.freeze({
+	tolerance: 0.005,
+	minStep: 0.02,
+	maxStep: 1,
+	density: { lids: 0.75, lidsEnd: 8, lidsPast: 4, far: 0.3, farAfter: 6, rim: 0.75, rimBand: 1.5 },
+	strip: 2,
+	near: 15,
+	nearShare: 0.8,
+	probe: {
+		rows: 64,
+		fine: 0.01,
+		step: 0.04,
+		far: 0.01,
+		reach: 0.1,
+		columns: 512,
+		rowsAcross: 64,
+	},
+})
 
 const bell = (value, width) => Math.exp(-((value / width) ** 2))
 const angleOf = (v) => Math.atan2(v[1], v[0])
@@ -136,7 +180,7 @@ function lidContext(lids, eye, fissure) {
 			const ring = []
 			// Laid out like the mesh's columns, so the corners' fans get points too
 			// (the face must meet the lids straight out of the canthi as well).
-			for (const column of loopColumns(open, nasalSign, FACE_RING)) {
+			for (const column of loopColumns(open, nasalSign, evenShares(FACE_RING))) {
 				const { profile, trace } = columnAt(openContext, column)
 				ring.push(shellPoint(openContext, profile, trace, profile.ring).position)
 			}
@@ -243,9 +287,15 @@ function loopStations(open, nasalSign, samples = 4096) {
 	return stations
 }
 
-// Columns around the open loop, spaced by their length along it plus
-// TURN_WEIGHT × their turning.
-function loopColumns(open, nasalSign, count) {
+// `count` shares of a whole, evenly spaced from 0.
+function evenShares(count) {
+	return Array.from({ length: count }, (_, j) => j / count)
+}
+
+// Columns around the open loop at `shares` (increasing, in [0, 1)) of its
+// weight: its length plus TURN_WEIGHT × its turning, so even shares give the
+// corners columns enough to fan out.
+function loopColumns(open, nasalSign, shares) {
 	const stations = loopStations(open, nasalSign)
 	let total = 0
 	stations[0].weight = 0
@@ -259,8 +309,8 @@ function loopColumns(open, nasalSign, count) {
 	}
 	const columns = []
 	let k = 1
-	for (let j = 0; j < count; j++) {
-		const target = (j / count) * total
+	for (const share of shares) {
+		const target = share * total
 		while (k < stations.length - 1 && stations[k].weight < target) k++
 		const a = stations[k - 1]
 		const b = stations[k]
@@ -575,8 +625,202 @@ function pointOn(context, data, s) {
 			share: profile.share,
 		}
 	}
-	const skin = skinPoint(context, profile, trace, a)
-	return { ...skin, a, share: profile.share }
+	return skinAt(context, data, a)
+}
+
+// The skin point of a column `a` mm from the margin, as pointOn() returns it.
+function skinAt(context, data, a) {
+	const skin = skinPoint(context, data.profile, data.trace, a)
+	return { ...skin, a, share: data.profile.share }
+}
+
+// The profile coordinate of the skin `a` mm from the margin (profileAt()'s
+// inverse), for the `lid` attribute.
+function skinS(profile, reach, a) {
+	const { edge } = LID_PROFILE
+	const k = Math.min(Math.max((a - profile.radius) / (reach - profile.radius), 0), 1)
+	return edge + (1 - edge) * k ** (1 / 1.8)
+}
+
+// The longest step (mm) over a bend of curvature `k` (per mm).
+function layoutStep(k) {
+	return Math.min(Math.max(chordStep(k, LAYOUT.tolerance), LAYOUT.minStep), LAYOUT.maxStep)
+}
+
+// The share of the density the curvature asks for (LAYOUT.density) on a
+// column of `profile`, `u` mm past the anterior edge and `rim` mm from the
+// patch's edge.
+function zoneDensity(profile, u, rim) {
+	const { lids, lidsEnd, lidsPast, far, farAfter, rim: atRim, rimBand } = LAYOUT.density
+	const end = Math.max(lidsEnd, profile.ring + lidsPast - profile.radius)
+	const away = lids + (far - lids) * smootherstep(end, end + farAfter, u)
+	return away + (atRim - away) * (1 - smootherstep(0, rimBand, rim))
+}
+
+// How far past the anterior edge the near rows reach on a column `length` mm
+// long: LAYOUT.near, or less on short columns (at most LAYOUT.nearShare of
+// the length), the two blended over 2 mm, so the rows do not kink where one
+// takes over from the other.
+function nearSpan(length) {
+	const a = LAYOUT.near
+	const b = LAYOUT.nearShare * length
+	return (a + b - Math.sqrt((a - b) ** 2 + 4)) / 2
+}
+
+// The skin rows' distances from the margin on a column: the near rows
+// (`layout.near`, mm past the anterior edge) at the same distances on every
+// column long enough, the far ones (`layout.far`, shares) spread to the
+// patch's edge.
+function skinDistances(layout, profile, reach) {
+	const length = reach - profile.radius
+	const near = nearSpan(length)
+	const scale = near / LAYOUT.near
+	return [
+		...layout.near.map((u) => profile.radius + u * scale),
+		...layout.far.map((v) => profile.radius + near + v * (length - near)),
+	]
+}
+
+// A column's rows: the strip's and the edge's by profile coordinate
+// (`layout.strip` and `layout.edge` steps), then the skin's by distance from
+// the margin.
+function columnRows(layout, data) {
+	const { wall, edge } = LID_PROFILE
+	const rows = []
+	for (let m = 0; m < layout.strip; m++) rows.push({ s: (wall * m) / layout.strip })
+	for (let m = 0; m < layout.edge; m++) rows.push({ s: wall + ((edge - wall) * m) / layout.edge })
+	for (const a of skinDistances(layout, data.profile, data.trace.reach)) rows.push({ a })
+	return rows
+}
+
+// The point of a column's row (columnRows()), with its profile coordinate.
+function rowPoint(context, data, row) {
+	if (row.a === undefined) return { ...pointOn(context, data, row.s), s: row.s }
+	return { ...skinAt(context, data, row.a), s: skinS(data.profile, data.trace.reach, row.a) }
+}
+
+// The mesh's layout for these lids, from the curvature of their surface:
+// `columns`, the shares of the loop's weight the columns leave from
+// (loopColumns()); `strip` and `edge`, the steps across the intermarginal
+// strip and the anterior edge; `near` and `far`, the skin rows
+// (skinDistances()). Each step keeps the mesh within LAYOUT.tolerance of the
+// surface where the measured curvature is highest across the columns (the
+// rows) or along the rows (the columns). `around` and `across` force the
+// columns' and the rows' counts, keeping their spacing. The lids closing in a
+// blink keep the layout of the lids at rest (src/adnexa/blinkFrames.js).
+export function lidLayout(lids, eye, nasalSign = 1, { around, across } = {}) {
+	const fissure = createFissure(lids, nasalSign)
+	const context = lidContext(lids, eye, fissure)
+	const { probe } = LAYOUT
+	// Rows: the bends down a set of columns.
+	const nearXs = []
+	for (let u = 0; u < 1; u += probe.fine) nearXs.push(u)
+	for (let u = 1; u < LAYOUT.near; u += probe.step) nearXs.push(u)
+	nearXs.push(LAYOUT.near)
+	const farXs = []
+	for (let v = 0; v < 1; v += probe.far) farXs.push(v)
+	farXs.push(1)
+	const nearDensity = new Float64Array(nearXs.length)
+	const farDensity = new Float64Array(farXs.length)
+	let radius = 0
+	for (const column of loopColumns(context.open, nasalSign, evenShares(probe.rows))) {
+		const data = columnAt(context, column)
+		const { profile, trace } = data
+		radius = Math.max(radius, profile.radius)
+		const length = trace.reach - profile.radius
+		const near = nearSpan(length)
+		const scale = near / LAYOUT.near
+		// Rows per unit of `xs`: the skin's own length per unit (it stretches
+		// where a closing lid slides over the globe, and down a crease's
+		// walls) over the step its bend allows.
+		const measure = (xs, density, distance) => {
+			const points = xs.map((x) => skinAt(context, data, distance(x)).position)
+			for (let i = 1; i < xs.length - 1; i++) {
+				const [a, b, c] = [points[i - 1], points[i], points[i + 1]]
+				const skin =
+					Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) +
+					Math.hypot(c[0] - b[0], c[1] - b[1], c[2] - b[2])
+				const u = distance(xs[i]) - profile.radius
+				const zone = zoneDensity(profile, u, length - u)
+				const rows = (zone * skin) / (xs[i + 1] - xs[i - 1]) / layoutStep(bendAt(a, b, c))
+				density[i] = Math.max(density[i], rows)
+			}
+		}
+		measure(nearXs, nearDensity, (u) => profile.radius + u * scale)
+		measure(farXs, farDensity, (v) => profile.radius + near + v * (length - near))
+	}
+	for (const density of [nearDensity, farDensity]) {
+		density[0] = density[1]
+		density[density.length - 1] = density.at(-2)
+	}
+	// A bend found on two neighboring probes a little apart (a crease whose
+	// height changes along the margin) may peak between them: each peak
+	// widens by `probe.reach` (mm, a share past `near`).
+	const nearIntegral = runningIntegral(nearXs, widen(nearXs, nearDensity, probe.reach))
+	const farIntegral = runningIntegral(farXs, widen(farXs, farDensity, probe.reach / LAYOUT.near))
+	// The anterior edge, a quarter round: its widest radius takes the most
+	// steps, (π / 2) √(r / 8 tolerance).
+	const edge = Math.max(
+		2,
+		Math.ceil(LAYOUT.density.lids * (Math.PI / 2) * Math.sqrt(radius / (8 * LAYOUT.tolerance))),
+	)
+	const total = nearIntegral.at(-1) + farIntegral.at(-1)
+	const skinSteps = across
+		? Math.max(4, across - 1 - LAYOUT.strip - edge)
+		: Math.max(4, Math.ceil(total))
+	// The skin's steps, shared between the near and the far rows by their
+	// integrals.
+	const nearSteps = Math.max(
+		2,
+		Math.min(skinSteps - 2, Math.round((skinSteps * nearIntegral.at(-1)) / total)),
+	)
+	const layout = {
+		strip: LAYOUT.strip,
+		edge,
+		near: evenlyUnder(nearXs, nearIntegral, nearSteps),
+		far: evenlyUnder(farXs, farIntegral, skinSteps - nearSteps).slice(1),
+		columns: null,
+	}
+	// Columns: the bends along the rows (up to probe.rowsAcross of them, the
+	// patch's edge always), across a set of columns. Each gap between two of
+	// them needs as many columns as its widest share of a step.
+	const shares = evenShares(probe.columns)
+	const count = shares.length
+	let probed = null
+	const columns = loopColumns(context.open, nasalSign, shares).map((column) => {
+		const data = columnAt(context, column)
+		const rows = columnRows(layout, data)
+		if (!probed) {
+			const stride = Math.ceil(rows.length / probe.rowsAcross)
+			probed = []
+			for (let j = 0; j < rows.length - 1; j += stride) probed.push(j)
+			probed.push(rows.length - 1)
+		}
+		const length = data.trace.reach - data.profile.radius
+		return probed.map((j) => {
+			const point = rowPoint(context, data, rows[j])
+			const u = Math.max(0, point.a - data.profile.radius)
+			return { position: point.position, zone: zoneDensity(data.profile, u, length - u) }
+		})
+	})
+	const need = new Float64Array(count)
+	for (let j = 0; j < probed.length; j++) {
+		const at = (i) => columns[(i + count) % count][j].position
+		const bends = shares.map((_, i) => bendAt(at(i - 1), at(i), at(i + 1)))
+		for (let i = 0; i < count; i++) {
+			const [p, q] = [at(i), at(i + 1)]
+			const gap = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2])
+			const zone = Math.max(columns[i][j].zone, columns[(i + 1) % count][j].zone)
+			const step = layoutStep(Math.max(bends[i], bends[(i + 1) % count]))
+			need[i] = Math.max(need[i], (zone * gap) / step)
+		}
+	}
+	const xs = [...shares, 1]
+	const cumulative = [0]
+	for (let i = 0; i < count; i++) cumulative.push(cumulative[i] + need[i])
+	const columnCount = around ?? Math.max(16, Math.ceil(cumulative.at(-1)))
+	layout.columns = evenlyUnder(xs, cumulative, columnCount).slice(0, columnCount)
+	return layout
 }
 
 // The face the lids turn into (its height at x, y), for these settings.
@@ -592,16 +836,24 @@ export function lidPoint(t, s, fissure, eye, lids) {
 	return pointOn(context, columnAt(context, column), s)
 }
 
-// Ring mesh data: `around` columns, `across` rows along the profile.
-// Attributes `lid` = (t, s, a, upper share), `relief` = (row direction x, y,
-// groove depth (mm, ≤ 0), share of the way along the margin from the medial
-// canthus) and `follow` = (upper share, follow weight). `rim`: the outer row,
-// the patch's edge, column by column; `face`: the face the lids turn into
-// (lidFace()), height at (x, y).
-export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across = 150 } = {}) {
+// Ring mesh data: columns around the loop, rows along the profile, laid out
+// by `layout` (lidLayout(): by default these lids', `around` and `across`
+// forcing its counts). Attributes `lid` = (t, s, a, upper share), `relief` =
+// (row direction x, y, groove depth (mm, ≤ 0), share of the way along the
+// margin from the medial canthus) and `follow` = (upper share, follow
+// weight). `rim`: the outer row, the patch's edge, column by column; `face`:
+// the face the lids turn into (lidFace()), height at (x, y); `layout`.
+export function createLidMesh(
+	lids,
+	eye,
+	nasalSign = 1,
+	{ around, across, layout = lidLayout(lids, eye, nasalSign, { around, across }) } = {},
+) {
 	const fissure = createFissure(lids, nasalSign)
 	const context = lidContext(lids, eye, fissure)
-	const columns = loopColumns(context.open, nasalSign, around)
+	const columns = loopColumns(context.open, nasalSign, layout.columns)
+	around = columns.length
+	across = layout.strip + layout.edge + layout.near.length + layout.far.length
 	const positions = new Float32Array(around * across * 3)
 	const lid = new Float32Array(around * across * 4)
 	const relief = new Float32Array(around * across * 4)
@@ -610,17 +862,19 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across =
 	for (let i = 0; i < around; i++) {
 		const data = columnAt(context, columns[i])
 		const { profile } = data
+		const rows = columnRows(layout, data)
 		for (let j = 0; j < across; j++) {
-			const s = j / (across - 1)
-			const point = pointOn(context, data, s)
+			const point = rowPoint(context, data, rows[j])
 			const index = i * across + j
 			positions.set(point.position, index * 3)
-			lid.set([profile.t, s, point.a, profile.share], index * 4)
+			lid.set([profile.t, point.s, point.a, profile.share], index * 4)
 			relief.set([point.direction[0], point.direction[1], point.fold, profile.along], index * 4)
 			follow.set([profile.share, followWeight(point.a, profile.band)], index * 2)
 		}
 		rim.set(positions.subarray((i * across + across - 1) * 3, (i + 1) * across * 3), i * 3)
 	}
+	// The lids closing in a blink keep the diagonals of the lids at rest.
+	const diagonals = layout.diagonals ?? quadDiagonals(positions, around, across)
 	const indices = new Uint32Array(around * (across - 1) * 6)
 	let k = 0
 	for (let i = 0; i < around; i++) {
@@ -632,11 +886,84 @@ export function createLidMesh(lids, eye, nasalSign = 1, { around = 560, across =
 			const d = i * across + j + 1
 			// Front faces toward +Z: the loop runs clockwise (seen from the front)
 			// for a right eye, counter-clockwise for a left one.
-			indices.set(nasalSign > 0 ? [a, c, b, a, d, c] : [a, b, c, a, c, d], k)
+			if (diagonals[i * (across - 1) + j]) {
+				indices.set(nasalSign > 0 ? [a, d, b, b, d, c] : [a, b, d, b, c, d], k)
+			} else indices.set(nasalSign > 0 ? [a, c, b, a, d, c] : [a, b, c, a, c, d], k)
 			k += 6
 		}
 	}
-	return { positions, lid, relief, follow, indices, fissure, rim, face: context.face }
+	return {
+		positions,
+		lid,
+		relief,
+		follow,
+		indices,
+		fissure,
+		rim,
+		face: context.face,
+		layout: { ...layout, diagonals },
+	}
+}
+
+// Which diagonal splits each quad of the ring (1: from (i + 1, j) to
+// (i, j + 1), 0: the other), the one closer to the surface. For a surface
+// bending by L along the columns' gaps, N along the rows' and twisting by M
+// over a quad, the middle of the diagonal from (i, j) strays from it by
+// L + N + 2M (over 8), the other's by L + N − 2M: where the bend S = L + N
+// and the twist T = 2M have the same sign, the other diagonal is closer. A
+// crease running across the quads at a slant, as the upper lid's does where
+// its height changes along the margin, then lies along the diagonal. The
+// bends come from the neighboring vertices, the twist from the quad's own,
+// all along the quad's normal.
+function quadDiagonals(positions, around, across) {
+	const diagonals = new Uint8Array(around * (across - 1))
+	const at = (i, j) => (((i + around) % around) * across + j) * 3
+	const normal = [0, 0, 0]
+	const height = (i, j) => {
+		const k = at(i, j)
+		return positions[k] * normal[0] + positions[k + 1] * normal[1] + positions[k + 2] * normal[2]
+	}
+	// The second difference across four vertices in a row, centered on the
+	// quad.
+	const second = (h0, h1, h2, h3) => (h0 - h1 - h2 + h3) / 2
+	for (let i = 0; i < around; i++) {
+		for (let j = 0; j < across - 1; j++) {
+			const [p00, p10, p01, p11] = [at(i, j), at(i + 1, j), at(i, j + 1), at(i + 1, j + 1)]
+			const u = [0, 1, 2].map(
+				(c) => positions[p10 + c] - positions[p00 + c] + positions[p11 + c] - positions[p01 + c],
+			)
+			const v = [0, 1, 2].map(
+				(c) => positions[p01 + c] - positions[p00 + c] + positions[p11 + c] - positions[p10 + c],
+			)
+			const n = vec3.cross(u, v)
+			const length = Math.hypot(n[0], n[1], n[2])
+			if (length < 1e-12) continue
+			for (let c = 0; c < 3; c++) normal[c] = n[c] / length
+			const twist = 2 * (height(i + 1, j + 1) - height(i + 1, j) - height(i, j + 1) + height(i, j))
+			let bend =
+				(second(height(i - 1, j), height(i, j), height(i + 1, j), height(i + 2, j)) +
+					second(
+						height(i - 1, j + 1),
+						height(i, j + 1),
+						height(i + 1, j + 1),
+						height(i + 2, j + 1),
+					)) /
+				2
+			if (j > 0 && j < across - 2) {
+				bend +=
+					(second(height(i, j - 1), height(i, j), height(i, j + 1), height(i, j + 2)) +
+						second(
+							height(i + 1, j - 1),
+							height(i + 1, j),
+							height(i + 1, j + 1),
+							height(i + 1, j + 2),
+						)) /
+					2
+			}
+			diagonals[i * (across - 1) + j] = bend * twist > 0 ? 1 : 0
+		}
+	}
+	return diagonals
 }
 
 // How far out (mm) the conjunctiva mesh reaches in the direction whose X is
@@ -662,12 +989,16 @@ function fornixZ(lids, eye, fissure, nasalSign, x, y) {
 // globe's outline, dipping under the globe there so the sclera meets it in a
 // clean line, and falling back behind the skin at its edge. The skin program
 // shades it as wet mucosa (`lid` s = 0); it does not follow the gaze. Front
-// faces toward +Z.
+// faces toward +Z. It shows only in the canthi, its caruncle and plica
+// medially: elsewhere the lids cover it. Its columns crowd there, up to
+// CONJUNCTIVA.crowd times as close within about CONJUNCTIVA.width radians of
+// each canthus, and spread out under the lids.
+const CONJUNCTIVA = { around: 104, across: 24, crowd: 8, width: 0.35 }
 export function createConjunctivaMesh(
 	lids,
 	eye,
 	nasalSign = 1,
-	{ around = 256, across = 40 } = {},
+	{ around = CONJUNCTIVA.around, across = CONJUNCTIVA.across } = {},
 ) {
 	const fissure = createFissure(lids, nasalSign)
 	const inner = eye.scleraRadius * (FORNIX_START - 0.06)
@@ -675,8 +1006,23 @@ export function createConjunctivaMesh(
 	const lid = new Float32Array(around * across * 4)
 	const relief = new Float32Array(around * across * 4)
 	const follow = new Float32Array(around * across * 2)
+	// The columns' angles: evenly under a density peaking at the canthi.
+	const canthi = [fissure.medial, fissure.lateral].map(([x, y]) => Math.atan2(y, x))
+	const angles = []
+	const density = []
+	for (let k = 0; k <= 2048; k++) {
+		const angle = (k / 2048) * Math.PI * 2
+		angles.push(angle)
+		let crowd = 0
+		for (const canthus of canthi) {
+			const apart = Math.atan2(Math.sin(angle - canthus), Math.cos(angle - canthus))
+			crowd += bell(apart, CONJUNCTIVA.width)
+		}
+		density.push(1 + (CONJUNCTIVA.crowd - 1) * Math.min(1, crowd))
+	}
+	const columns = evenlyUnder(angles, runningIntegral(angles, density), around)
 	for (let i = 0; i < around; i++) {
-		const angle = (i / around) * Math.PI * 2
+		const angle = columns[i]
 		const cx = Math.cos(angle)
 		const cy = Math.sin(angle)
 		const reach = fornixReach(nasalSign, cx)
@@ -686,7 +1032,7 @@ export function createConjunctivaMesh(
 			const y = cy * r
 			const index = i * across + j
 			positions.set([x, y, fornixZ(lids, eye, fissure, nasalSign, x, y)], index * 3)
-			lid.set([i / around, 0, r - inner, cy > 0 ? 1 : 0], index * 4)
+			lid.set([angle / (Math.PI * 2), 0, r - inner, cy > 0 ? 1 : 0], index * 4)
 			relief.set([cx, cy, 0, 0], index * 4)
 			follow.set([cy > 0 ? 1 : 0, 0], index * 2)
 		}
@@ -704,7 +1050,7 @@ export function createConjunctivaMesh(
 			k += 6
 		}
 	}
-	return { positions, lid, relief, follow, indices }
+	return { positions, lid, relief, follow, indices, around, across }
 }
 
 // The palpebral conjunctiva: a curtain hanging from each posterior margin
@@ -715,16 +1061,23 @@ export function createConjunctivaMesh(
 // along the globe's outline, ends on it, on the conjunctiva or on the globe,
 // from any side. Where the margin rests on the globe it stays inside it. It
 // is part of the lid: it follows the gaze with its margin, and shows where
-// the margin stands off the globe. `around` must be the lid mesh's, so its
-// top row is the lid's posterior margin; its rows are denser near the
-// margin, the part the opening shows. `depth`: each vertex's depth below its
-// margin (mm), for the occlusion. The skin program shades it as the margin's
-// posterior border (`lid` s = 0). Front faces toward the opening.
+// the margin stands off the globe. `layout` must be the lid mesh's
+// (lidLayout()), so its columns are the lid's and its top row is the lid's
+// posterior margin; its rows are denser near the margin, the part the
+// opening shows. `depth`: each vertex's depth below its margin (mm), for the
+// occlusion. The skin program shades it as the margin's posterior border
+// (`lid` s = 0). Front faces toward the opening.
 const CURTAIN_BELOW = 1.5
-export function createPalpebralMesh(lids, eye, nasalSign = 1, { around = 560, rows = 12 } = {}) {
+export function createPalpebralMesh(
+	lids,
+	eye,
+	nasalSign = 1,
+	{ layout = lidLayout(lids, eye, nasalSign), rows = 6 } = {},
+) {
 	const fissure = createFissure(lids, nasalSign)
 	const context = lidContext(lids, eye, fissure)
-	const columns = loopColumns(context.open, nasalSign, around)
+	const columns = loopColumns(context.open, nasalSign, layout.columns)
+	const around = columns.length
 	const positions = new Float32Array(around * rows * 3)
 	const lid = new Float32Array(around * rows * 4)
 	const relief = new Float32Array(around * rows * 4)
@@ -773,8 +1126,11 @@ export function createPalpebralMesh(lids, eye, nasalSign = 1, { around = 560, ro
 // intermarginal strip and the support, along both margins, its radius
 // tapering at the canthi and where the margin leaves the globe (lower about
 // 0.36 mm, upper smaller: Yokoi 1999, Shen 2008). Attribute `meniscus` = (t, φ
-// across the fillet, radius).
-export function createMeniscusMesh(lids, eye, nasalSign = 1, { around = 320, across = 10 } = {}) {
+// across the fillet, radius). Its normals are exact, so the mesh only follows
+// its shape: 4 steps across a quarter round of 0.36 mm stray 7 µm from it,
+// and along margins bending over about 15 mm, 128 columns stray 3 µm (at the
+// canthi, where the margins turn sharply, it has tapered to nothing).
+export function createMeniscusMesh(lids, eye, nasalSign = 1, { around = 128, across = 5 } = {}) {
 	const fissure = createFissure(lids, nasalSign)
 	const positions = new Float32Array(around * across * 3)
 	const normals = new Float32Array(around * across * 3)

@@ -183,8 +183,7 @@
     "noseProjection": 6.7,
     "seed": 544,
     "meniscusLower": 0.105,
-    "meniscusUpper": 0.06,
-    "bubbles": 3
+    "meniscusUpper": 0.06
   },
   "lashes": {
     "seed": 8152,

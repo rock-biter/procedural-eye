@@ -170,8 +170,11 @@ test('the blink frames keep the layout, end closed, and the spline follows the c
 	const eye = createEyeGeometry(params)
 	const frames = createBlinkFrames(params)
 	const side = eye.nasalSign
-	const closedAt = (closure) => createLidMesh({ ...params.lids, closure }, eye, side)
 	const open = createLidMesh(params.lids, eye, side)
+	// The lids rebuilt closing, with the layout of the lids at rest (as the
+	// frames).
+	const closedAt = (closure) =>
+		createLidMesh({ ...params.lids, closure }, eye, side, { layout: open.layout })
 	const closed = closedAt(1)
 	assert.equal(frames.lids.length, BLINK_FRAMES)
 	for (const frame of frames.lids) {

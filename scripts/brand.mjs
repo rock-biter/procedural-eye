@@ -44,7 +44,7 @@ const ICON = {
 		},
 		animation: { enabled: false, yaw: 0, pitch: 0 },
 	},
-	setup: ['lids.mesh', 'lashes.mesh', 'tearFilm.meniscus', 'tearFilm.bubbles']
+	setup: ['lids.mesh', 'lashes.mesh', 'tearFilm.meniscus']
 		.map((mesh) => `app.${mesh}.visible = false`)
 		.join(';'),
 }
