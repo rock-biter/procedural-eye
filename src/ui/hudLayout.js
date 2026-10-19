@@ -26,7 +26,7 @@ export const HUD = Object.freeze({
 	dash: 3,
 	dashPeriod: 8,
 	// The skin tones around `center`, at the left on the horizontal, the
-	// first (fair) highest, `spacing` px apart. At rest the middle tone sits
+	// first (light) highest, `spacing` px apart. At rest the middle tone sits
 	// there; the group turns along the circle to bring the pressed one there
 	// (turnTones()).
 	tones: Object.freeze({ center: 180 * DEGREE, spacing: 60 }),
@@ -111,7 +111,7 @@ export const HUD = Object.freeze({
 	}),
 	// Three arcs `span` long on a circle inside the inner zoom ring
 	// (`radiusRatio` of the central radius), 120° apart at rest. Each skin
-	// tone, fair to deep, turns each arc to its own place: `tones` holds their
+	// tone, light to deep, turns each arc to its own place: `tones` holds their
 	// centers per tone (radians clockwise from the right; −90° is the top).
 	arcs: Object.freeze({
 		radiusRatio: 0.78,
@@ -171,7 +171,7 @@ export function hudAngles(radius, toneCount, hud = HUD, split = false) {
 }
 
 // How many spacings the tone group turns (clockwise) to bring the tone at
-// `pressed` (its index, fair first) of `count` to the group's center.
+// `pressed` (its index, light first) of `count` to the group's center.
 export function toneSteps(pressed, count) {
 	return pressed - (count - 1) / 2
 }
@@ -407,7 +407,7 @@ export function spinRing(radius, turns, hud = HUD, split = false) {
 	}
 }
 
-// The three arcs for the skin tone at `tone` (its index, fair first) about
+// The three arcs for the skin tone at `tone` (its index, light first) about
 // the HUD's circle of `radius` px: each a circle of the arcs' radius with a
 // single dash `arcs.span` long, which its SVG dash offset centers on the
 // arc's place (a circle's dashes start at its right and run clockwise; a

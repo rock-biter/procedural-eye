@@ -73,7 +73,7 @@ for (const [screen, [width, height]] of Object.entries(SCREENS)) {
 		}
 	})
 
-	test(`${screen}: the tones lie evenly spaced about their center, fair highest, the middle one there`, () => {
+	test(`${screen}: the tones lie evenly spaced about their center, light highest, the middle one there`, () => {
 		const { tones } = angles
 		assert.equal(tones.length, TONES)
 		assert.ok(near(tones[(TONES - 1) / 2], toneCenter), 'the middle tone at the center')

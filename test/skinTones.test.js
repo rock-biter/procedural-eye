@@ -5,7 +5,7 @@ import { getLeaf, sanitizeValue } from '../src/params/params'
 import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
 import { SKIN_TONES } from '../src/params/skinTones'
 
-test('the skin tones are skin colors, named once, from fair to deep', () => {
+test('the skin tones are skin colors, named once, from light to deep', () => {
 	const leaf = getLeaf(BASE_PARAM_SCHEMA, 'skin.color')
 	const luminance = (hex) => {
 		const [r, g, b] = hexToLinearRgb(hex)

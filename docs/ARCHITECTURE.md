@@ -16,7 +16,7 @@
 | [`src/params/paramTransition.js`](../src/params/paramTransition.js) * | Transitions: numbers and colors glide to a target, the rest switches, lights fade. |
 | [`src/params/presets.js`](../src/params/presets.js) * | Named partial overrides, one per reference photograph. |
 | [`src/params/populationPriors.js`](../src/params/populationPriors.js) * | The random eye: features sampled from measured frequencies by ancestry, mapped onto parameters. |
-| [`src/params/skinTones.js`](../src/params/skinTones.js) * | `SKIN_TONES`: the `skin.color` values of the skin buttons, fair to deep. |
+| [`src/params/skinTones.js`](../src/params/skinTones.js) * | `SKIN_TONES`: the `skin.color` values of the skin buttons, light to deep. |
 | **Eye** | |
 | [`src/eye/eyeProfile.js`](../src/eye/eyeProfile.js) * | Eye geometry in eye space (profile, chamber, lens, iris shell) and its uniform packing. |
 | [`src/eye/cornealOptics.js`](../src/eye/cornealOptics.js) * | Snell, Fresnel, ray–surface intersections, two-surface corneal trace, entrance pupil. |
@@ -185,7 +185,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
   - A tenth of the eyes, of any ancestry (`MAKO_SHARE`), take the fantasy **mako** shade instead: the glowing green-blue of the mako eyes of Final Fantasy VII, a deep blue stroma tinted between green and cyan at full saturation with `irisColor.glow`, without a ring or pigment spots. It is drawn last, so the other eyes of a seed do not change.
   - The result maps onto the age, the pupil, the iris structure and color, and the sclera. The lashes and the skin stay as they are.
   - `main.js` resets those groups to their defaults before applying it, and glides to the result.
-- **Skin tones** ([`src/params/skinTones.js`](../src/params/skinTones.js)): five values of `skin.color`, fair to deep; the light one is the color of `defaults.json`. A skin button (or `skinTone(name)`) glides the color the params are heading for to its tone, the other leaves keeping their targets. Presets do not name the skin, so one brings back the default color.
+- **Skin tones** ([`src/params/skinTones.js`](../src/params/skinTones.js)): five values of `skin.color`, light to deep; the brown one is the color of `defaults.json`, and the light one sets the backdrop’s tone. A skin button (or `skinTone(name)`) glides the color the params are heading for to its tone, the other leaves keeping their targets. Presets do not name the skin, so one brings back the default color.
 - **State**: `encodeState()` writes the non-default values as base64url JSON. **Copy state URL** puts it in `?state=`; **Save PNG** stores it in a `tEXt` chunk named `eye-state` ([`src/render/pngMetadata.js`](../src/render/pngMetadata.js)).
 
 ## Coordinate Spaces

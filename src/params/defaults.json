@@ -187,10 +187,10 @@
   },
   "lashes": {
     "seed": 8152,
-    "upperCount": 150,
-    "lowerCount": 70,
-    "upperLength": 7.5,
-    "lowerLength": 4.0,
+    "upperCount": 180,
+    "lowerCount": 90,
+    "upperLength": 7.8,
+    "lowerLength": 4.3,
     "thickness": 0.075,
     "upperLift": 22,
     "lowerLift": 32,
@@ -203,7 +203,7 @@
     "zoomOut": 1.0
   },
   "skin": {
-    "color": "#a06c48",
+    "color": "#784c32",
     "redness": 0.45,
     "roughness": 0.42,
     "wetness": 0.5,
@@ -368,13 +368,13 @@
     "whiteBalance": 5600
   },
   "zoom": {
-    "in": 230,
+    "in": 250,
     "out": 540,
     "mobileIn": 426,
     "mobileOut": 811,
     "sensorIn": 12,
     "sensorOut": 24,
-    "start": 0.8,
+    "start": 0.5,
     "mobileStart": 0.42,
     "duration": 0.7,
     "elasticity": 0.12
@@ -398,11 +398,11 @@
     "adaptiveResolution": true,
     "minPixelRatio": 1,
     "photoSamples": 256,
-    "irisSteps": 64,
-    "irisShadowSteps": 10,
+    "irisSteps": 32,
+    "irisShadowSteps": 5,
     "irisAoSteps": 5,
     "interactiveShadowSteps": 4,
     "interactiveAoSteps": 3,
-    "splitShading": true
+    "splitShading": false
   }
 }
