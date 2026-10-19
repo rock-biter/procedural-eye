@@ -18,7 +18,6 @@ import {
 import { apertureRadius } from '../camera/cameraOptics'
 import { debugViewDefine } from '../debug/debugViews'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
-import { SHADOW_LAYER } from '../lighting/keyShadow'
 import { DRAW_ORDER } from '../render/drawOrder'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
@@ -31,6 +30,8 @@ import {
 } from './lidGeometry'
 import { setBlinkFrames, setBlinkPlaceholders } from './lidBlink'
 import { bakeLidOcclusion } from './lidOcclusion'
+import ShadowCaster from './shadowCaster'
+import { lidShadowProxy } from './shadowProxy'
 import SkinPattern from './skinPattern'
 import SkinRelief from './skinRelief'
 
@@ -68,8 +69,9 @@ export default class Lids {
 		this.mesh = new Mesh(new BufferGeometry(), this.material)
 		this.mesh.name = 'Lids'
 		this.mesh.renderOrder = DRAW_ORDER.lids
-		// Casters of the key light's shadow.
-		this.mesh.layers.enable(SHADOW_LAYER)
+		// Its lighter stand-in casts the key light's shadow
+		// (src/adnexa/shadowProxy.js).
+		this.shadow = new ShadowCaster('LidsShadow')
 		this.fissure = null
 		// The back shell: the same skin uniforms, and its tone. It lies behind
 		// the skin the key light falls on, so it casts no shadow.
@@ -183,6 +185,18 @@ export default class Lids {
 			curtain: (data.positions.length + fornix.positions.length) / 3,
 			rows: curtain.positions.length / 3 / around,
 		}
+		this.shadow.rebuild(
+			geometry,
+			lidShadowProxy({
+				ring: { columns: around, rows: this.layout.across, layout: data.layout },
+				conjunctiva: {
+					first: data.positions.length / 3,
+					columns: fornix.around,
+					rows: fornix.across,
+				},
+				curtain: { first: this.layout.curtain, rows: this.layout.rows },
+			}),
+		)
 		// The patterns cover the mesh at rest, with a texel or so to spare.
 		const { min, max } = geometry.boundingBox
 		this.pattern.bake(
@@ -230,6 +244,7 @@ export default class Lids {
 			occlusion.push(new BufferAttribute(ao, 1))
 		}
 		setBlinkFrames(geometry, { position: positions, normal: normals, color: occlusion })
+		this.shadow.setBlinkFrames(positions.map((attribute) => attribute.array))
 	}
 
 	// The back shell's mesh from its data (src/adnexa/backShell.js).
@@ -305,6 +320,7 @@ export default class Lids {
 	dispose() {
 		this.mesh.geometry.dispose()
 		this.material.dispose()
+		this.shadow.dispose()
 		this.back.geometry.dispose()
 		this.backMaterial.dispose()
 		this.pattern.dispose()

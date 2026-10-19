@@ -203,7 +203,7 @@ A share f of the density lengthens the steps by 1 / f. The steps stay between 0.
   - It then curls further that way (`upperCurl` / `lowerCurl`), with `randomness` in lift, sideways deviation and curl.
 - **Clumps**: runs of 2–5 neighbors whose tips draw together (`clumping`).
 
-`lashTubes()` sweeps tapered tubes along the 14-segment centerlines, and [`src/adnexa/lashes.js`](../src/adnexa/lashes.js) makes them a geometry. The lash material (`lash-fragment.glsl`) uses Kajiya–Kay diffuse and two shifted specular lobes along the hair: a white one off the cuticle (`lashes.shine`) and a dimmer, colored one through the fiber. Tips are lighter. Lashes and lids cast the key-light shadow (layer 1).
+`lashTubes()` sweeps tapered tubes along the 14-segment centerlines, and [`src/adnexa/lashes.js`](../src/adnexa/lashes.js) makes them a geometry. The lash material (`lash-fragment.glsl`) uses Kajiya–Kay diffuse and two shifted specular lobes along the hair: a white one off the cuticle (`lashes.shine`) and a dimmer, colored one through the fiber. Tips are lighter. Lashes and lids cast the key-light shadow through lighter stand-ins, their shadow proxies ([`docs/OPTICS.md`](OPTICS.md#key-light-shadow)).
 
 ## Tear Film
 

@@ -3,12 +3,13 @@
 import { BufferAttribute, BufferGeometry, Color, Mesh, ShaderMaterial, Uniform } from 'three'
 import { debugViewDefine } from '../debug/debugViews'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
-import { SHADOW_LAYER } from '../lighting/keyShadow'
 import { DRAW_ORDER } from '../render/drawOrder'
 import fragmentShader from '../shaders/lash-fragment.glsl'
 import vertexShader from '../shaders/lash-vertex.glsl'
-import { generateLashes, lashTubes } from './lashGenerator'
+import { generateLashes, LASH_SIDES, lashTubes } from './lashGenerator'
 import { setBlinkFrames, setBlinkPlaceholders } from './lidBlink'
+import ShadowCaster from './shadowCaster'
+import { lashShadowProxy } from './shadowProxy'
 
 // Tube geometry along every lash (lashTubes(), src/adnexa/lashGenerator.js).
 export function createLashGeometry(lashes) {
@@ -45,8 +46,9 @@ export default class Lashes {
 		this.mesh.name = 'Lashes'
 		// Drawn first: the skin and the eye behind them are not shaded.
 		this.mesh.renderOrder = DRAW_ORDER.lashes
-		// Casters of the key light's shadow.
-		this.mesh.layers.enable(SHADOW_LAYER)
+		// Their lighter stand-in casts the key light's shadow
+		// (src/adnexa/shadowProxy.js).
+		this.shadow = new ShadowCaster('LashesShadow')
 		this.lashes = []
 	}
 
@@ -59,6 +61,13 @@ export default class Lashes {
 		setBlinkPlaceholders(geometry, ['position', 'normal', 'tangent3'])
 		this.mesh.geometry = geometry
 		this.mesh.updateMorphTargets()
+		this.shadow.rebuild(
+			geometry,
+			lashShadowProxy(
+				this.lashes.map((lash) => lash.points.length),
+				LASH_SIDES,
+			),
+		)
 	}
 
 	// The blink's frames: positions, normals and tangents per frame
@@ -70,6 +79,7 @@ export default class Lashes {
 			normal: attributes('normals'),
 			color: attributes('tangents'),
 		})
+		this.shadow.setBlinkFrames(frames.map((frame) => frame.positions))
 	}
 
 	setDebugView(view) {
@@ -87,5 +97,6 @@ export default class Lashes {
 	dispose() {
 		this.mesh.geometry.dispose()
 		this.material.dispose()
+		this.shadow.dispose()
 	}
 }

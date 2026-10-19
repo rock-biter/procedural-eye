@@ -1050,7 +1050,7 @@ export function createConjunctivaMesh(
 			k += 6
 		}
 	}
-	return { positions, lid, relief, follow, indices }
+	return { positions, lid, relief, follow, indices, around, across }
 }
 
 // The palpebral conjunctiva: a curtain hanging from each posterior margin

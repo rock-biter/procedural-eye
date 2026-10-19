@@ -1,4 +1,5 @@
-// The blink on the GPU. The lid meshes (lids, lashes, tear meniscus) carry
+// The blink on the GPU. The lid meshes (lids, lashes, tear meniscus, and the
+// lids' and lashes' shadow casters, src/adnexa/shadowCaster.js) carry
 // BLINK_FRAMES closing frames as three.js morph targets, absolute positions
 // (src/adnexa/blinkFrames.js), and lid-morph.glsl blends them by the weights
 // of the blink's closure; the fissure map's second channel holds the fissure
@@ -110,7 +111,14 @@ export default class LidBlink {
 	set(blink) {
 		const value = this.ready ? blink : 0
 		const weights = blinkWeights(value)
-		for (const mesh of [this.lids.mesh, this.lashes.mesh, this.tearFilm.meniscus]) {
+		const meshes = [
+			this.lids.mesh,
+			this.lids.shadow.mesh,
+			this.lashes.mesh,
+			this.lashes.shadow.mesh,
+			this.tearFilm.meniscus,
+		]
+		for (const mesh of meshes) {
 			const influences = mesh.morphTargetInfluences
 			if (influences) for (let k = 0; k < weights.length; k++) influences[k] = weights[k]
 		}

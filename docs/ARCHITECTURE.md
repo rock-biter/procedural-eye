@@ -39,7 +39,9 @@
 | [`src/adnexa/fissureMap.js`](../src/adnexa/fissureMap.js) * | Signed distance to the fissure, baked for the shaders. |
 | [`src/adnexa/blinkFrames.js`](../src/adnexa/blinkFrames.js) * | The blink's closing frames: the lid ring (with its occlusion), the meniscus and the lashes closed by steps, and the closed fissure map; the spline weights between them. |
 | [`src/adnexa/blinkFrames.worker.js`](../src/adnexa/blinkFrames.worker.js) | Builds the blink's frames off the main thread (the only worker). |
-| [`src/adnexa/lidBlink.js`](../src/adnexa/lidBlink.js) | The blink on the GPU: asks the worker for the frames, puts them on the lid, lash and meniscus meshes as morph targets, sets the weights and `uLidBlink`. |
+| [`src/adnexa/lidBlink.js`](../src/adnexa/lidBlink.js) | The blink on the GPU: asks the worker for the frames, puts them on the lid, lash and meniscus meshes (and the lids' and lashes' shadow proxies) as morph targets, sets the weights and `uLidBlink`. |
+| [`src/adnexa/shadowProxy.js`](../src/adnexa/shadowProxy.js) * | Lighter stand-ins of the lid and lash meshes for the shadow passes, each vertex a fixed blend of at most two of the mesh's, and those blends applied to any of its attributes (the blink's frames too). |
+| [`src/adnexa/shadowCaster.js`](../src/adnexa/shadowCaster.js) | A shadow proxy as a mesh on the shadow layer only, with its mesh's positions, gaze follow and blink frames. |
 | [`src/adnexa/lids.js`](../src/adnexa/lids.js), [`lashes.js`](../src/adnexa/lashes.js), [`tearFilm.js`](../src/adnexa/tearFilm.js) | The lid, back shell, lash and meniscus meshes with their materials. |
 | [`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js) | The skin's pigment patterns baked on the GPU over the lid mesh at rest. |
 | [`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js) | The skin's relief and freckles baked on the GPU over the same box, read outside `#debug`. |
