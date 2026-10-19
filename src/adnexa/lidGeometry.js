@@ -32,6 +32,7 @@
 // skin bends, so that the mesh strays from the surface by at most
 // LAYOUT.tolerance between its vertices.
 import { smoothstep, smootherstep, vec3 } from '../math'
+import { bendAt, chordStep, evenlyUnder, runningIntegral, widen } from '../meshLayout'
 import { createFissure } from './fissure'
 import {
 	conjunctivaZ,
@@ -643,8 +644,7 @@ function skinS(profile, reach, a) {
 
 // The longest step (mm) over a bend of curvature `k` (per mm).
 function layoutStep(k) {
-	const step = Math.sqrt((8 * LAYOUT.tolerance) / Math.max(k, 1e-9))
-	return Math.min(Math.max(step, LAYOUT.minStep), LAYOUT.maxStep)
+	return Math.min(Math.max(chordStep(k, LAYOUT.tolerance), LAYOUT.minStep), LAYOUT.maxStep)
 }
 
 // The share of the density the curvature asks for (LAYOUT.density) on a
@@ -655,56 +655,6 @@ function zoneDensity(profile, u, rim) {
 	const end = Math.max(lidsEnd, profile.ring + lidsPast - profile.radius)
 	const away = lids + (far - lids) * smootherstep(end, end + farAfter, u)
 	return away + (atRim - away) * (1 - smootherstep(0, rimBand, rim))
-}
-
-// The curvature (per mm) of the polyline a, b, c at b: its turning over the
-// mean of its two segments. 0 where they are too short to tell.
-function bendAt(a, b, c) {
-	const d0 = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])
-	const d1 = Math.hypot(c[0] - b[0], c[1] - b[1], c[2] - b[2])
-	if (d0 < 1e-6 || d1 < 1e-6) return 0
-	let turn = 0
-	for (let i = 0; i < 3; i++) turn += ((c[i] - b[i]) / d1 - (b[i] - a[i]) / d0) ** 2
-	return (2 * Math.sqrt(turn)) / (d0 + d1)
-}
-
-// `count` + 1 points from 0 to the end of `cumulative` (a running integral of
-// a density, sampled at `xs`), the density's integral even between them: they
-// lie closest where it is highest.
-function evenlyUnder(xs, cumulative, count) {
-	const total = cumulative.at(-1)
-	const points = [xs[0]]
-	let k = 1
-	for (let n = 1; n < count; n++) {
-		const target = (n / count) * total
-		while (k < xs.length - 1 && cumulative[k] < target) k++
-		const span = cumulative[k] - cumulative[k - 1]
-		const f = span > 0 ? (target - cumulative[k - 1]) / span : 0
-		points.push(xs[k - 1] + (xs[k] - xs[k - 1]) * f)
-	}
-	points.push(xs.at(-1))
-	return points
-}
-
-// `density` sampled at `xs`, each sample the highest within `reach` of it.
-function widen(xs, density, reach) {
-	return xs.map((x, i) => {
-		let highest = density[i]
-		for (let k = i - 1; k >= 0 && x - xs[k] <= reach; k--) highest = Math.max(highest, density[k])
-		for (let k = i + 1; k < xs.length && xs[k] - x <= reach; k++) {
-			highest = Math.max(highest, density[k])
-		}
-		return highest
-	})
-}
-
-// The running integral of `density` sampled at `xs` (trapezoids).
-function runningIntegral(xs, density) {
-	const cumulative = [0]
-	for (let i = 1; i < xs.length; i++) {
-		cumulative.push(cumulative[i - 1] + ((density[i - 1] + density[i]) / 2) * (xs[i] - xs[i - 1]))
-	}
-	return cumulative
 }
 
 // How far past the anterior edge the near rows reach on a column `length` mm
@@ -1176,8 +1126,11 @@ export function createPalpebralMesh(
 // intermarginal strip and the support, along both margins, its radius
 // tapering at the canthi and where the margin leaves the globe (lower about
 // 0.36 mm, upper smaller: Yokoi 1999, Shen 2008). Attribute `meniscus` = (t, φ
-// across the fillet, radius).
-export function createMeniscusMesh(lids, eye, nasalSign = 1, { around = 320, across = 10 } = {}) {
+// across the fillet, radius). Its normals are exact, so the mesh only follows
+// its shape: 4 steps across a quarter round of 0.36 mm stray 7 µm from it,
+// and along margins bending over about 15 mm, 128 columns stray 3 µm (at the
+// canthi, where the margins turn sharply, it has tapered to nothing).
+export function createMeniscusMesh(lids, eye, nasalSign = 1, { around = 128, across = 5 } = {}) {
 	const fissure = createFissure(lids, nasalSign)
 	const positions = new Float32Array(around * across * 3)
 	const normals = new Float32Array(around * across * 3)

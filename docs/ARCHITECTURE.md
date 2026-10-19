@@ -20,7 +20,7 @@
 | **Eye** | |
 | [`src/eye/eyeProfile.js`](../src/eye/eyeProfile.js) * | Eye geometry in eye space (profile, chamber, lens, iris shell) and its uniform packing. |
 | [`src/eye/cornealOptics.js`](../src/eye/cornealOptics.js) * | Snell, Fresnel, ray–surface intersections, two-surface corneal trace, entrance pupil. |
-| [`src/eye/eyeballGeometry.js`](../src/eye/eyeballGeometry.js) | The eyeball mesh with its cap and sclera groups, coarse on purpose (the shaders refine the surface). |
+| [`src/eye/eyeballGeometry.js`](../src/eye/eyeballGeometry.js) | The eyeball mesh with its cap and sclera groups, coarse on purpose (the shaders refine the surface): rings and columns by the surface's bend, looser where the lids always cover it. |
 | [`src/eye/eyeball.js`](../src/eye/eyeball.js) | The eyeball mesh, its two `ShaderMaterial`s and their shared uniforms (optics, iris, sclera, lid reflections). |
 | [`src/eye/eyeRig.js`](../src/eye/eyeRig.js) | Pivot (the globe's center, gaze) and eye-space group; world↔eye matrices. |
 | **Iris** ([`docs/IRIS.md`](IRIS.md)) | |
@@ -79,6 +79,7 @@
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
 | [`src/ui/hud.js`](../src/ui/hud.js) | The HUD: a dashed circle around the eye (two on a portrait box, the zoom on the wider one, kept above the footer by `reserveBottom()`), cut around each button, with flat square reticles, animated selection brackets, two counter-rotating segmented zoom rings and the square zoom marker sliding along it with resisted overshoot and snap on release; `main.js` gives it the actions. |
 | [`src/ui/hudLayout.js`](../src/ui/hudLayout.js) * | The HUD's circle (`HUD.scale` times the one inscribed in its box, or smaller until its buttons fit), on a portrait box split from the zoom's wider circle (`HUD.split`, `zoomRadius()`), and every button's angle on them; the knob's track, its angle at a zoom level and back, and the endpoints a released drag snaps to and its bounded elastic overshoot; the unclamped camera progress and bounded zoom level of a camera distance (log scale) and back; the inner and outer segmented rings' fixed radius ratios, their turns at that level and their paths at the layout's size, with dashes in px (`orbitArt()`, `dashFit()`). |
+| [`src/meshLayout.js`](../src/meshLayout.js) * | Vertices spaced by the surface's bend (the chord's sagitta under a tolerance), density integrals and even placement under them, rings of different counts zipped by angle: for the lids, the back shell and the eyeball. |
 | [`src/math.js`](../src/math.js) *, [`src/random.js`](../src/random.js) * | Scalar and vector helpers; seeds, PCG hash twin, weighted picks, Gaussian samples. |
 | [`src/frameStats.js`](../src/frameStats.js), [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | Frame telemetry and the adaptive resolution rules (from the terrain project). |
 

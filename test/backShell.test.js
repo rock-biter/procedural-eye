@@ -216,6 +216,31 @@ test('only the hidden parts move inside: the fornix past the globe, the curtain 
 	}
 })
 
+test('the dome follows its bend with few vertices, the band keeps the edge', () => {
+	// The app's lid mesh, the patch's edge its own columns.
+	const eye = eyeOf(1)
+	const lid = createLidMesh(params.lids, eye, 1)
+	const surface = backShellSurface(lid, eye, params.shell)
+	const back = createBackShell(lid, surface, params.shell)
+	const edge = lid.rim.length / 3
+	const count = back.positions.length / 3
+	// The band's two rings and the dome's edge ring keep the edge's columns;
+	// the rest of the dome takes about five hundred vertices.
+	assert.ok(count - 3 * edge < 600, `${count} vertices, ${edge} on the edge`)
+	// Each of its triangles' middles lies near the dome (in height: near the
+	// band the dome is steep).
+	let worst = 0
+	for (let k = 0; k < back.indices.length; k += 3) {
+		const corners = [0, 1, 2].map((i) => back.indices[k + i])
+		if (corners.some((v) => v < 3 * edge)) continue
+		const middle = [0, 1, 2].map(
+			(c) => corners.reduce((sum, v) => sum + back.positions[v * 3 + c], 0) / 3,
+		)
+		worst = Math.max(worst, Math.abs(surface.heightAt(middle[0], middle[1]) - middle[2]))
+	}
+	assert.ok(worst < 0.4, `${worst} mm off the dome`)
+})
+
 test('a larger clearance or band pushes the dome back', () => {
 	const near = build(params.lids, 1, { ...params.shell, clearance: 1 })
 	const far = build(params.lids, 1, { ...params.shell, clearance: 6 })
