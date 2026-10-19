@@ -19,6 +19,7 @@ export function createLashGeometry(lashes) {
 	geometry.setAttribute('normal', new BufferAttribute(tubes.normals, 3))
 	geometry.setAttribute('tangent3', new BufferAttribute(tubes.tangents, 3))
 	geometry.setAttribute('lash', new BufferAttribute(tubes.lash, 2))
+	geometry.setAttribute('lashRadius', new BufferAttribute(tubes.radii, 1))
 	geometry.setAttribute('follow', new BufferAttribute(tubes.follow, 2))
 	geometry.setIndex(new BufferAttribute(tubes.indices, 1))
 	geometry.computeBoundingSphere()
@@ -32,6 +33,7 @@ export default class Lashes {
 			uZero: new Uniform(0),
 			uLashColor: new Uniform(new Color()),
 			uLashShine: new Uniform(0.5),
+			uLashWiden: new Uniform(0),
 			...envUniforms,
 			...shadowUniforms,
 		}
@@ -89,9 +91,12 @@ export default class Lashes {
 		this.material.needsUpdate = true
 	}
 
-	update(params) {
+	// `widen`: how much thicker the lashes are, a share of their radius
+	// (lashWidening(), src/adnexa/lashGenerator.js).
+	update(params, widen = 0) {
 		this.uniforms.uLashColor.value.set(params.lashes.color)
 		this.uniforms.uLashShine.value = params.lashes.shine
+		this.uniforms.uLashWiden.value = widen
 	}
 
 	dispose() {

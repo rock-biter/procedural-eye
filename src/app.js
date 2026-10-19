@@ -23,6 +23,7 @@ import { accumulationSample } from './camera/lensSampling'
 import PhysicalCamera from './camera/physicalCamera'
 import { entrancePupil } from './eye/cornealOptics'
 import Lashes from './adnexa/lashes'
+import { lashWidening } from './adnexa/lashGenerator'
 import { bakeFissureMap, FISSURE_MAP } from './adnexa/fissureMap'
 import LidBlink from './adnexa/lidBlink'
 import Lids from './adnexa/lids'
@@ -660,7 +661,11 @@ export default class EyeApp {
 			this.lightRig.luminance * 0.05,
 		)
 		this.lids.update(this.params, pixelAngle)
-		this.lashes.update(this.params)
+		// The lashes thicken as the camera zooms out, between the screen's zoom
+		// distances (main.js), so they read fuller from afar.
+		const zoom = this.controls.distanceLimits?.() ?? [this.params.zoom.in, this.params.zoom.out]
+		const widen = lashWidening(this.params.camera.distance, zoom, this.params.lashes.zoomOut)
+		this.lashes.update(this.params, widen)
 		const lens = this.params.camera
 		this.post.splitShading = this.params.quality.splitShading
 		this.post.antialias = this.params.quality.antialias

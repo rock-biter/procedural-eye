@@ -263,6 +263,9 @@ export const BASE_PARAM_SCHEMA = {
 		randomness: num(0.6, 0, 1, 0.01, '', 'rebuild'),
 		color: color('#1d140f'),
 		shine: num(0.5, 0, 1, 0.01),
+		// How much thicker the lashes are zoomed all the way out (none zoomed
+		// in): fuller from afar without more of them.
+		zoomOut: num(0.3, 0, 1, 0.01, '', 'uniform', 'thicker zoomed out'),
 	},
 	skin: {
 		color: color('#c98f6e'),

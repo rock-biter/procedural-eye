@@ -152,7 +152,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uSkinPattern`, `uSkinPatternBox` | The baked pigment patterns and the front-plane box they cover ([`src/adnexa/skinPattern.js`](../src/adnexa/skinPattern.js)). |
 | `uSkinRelief`, `uSkinReliefTexel`, `uSkinFreckles`, `uSkinFrecklesTexel` | With `SKIN_BAKED`: the baked relief (the lids', or the shell's in its program) and freckles over the same box, and their texel sizes (mm), which set the mip level they are read at ([`src/adnexa/skinRelief.js`](../src/adnexa/skinRelief.js)). |
 | `uShellTone` | The back shell's albedo, a share of the skin's (`shell.tone`); its program shares the skin's other uniforms. |
-| `uLashColor`, `uLashShine` | Lash fiber color and cuticle shine. |
+| `uLashColor`, `uLashShine`, `uLashWiden` | Lash fiber color and cuticle shine; how much thicker the lashes are, a share of their radius, as the camera zooms out. |
 | `uTearTint` | What the water shows of what lies behind. |
 | **Dust and haze** | |
 | `uView`, `uProjection`, `uViewport` | The pinhole camera of the frame and the buffer size (px). |

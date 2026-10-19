@@ -147,10 +147,20 @@ export function generateLashes(params, eye) {
 	return lashes.map((lash, i) => ({ ...lash, points: centerlines[i] }))
 }
 
+// How much thicker the lashes are at camera `distance` (a share of their
+// radius): `share` at the zoom-out end of `limits` ([zoom in, zoom out]
+// distances), none at the zoom-in end, linear between on the log of the
+// distance, as the HUD's zoom level runs.
+export function lashWidening(distance, [near, far], share) {
+	const level = Math.log(distance / near) / Math.log(far / near)
+	return share * Math.min(Math.max(level, 0), 1)
+}
+
 // Tube geometry along every lash: parallel-transported rings, radius tapering
 // over the last third. Attributes: positions, normals, tangents (along the
-// lash), `lash` = (place along it, 0 root to 1 tip; a random per lash) and
-// `follow` = (upper lid, 1), and the triangles. `references`: the vector each
+// lash), `lash` = (place along it, 0 root to 1 tip; a random per lash),
+// `radii` (the ring's radius, which the lashes widen by as the camera zooms
+// out) and `follow` = (upper lid, 1), and the triangles. `references`: the vector each
 // lash's first ring is oriented by (returned); pass those of the open lids
 // for a closing one, so the rings of the blink's frames correspond.
 export function lashTubes(lashes, references = null) {
@@ -159,6 +169,7 @@ export function lashTubes(lashes, references = null) {
 	const normals = new Float32Array(ringCount * SIDES * 3)
 	const tangents = new Float32Array(ringCount * SIDES * 3)
 	const attributes = new Float32Array(ringCount * SIDES * 2)
+	const radii = new Float32Array(ringCount * SIDES)
 	const follow = new Float32Array(ringCount * SIDES * 2)
 	const indices = []
 	const used = []
@@ -186,6 +197,7 @@ export function lashTubes(lashes, references = null) {
 				normals.set(normal, vertex * 3)
 				tangents.set(tangent, vertex * 3)
 				attributes.set([u, random], vertex * 2)
+				radii[vertex] = radius
 				follow.set([lash.side === 'upper' ? 1 : 0, 1], vertex * 2)
 				vertex++
 			}
@@ -205,6 +217,7 @@ export function lashTubes(lashes, references = null) {
 		normals,
 		tangents,
 		lash: attributes,
+		radii,
 		follow,
 		indices: new Uint32Array(indices),
 		references: used,

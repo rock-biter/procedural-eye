@@ -125,7 +125,7 @@
      3. `LightRig` rebuilds the emitters and packs them in eye space and in world space.
      4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window; on fresh frames it reduces it into the key's soft coverage when the light, `backdrop.softness` or the lids changed (`refreshScene()`, after the mesh tree shows or hides an object, drops both coverages).
      5. `ShaftLight` sets the light shafts' source, blades (swaying and flickering on the dust's clock), cookie (baked again when their layout changed or they moved) and light; on fresh frames it redraws their shadow and coverage when its inputs changed. Moving shafts restart the image every frame (`shaftsMove`), as a living eye does. `Backdrop` takes the clear color and the shadow plane.
-     6. The eyeball, lid and lash uniforms are refreshed from the params.
+     6. The eyeball, lid and lash uniforms are refreshed from the params; the lashes' widening from the camera's distance between the screen's zoom distances (`lashWidening()`, [`docs/ADNEXA.md`](ADNEXA.md#lashes)).
      7. The post-processing updates the lens of the depth of field and its fade, then the haze, the shafts' origin and the dust (`updateAtmosphere()`: the pinhole camera, the rig and the dust's clock), then the composer renders.
 
 ## Parameter Routing

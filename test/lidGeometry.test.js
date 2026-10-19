@@ -654,6 +654,36 @@ test('baked occlusion: open on the face, dark in the canthi and under the margin
 	)
 })
 
+test('the lashes thicken as the camera zooms out, by their own radius', async () => {
+	const { generateLashes, LASH_SIDES, lashTubes, lashWidening } =
+		await import('../src/adnexa/lashGenerator')
+	// None zoomed in, the whole share zoomed out, half of it half way on the
+	// log of the distance; held past both ends.
+	const limits = [300, 540]
+	close(lashWidening(300, limits, 0.3), 0, 1e-12)
+	close(lashWidening(540, limits, 0.3), 0.3, 1e-12)
+	close(lashWidening(Math.sqrt(300 * 540), limits, 0.3), 0.15, 1e-12)
+	close(lashWidening(200, limits, 0.3), 0, 1e-12)
+	close(lashWidening(800, limits, 0.3), 0.3, 1e-12)
+	// Each vertex carries its ring's radius: its distance off the centerline.
+	const lashes = generateLashes(params, eye)
+	const tubes = lashTubes(lashes)
+	let ring = 0
+	for (const lash of lashes.slice(0, 20)) {
+		lash.points.forEach((center, k) => {
+			for (let j = 0; j < LASH_SIDES; j++) {
+				const v = (ring + k) * LASH_SIDES + j
+				const p = tubes.positions.subarray(v * 3, v * 3 + 3)
+				const off = Math.hypot(p[0] - center[0], p[1] - center[1], p[2] - center[2])
+				close(off, tubes.radii[v], 1e-5)
+			}
+		})
+		ring += lash.points.length
+	}
+	// Thinner toward the tip, so the tips stay fine as the lashes widen.
+	assert.ok(tubes.radii[(lashes[0].points.length - 1) * LASH_SIDES] < 0.2 * tubes.radii[0])
+})
+
 test('lashes: counts, lengths, roots on the margin, pointing away from the eye', async () => {
 	const { generateLashes, LASH_SEGMENTS } = await import('../src/adnexa/lashGenerator')
 	const lashes = generateLashes(params, eye)
