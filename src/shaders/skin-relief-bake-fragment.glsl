@@ -32,9 +32,7 @@ void main() {
 	vec2 across = normalize(vRelief.xy + vec2(1e-6, 0.0));
 	MicroRelief r =
 		skinMicroRelief(p, a, along, alongMm, upper, across, uCanthi, uSkin.w, uSkin2.x, uFootprint, 1.0, seed);
-	vec3 micro = r.furrowed + r.network;
-	vec3 wrinkles = onSkin * r.wrinkles;
-	gl_FragColor =
-		encodeRelief(micro.yz + wrinkles.yz, 3.0 * r.furrowed.x + r.network.x, 4.0 * micro.x + 1.5 * wrinkles.x);
+	vec4 terms = reliefTerms(r.furrowed, r.network, r.openings, onSkin * r.wrinkles);
+	gl_FragColor = encodeRelief(terms.xy, terms.z, terms.w);
 #endif
 }

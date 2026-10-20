@@ -43,6 +43,8 @@
   - The frames take a couple of seconds in a worker after a lid rebuild; until they arrive the eye does not blink.
 - **Skin**:
   - The fine relief is evaluated in the front plane, so it stretches where the skin turns away from it, deep in the canthi.
+  - Its bake costs about 0.35 s of GPU work on the M1, a hitch at start-up and at the end of a glide that changes `lids.seed` or the skin's structure; spread over several frames, it would not show.
+  - Light scattered under the skin softens the relief in the diffuse by a share per channel, not by scale: the dimples of the pores fade in the red as much as the furrows.
   - There are no vellus hairs.
 - **Lashes**: they have no minimum on-screen width, so far-off fine lashes alias in interactive frames until the accumulation resolves them.
 - **Export**: **Save PNG** writes the canvas resolution. Tiled high-resolution export is not implemented.

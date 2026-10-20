@@ -1,8 +1,9 @@
 // Periocular skin at macro scale, in the front plane at the lids' rest
-// position (mm): the micro-relief (furrows crossing into rhomboid plateaus,
-// the fine network inside them, pores, fine wrinkles along the lids and the
-// crow's feet) as height functions returning vec3(height mm ≤ 0, d/dx, d/dy),
-// and the pigment patterns (mottling, freckles, veins seen through the thin
+// position (mm): the micro-relief (furrows crossing into domed plateaus, the
+// secondary furrows inside them, the follicles opening at the crossings, the
+// dimples of the visible pores, fine wrinkles along the lids and the crow's
+// feet) as height functions returning vec3(height mm ≤ 0, d/dx, d/dy), and
+// the pigment patterns (mottling, freckles, veins seen through the thin
 // skin). Nothing is periodic: every pattern is hashed per cell.
 #ifndef SKIN_RELIEF_GLSL
 #define SKIN_RELIEF_GLSL
@@ -61,90 +62,185 @@ vec2 grooves(float w, vec2 p, float spacing, float width, float segment, float f
 	return sum;
 }
 
-// The primary furrows of the skin surface: three families of straight,
-// broken grooves 60° apart, crossing into rhomboid and triangular plateaus.
-// The family along the skin tension lines (`tension`, unit) is the deepest.
-// Each line breaks into segments by a 1D noise along it.
-vec3 furrows(vec2 p, vec2 tension, float footprint, uint seed) {
-	// A slight wobble keeps the lines from looking ruled.
-	vec2 q = p + 0.025 * vec2(valueNoise(p * 2.3, seed), valueNoise(p * 2.3 + 7.7, seed + 9u));
-	float width = sqrt(sq(0.016) + sq(0.5 * footprint));
-	float depth = 0.016 / width;
-	vec3 sum = vec3(0.0);
-	for (int k = ZERO; k < 3; k++) {
-		float angle = float(k) * (PI / 3.0) + 0.3;
-		vec2 across = vec2(cos(angle), sin(angle));
-		vec2 along = vec2(-across.y, across.x);
-		float weight = depth * (0.3 + 0.7 * pow(abs(dot(along, tension)), 6.0));
-		float spacing = 0.22 + 0.04 * float(k);
-		float w = dot(q, across);
-		float v = dot(q, along) / 0.5;
-		float cell = floor(w / spacing);
-		for (int j = -1; j <= 1; j++) {
-			uint h = pcgHash(uint(int(cell) + j) ^ (seed + uint(k) * 101u));
-			vec4 r = hashBytes(h);
-			float center = (cell + float(j) + 0.15 + 0.7 * r.x) * spacing;
-			// Segments: a 1D value noise along the line.
-			float i = floor(v + r.y * 64.0);
-			float f = v + r.y * 64.0 - i;
-			float on = mix(
-				hashBytes(pcgHash(uint(int(i)) ^ h)).x,
-				hashBytes(pcgHash(uint(int(i) + 1) ^ h)).x,
-				f * f * (3.0 - 2.0 * f)
-			);
-			float d = (w - center) / width;
-			float g = weight * (0.3 + 0.7 * r.w) * smoothstep(0.35, 0.65, on) * exp(-d * d);
-			sum += vec3(-g, (2.0 * d * g / width) * across);
-		}
-	}
-	return sum;
+// A height (mm) with its front-plane gradient, and the pits opening in it.
+struct Pitted {
+	vec3 relief;
+	vec3 pits;
+};
+
+// The node of cell `c` of a star grid (hash `h`), mm from the point `q`
+// (cells).
+vec2 starNode(ivec2 c, uint h, vec2 q, float cell) {
+	return (vec2(c) + 0.2 + 0.6 * vec2(float(h & 65535u), float(h >> 16u)) / 65535.0 - q) * cell;
 }
 
-// The fine network of shallow grooves inside the plateaus (Worley cell
-// borders, cells about 0.13 mm) and pores at some cell centers (up to about
-// 4 per mm² with `pores` 1), prefiltered by the pixel `footprint` (mm) like
-// the grooves. Heights in units of the groove depth.
-vec3 fineNetwork(vec2 p, float pores, float footprint, uint seed) {
-	const float SCALE = 7.5;
-	vec2 q = p * SCALE;
+// The primary furrows: stars of fine lines out of the hair follicles, which
+// open at the nodes of a jittered `cell` mm grid (Hashimoto's primary lines,
+// which run through the follicles). Each node is joined to its eight
+// neighbors and, by longer lines, to the four beyond them a knight's move
+// away, a share `kept` of the lines shown, each a little bowed: they cross
+// into the small triangular and rhomboid plateaus of the skin surface. The
+// lines are deepest at the follicles; those along the skin tension lines
+// (`tension`, unit) are deeper, by `emphasis` (0: all alike). The profile
+// (`profile`: depth, flank width, bottom radius, mm) is a V with a rounded
+// bottom and exponential flanks; where lines meet, the deepest wins (a smooth
+// maximum). The follicle at each node is a round pit 60–100 µm across,
+// `follicles` its depth (mm); some (`dimples`: the chance per node) open in
+// the shallow round dimple, 0.25–0.5 mm across, of a visible pore, which
+// gives the skin its golf-ball look (Flament et al. 2015: 10–90 per cm² on
+// the cheeks). Prefiltered by the pixel `footprint` (mm): flanks and pits
+// narrower than it widen and grow shallower, keeping their volume, so fresh
+// frames do not flicker.
+Pitted starFurrows(
+	vec2 p,
+	vec2 tension,
+	float emphasis,
+	float cell,
+	float kept,
+	vec3 profile,
+	float follicles,
+	float dimples,
+	float footprint,
+	uint seed
+) {
+	// The lines' directions, the eight neighbors' as four lines out of each
+	// node, then the knight's moves.
+	const ivec2 LINES[8] = ivec2[8](
+		ivec2(1, 0), ivec2(0, 1), ivec2(1, 1), ivec2(-1, 1), ivec2(2, 1), ivec2(1, 2), ivec2(-1, 2), ivec2(-2, 1)
+	);
+	vec2 q = p / cell;
+	ivec2 i = ivec2(floor(q));
+	float flank = sqrt(sq(profile.y) + sq(0.5 * footprint));
+	float round = profile.z * flank / profile.y;
+	float depth = profile.x * profile.y / flank;
+	// Every line whose cells' box holds p's cell (the lines run up and
+	// sideways, so they leave from the nodes up to two rows below and two
+	// columns aside): the smooth maximum of their depths, (Σ g⁴)^¼, from the
+	// sums of g⁴ and g³ ∇g. The back shell, seen from afar, has only the lines
+	// to the eight neighbors.
+#ifdef SKIN_SHELL
+	const int LINE_COUNT = 4;
+#else
+	const int LINE_COUNT = 8;
+#endif
+	float sum4 = 0.0;
+	vec2 sum3 = vec2(0.0);
+	for (int sy = ZERO - 2; sy <= 0; sy++) {
+		for (int sx = ZERO - 2; sx <= 2; sx++) {
+			ivec2 c = i + ivec2(sx, sy);
+			uint h = cellHash(c, seed);
+			vec2 from = starNode(c, h, q, cell);
+			for (int k = ZERO; k < LINE_COUNT; k++) {
+				ivec2 line = LINES[k];
+				ivec2 low = min(ivec2(sx, sy), ivec2(sx, sy) + line);
+				ivec2 high = max(ivec2(sx, sy), ivec2(sx, sy) + line);
+				if (any(greaterThan(low, ivec2(0))) || any(lessThan(high, ivec2(0)))) continue;
+				vec4 r = hashBytes(pcgHash(h + uint(k) * 2654435761u));
+				if (r.x >= kept) continue;
+				vec2 span = starNode(c + line, cellHash(c + line, seed), q, cell) - from;
+				float len = length(span);
+				vec2 along = span / len;
+				vec2 normal = vec2(-along.y, along.x);
+				// Along the line 0–1, and across it (signed, bowed); lines
+				// farther than a few flanks add nothing to the maximum.
+				float t = -dot(from, along) / len;
+				float bow = (r.z - 0.5) * 0.12 * len;
+				float across = -dot(from, normal) - 4.0 * bow * saturate(t) * (1.0 - saturate(t));
+				if (abs(across) > 6.0 * flank) continue;
+				vec2 offset;
+				vec2 dOffset = vec2(0.0);
+				if (t <= 0.0 || t >= 1.0) {
+					offset = t <= 0.0 ? -from : -from - span;
+				} else {
+					offset = across * normal;
+					dOffset = -4.0 * bow * (1.0 - 2.0 * t) / len * along * sign(across);
+				}
+				float d = length(offset);
+				vec2 dD = d > 0.0 ? offset / d + dOffset : vec2(0.0);
+				// Deeper toward the follicles at its ends.
+				float ends = sq(2.0 * saturate(t) - 1.0);
+				float weight = depth * (0.35 + 0.65 * r.y) * mix(1.0, 0.3 + 0.7 * sq(sq(dot(along, tension))), emphasis);
+				float rounded = sqrt(d * d + round * round);
+				float e = weight * exp((round - rounded) / flank);
+				float g = (0.6 + 0.4 * ends) * e;
+				vec2 dG = -g * d / (flank * rounded) * dD;
+				if (t > 0.0 && t < 1.0) dG += 1.6 * (2.0 * t - 1.0) / len * e * along;
+				float g2 = g * g;
+				sum4 += g2 * g2;
+				sum3 += g2 * g * dG;
+			}
+		}
+	}
+	float height = pow(sum4, 0.25);
+	Pitted result;
+	result.relief = vec3(-height, -sum3 / max(height * height * height, 1e-12));
+	// The follicles at the nodes around p, and the dimples of the visible
+	// pores: a bowl, smooth at its rim, deeper the wider.
+	result.pits = vec3(0.0);
+	for (int y = ZERO - 1; y <= 1; y++) {
+		for (int x = ZERO - 1; x <= 1; x++) {
+			ivec2 c = i + ivec2(x, y);
+			uint h = cellHash(c, seed);
+			vec2 node = starNode(c, h, q, cell);
+			vec4 r = hashBytes(pcgHash(h ^ seed));
+			float distance2 = dot(node, node);
+			bool dimpled = r.w < dimples;
+			float radius = (dimpled ? 0.045 : 0.03) + 0.02 * r.y;
+			float blurred = sqrt(sq(radius) + sq(0.5 * footprint));
+			float pit = follicles * (0.4 + 0.6 * r.z) * sq(radius / blurred) * exp(-distance2 / sq(blurred));
+			result.pits += vec3(-pit, -2.0 * pit * node / sq(blurred));
+			float bowlRadius = 0.12 + 0.13 * sq(fract(r.w * 7.31 + r.y));
+			float t = distance2 / sq(bowlRadius);
+			if (!dimpled || t >= 1.0) continue;
+			float bowl = 0.1 * bowlRadius;
+			result.relief += vec3(-bowl * sq(1.0 - t), -4.0 * bowl * (1.0 - t) / sq(bowlRadius) * node);
+		}
+	}
+	return result;
+}
+
+// The secondary furrows: Voronoi cells `cell` mm across, each a cushion that
+// domes over its point (a paraboloid, `profile.w` mm below its top at half a
+// cell from it), the furrow a narrow V along the border with a rounded bottom
+// (`profile`: depth, flank width, bottom radius, mm). Prefiltered like the
+// primary furrows. Height in mm with its front-plane gradient.
+vec3 cushions(vec2 p, float cell, vec4 profile, float footprint, uint seed) {
+	vec2 q = p / cell;
 	ivec2 i = ivec2(floor(q));
 	vec2 f = q - vec2(i);
+	// The two nearest points (offsets from p, cells).
 	float f1 = 8.0;
 	float f2 = 8.0;
 	vec2 r1 = vec2(0.0);
 	vec2 r2 = vec2(0.0);
-	ivec2 c1 = i;
-	for (int y = -1; y <= 1; y++) {
-		for (int x = -1; x <= 1; x++) {
-			ivec2 g = ivec2(x, y);
-			vec2 r = vec2(g) + cellPoint(i + g, seed) - f;
+	for (int y = ZERO - 1; y <= 1; y++) {
+		for (int x = ZERO - 1; x <= 1; x++) {
+			vec2 r = vec2(x, y) + 0.1 + 0.8 * cellPoint(i + ivec2(x, y), seed) - f;
 			float d = dot(r, r);
 			if (d < f1) {
 				f2 = f1;
 				r2 = r1;
 				f1 = d;
 				r1 = r;
-				c1 = i + g;
 			} else if (d < f2) {
 				f2 = d;
 				r2 = r;
 			}
 		}
 	}
-	f1 = sqrt(f1) + 1e-5;
-	f2 = sqrt(f2) + 1e-5;
-	// Cell border: F2 − F1 small; d(F)/dq = −r / F. Only some borders show,
-	// in patches, so the network does not read as scales.
-	float width = sqrt(sq(0.12) + sq(0.5 * footprint * SCALE));
-	float shown = smoothstep(-0.3, 0.6, valueNoise(p * 3.0, seed + 5u));
-	float border = shown * (0.12 / width) * exp(-sq((f2 - f1) / width));
-	vec2 dBorder = border * (-2.0 * (f2 - f1) / sq(width)) * (r1 / f1 - r2 / f2);
-	vec3 height = vec3(-border, -dBorder * SCALE);
-	// A pore: a small round pit at a few cell centers.
-	float hasPore = step(1.0 - 0.08 * pores, hashBytes(cellHash(c1, seed + 7u)).x);
-	float pit = hasPore * exp(-sq(f1 / 0.22));
-	height += 2.2 * vec3(-pit, -pit * 2.0 * r1 / sq(0.22) * SCALE);
-	return height;
+	// The distance to their bisector (mm), growing toward the nearest point:
+	// the border but near the cells' corners, where the furrow is too shallow
+	// for the difference to show.
+	vec2 apart = r2 - r1;
+	float span = max(length(apart), 1e-4);
+	float border = (f2 - f1) / (2.0 * span) * cell;
+	float flank = sqrt(sq(profile.y) + sq(0.5 * footprint));
+	float round = profile.z * flank / profile.y;
+	float rounded = sqrt(sq(border) + sq(round));
+	float g = profile.x * profile.y / flank * exp((round - rounded) / flank);
+	float c = profile.w / sq(0.5 * cell);
+	vec2 toPoint = r1 * cell;
+	return vec3(-g - c * dot(toPoint, toPoint), -g * border / (flank * rounded) * apart / span + 2.0 * c * toPoint);
 }
 
 // Fine wrinkles: lines along the lids (across `a`, mm from the margin, which
@@ -222,20 +318,24 @@ float veinNetwork(vec2 p, uint seed) {
 	return max(veins, 0.5 * onSmall * exp(-sq(branch / 0.1)));
 }
 
-// The micro-relief and the fine wrinkles of the skin at `p`, unweighted: the
-// furrows and the fine network (with the pores) in mm, and the wrinkles, as
-// heights with their front-plane gradients. The caller weighs them by its
-// fades, the keratinized share and the skin share. `a`, `along`, `alongMm`
-// and `upper` are the lid frame (mm from the margin, along the margin 0–1
-// and in mm, the upper share), `across` the unit front-plane direction in
-// which `a` grows, `canthi` the medial (xy) and lateral (zw) canthus;
-// `pores` and `wrinkleAmount` are skin.pores and skin.wrinkles. The fine
-// network is left out where `detail` is 0. The skin program evaluates it per
-// pixel in #debug, the bake (skin-relief-bake-fragment.glsl) per texel.
-// SKIN_SHELL: the back shell's, in its own coordinates.
+// The micro-relief and the fine wrinkles of the skin at `p`, unweighted, as
+// heights (mm) with their front-plane gradients: the primary furrows with the
+// dimples of the visible pores, the secondary furrows, the follicle openings
+// (at the furrows' crossings and in the dimples) and the wrinkles. The caller
+// weighs them by its fades, the keratinized share and the skin share, and
+// turns them into the shading's terms with reliefTerms(). `a`, `along`,
+// `alongMm` and `upper` are the lid frame (mm from the margin, along the
+// margin 0–1 and in mm, the upper share), `across` the unit front-plane
+// direction in which `a` grows, `canthi` the medial (xy) and lateral (zw)
+// canthus; `pores` and `wrinkleAmount` are skin.pores and skin.wrinkles. The
+// secondary furrows and the furrows' openings are left out where `detail` is
+// 0. The skin program evaluates it per pixel in #debug, the bake
+// (skin-relief-bake-fragment.glsl) per texel. SKIN_SHELL: the back shell's,
+// in its own coordinates.
 struct MicroRelief {
 	vec3 furrowed;
 	vec3 network;
+	vec3 openings;
 	vec3 wrinkles;
 };
 
@@ -276,20 +376,38 @@ MicroRelief skinMicroRelief(
 #ifdef SKIN_SHELL
 	// The shell's coordinates cover the front plane's again: no canthi there.
 	// Its tension lines wander over about a centimeter: lines all along the
-	// edge streak where the shell turns away, furrows all as shallow cross
-	// into a regular lattice.
+	// edge streak where the shell turns away, furrows all alike cross into a
+	// regular lattice.
 	fan = 0.0;
 	float tensionTurn = PI * valueNoise(p / 12.0, seed + 19u);
 	tension = vec2(cos(tensionTurn), sin(tensionTurn));
 #endif
 
+	// The lids' thin skin creases along its tension lines; elsewhere the
+	// lines are more alike.
+	float emphasis = mix(0.3, 1.0, max(1.0 - smoothstep(6.0, 14.0, a), fan));
+	// Stars of primary furrows out of follicles about 0.6 mm apart (2–3
+	// follicles per mm² on the face), 25 µm deep at most, their depth
+	// drifting in patches; the follicles' pits deeper with `pores`, shallower
+	// on the lids, none at the lash line; the dimples of the visible pores
+	// on the cheek and the brow, hardly on the lids. The cushions of the
+	// secondary furrows, 0.08 mm across, inside the plateaus.
+	float follicles = 0.012 * pores * mix(0.3, 1.0, smoothstep(2.0, 8.0, a)) * smoothstep(0.8, 1.6, a);
+	float dimples = 0.3 * pores * smoothstep(3.0, 10.0, a);
+	float drift = mix(0.5, 1.0, smoothstep(-0.5, 0.5, valueNoise(p / 0.5, seed + 21u))) *
+		mix(0.6, 1.0, smoothstep(-0.6, 0.6, valueNoise(p / 1.5, seed + 23u)));
+	Pitted primary = starFurrows(
+		p, tension, emphasis, 0.6, 0.85, vec3(0.025, 0.018, 0.005), follicles, dimples, footprint, seed + 11u
+	);
+
 	MicroRelief relief;
-	relief.furrowed = 0.011 * furrows(p, tension, footprint, seed + 11u);
+	relief.furrowed = drift * primary.relief;
 	relief.network = vec3(0.0);
 	if (detail > 0.0) {
-		float poreShare = pores * mix(0.35, 1.0, smoothstep(2.0, 8.0, a)) * mix(1.0, 0.6, upper);
-		relief.network = 0.0025 * fineNetwork(p, poreShare, footprint, seed + 13u);
+		float shown = mix(0.4, 1.0, smoothstep(-0.3, 0.6, valueNoise(p * 2.0, seed + 25u)));
+		relief.network = shown * cushions(p, 0.08, vec4(0.0015, 0.006, 0.003, 0.0015), footprint, seed + 13u);
 	}
+	relief.openings = detail > 0.0 ? primary.pits : vec3(0.0);
 	float lidLines = wrinkleAmount * smoothstep(1.2, 2.5, a) * (1.0 - smoothstep(13.0, 20.0, a)) * (1.0 - fan) *
 		smoothstep(0.0, 0.15, along);
 	// Slanted lines: 25° off the margin, toward the lateral side.
@@ -300,12 +418,22 @@ MicroRelief skinMicroRelief(
 	return relief;
 }
 
+// The relief's terms in the shading, from its weighed parts: the front-plane
+// gradient of the whole height (xy), the albedo term (z: the furrows a little
+// darker, the openings more) and the occlusion term (w). All linear in the
+// heights.
+vec4 reliefTerms(vec3 furrowed, vec3 network, vec3 openings, vec3 wrinkles) {
+	return vec4(
+		furrowed.yz + network.yz + openings.yz + wrinkles.yz,
+		2.0 * furrowed.x + network.x + 10.0 * openings.x,
+		4.0 * (furrowed.x + network.x) + 30.0 * openings.x + 1.5 * wrinkles.x
+	);
+}
+
 // The baked relief (src/adnexa/skinRelief.js), RGBA8 over the front-plane
-// box: the front-plane gradient of the whole height (rg, ±RELIEF_SLOPE), the
-// albedo term of the furrows and the network (b, 3 furrows + network, in
-// −RELIEF_SHADE–0) and the occlusion term (a, 4 micro-relief + 1.5 wrinkles,
-// in −RELIEF_OCCLUSION–0). All linear in the heights, so the mipmaps filter
-// them as the footprint would.
+// box: reliefTerms(), the gradient (rg, ±RELIEF_SLOPE), the albedo term (b,
+// −RELIEF_SHADE–0) and the occlusion term (a, −RELIEF_OCCLUSION–0). Linear in
+// the heights, so the mipmaps filter them as the footprint would.
 const float RELIEF_SLOPE = 1.5;
 const float RELIEF_SHADE = 0.12;
 const float RELIEF_OCCLUSION = 0.4;

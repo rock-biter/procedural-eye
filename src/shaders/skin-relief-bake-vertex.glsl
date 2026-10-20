@@ -1,8 +1,8 @@
 // Bake of the skin relief (src/adnexa/skinRelief.js): the lid mesh at rest
 // laid onto the texture's front-plane box, nearest the viewer in front (the
 // rest z sets the depth), with its lid frame. RELIEF_UNDERLAY: a full-screen
-// triangle under it, behind every part of the mesh, for the texels it leaves
-// uncovered.
+// quad at the far plane, behind every part of the mesh, for the texels it
+// leaves uncovered.
 attribute vec4 lid; // t along the fissure, s across the profile, a (mm from the margin), upper lid
 attribute vec4 relief; // front-plane direction in which a grows (xy), fold depth (mm, ≤ 0), along the margin
 
@@ -18,7 +18,7 @@ void main() {
 	vPoint = uBox.xy + uv * uBox.zw;
 	vLid = vec4(0.0, 1.0, 60.0, 0.0);
 	vRelief = vec4(1.0, 0.0, 0.0, 0.5);
-	gl_Position = vec4(position.xy, 0.0, 1.0);
+	gl_Position = vec4(position.xy, 1.0, 1.0);
 #else
 	vPoint = position.xy;
 	vLid = lid;

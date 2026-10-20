@@ -23,11 +23,26 @@ float schlick(float cosTheta, float f0) {
 }
 
 // Diffuse with wrap per channel (`wrap` = red, green, blue reach past the
-// terminator), specular GGX lobe of `roughness`, for every emitter, plus the
-// background. `shadow0` dims emitter 0 (the key light) per channel: skin
-// passes it with a softer red, the scattered light bleeding into the shadow.
-vec3 litSurface(vec3 p, vec3 n, vec3 v, vec3 albedo, vec3 wrap, float roughness, float f0, float specular, vec3 shadow0) {
-	vec3 color = albedo * INV_PI * backgroundIrradiance(n);
+// terminator) and a normal per channel (the columns of `diffuse`: red, green,
+// blue; skin passes its relief softer in the red, which light scattered
+// under it blurs the most), specular GGX lobe of `roughness` on the normal
+// `n`, for every emitter, plus the background. `shadow0` dims emitter 0 (the
+// key light) per channel: skin passes it with a softer red, the scattered
+// light bleeding into the shadow.
+vec3 litSurface(
+	vec3 p,
+	vec3 n,
+	mat3 diffuse,
+	vec3 v,
+	vec3 albedo,
+	vec3 wrap,
+	float roughness,
+	float f0,
+	float specular,
+	vec3 shadow0
+) {
+	vec3 color = albedo * INV_PI *
+		vec3(backgroundIrradiance(diffuse[0]).r, backgroundIrradiance(diffuse[1]).g, backgroundIrradiance(diffuse[2]).b);
 	float nv = max(dot(n, v), 1e-3);
 	for (int i = ZERO; i < uEmitterCount; i++) {
 		int base = i * EMITTER_VEC4S;
@@ -40,7 +55,7 @@ vec3 litSurface(vec3 p, vec3 n, vec3 v, vec3 albedo, vec3 wrap, float roughness,
 		vec3 facing = emitterIrradiance(i, p, l);
 		vec3 shadow = i == 0 ? shadow0 : vec3(1.0);
 		float nl = dot(n, l);
-		vec3 wrapped = saturate((vec3(nl) + wrap) / (1.0 + wrap));
+		vec3 wrapped = saturate((l * diffuse + wrap) / (1.0 + wrap));
 		color += albedo * INV_PI * facing * wrapped * shadow;
 		if (nl <= 0.0 || specular <= 0.0) continue;
 		// Representative point: the emitter seen as a sphere of its size widens the lobe.

@@ -8,7 +8,9 @@
 // its footprint.
 //   lids: the lid mesh laid onto the box, nearest the viewer in front, over
 //     an underlay of the shell's relief for the texels it leaves uncovered
-//     (two renders, the underlay first);
+//     (two renders: the ring first, then the underlay behind it, which the
+//     depth test keeps off the ring's texels, so they are not evaluated
+//     twice);
 //   shell: the back shell's relief (its coordinates lie inside the box);
 //   freckles: their coverage.
 import {
@@ -80,7 +82,6 @@ export default class SkinRelief {
 		}
 		this.lidMaterial = material('SkinReliefBake')
 		this.underlayMaterial = material('SkinReliefShellBake', { RELIEF_UNDERLAY: '', SKIN_SHELL: '' })
-		this.underlayMaterial.depthTest = false
 		this.underlayMaterial.depthWrite = false
 		this.frecklesMaterial = material('SkinFrecklesBake', { RELIEF_UNDERLAY: '', FRECKLES: '' })
 		this.frecklesMaterial.depthTest = false
@@ -122,9 +123,9 @@ export default class SkinRelief {
 		const previous = renderer.getRenderTarget()
 		const autoClear = renderer.autoClear
 		renderer.autoClear = false
-		// One mesh per render: the underlay first, then the lid ring over it.
-		// Drawn together, the renderer's sort would pick their order (WebGL's
-		// by material, which drew the underlay last, over the whole ring).
+		// One mesh per render: the lid ring first, then the underlay, at the
+		// far plane, only where the ring left the cleared depth. Drawn
+		// together, the renderer's sort would pick their order.
 		const render = (mesh) => {
 			this.quad.visible = mesh === this.quad
 			this.lidMesh.visible = mesh === this.lidMesh
@@ -138,8 +139,8 @@ export default class SkinRelief {
 			// The quad covers every texel; the clear resets the depth.
 			renderer.setRenderTarget(this.targets[name])
 			renderer.clear()
-			render(this.quad)
 			if (lids) render(this.lidMesh)
+			render(this.quad)
 		}
 		this.lidMesh.geometry = geometry
 		draw('lids', { quad: this.underlayMaterial, lids: true })

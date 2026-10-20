@@ -1,0 +1,55 @@
+PELLE UMANA — SET PBR 2K
+
+Materiale sintetico di pelle adulta neutra, senza peli o segni distintivi.
+Tutte le mappe del materiale: 2048 x 2048 pixel.
+
+MAPPE E SPAZIO COLORE
+Skin_BaseColor.png: tinta pelle neutra sintetica con microvariazioni; sRGB.
+Skin_Height_16bit.png: altezza; PNG grayscale 16 bit; Non-Color/Linear.
+Skin_Bump_16bit.png: stessa altezza, da usare come bump; Non-Color.
+Skin_Normal_OpenGL.png: normal tangent-space +Y; Non-Color.
+Skin_Normal_DirectX.png: normal tangent-space -Y; Non-Color.
+Skin_Roughness.png: bianco = piu ruvido; Non-Color.
+Skin_AO.png: micro-occlusione stimata, molto tenue; Non-Color.
+Skin_Metallic.png: nero, pelle non metallica; Non-Color.
+Skin_Specular_F0_035.png: riflettanza F0 lineare circa 0.035;
+  mappa costante, NON il valore del cursore Specular/IOR Level di Blender.
+Skin_ORM.png: canale R = AO, G = roughness, B = metallic; Non-Color.
+Preview_Tiling_3x3.png: controllo visivo 3 x 3, non mappa materiale.
+
+UTILIZZO
+Usare un solo tipo di normal in base al motore.
+In Blender usare OpenGL, Image Texture Non-Color -> Normal Map -> Normal.
+Base Color in sRGB, roughness e height in Non-Color.
+Punto di partenza per la scala: un tile corrisponde a circa 5 x 5 cm.
+Per displacement: midlevel 0.5, escursione iniziale molto bassa,
+circa 0.05–0.15 mm; regolare in base alla scala della scena.
+La normal incorpora gia il microdettaglio: aggiungere lo stesso bump a piena
+intensita puo amplificarlo due volte. Preferire normal oppure bump, o ridurre
+l'intensita quando si combinano. Il vero displacement richiede geometria.
+Per pelle credibile in primo piano configurare anche SSS nel materiale.
+SSS, spessore e scattering dipendono dal modello: non sono deducibili da
+una texture piana e non sono incluse mappe fisiche inventate per tali dati.
+
+ORIGINE E LIMITI
+Rilievo base generato con imagegen integrato; normal e bump ricavati dal medesimo
+rilievo, con derivate periodiche. Non e una scansione o una misura fisica.
+La sorgente generata e 1254 x 1254 pixel ed e ricampionata a 2048 x 2048:
+i file finali sono 2K, il dettaglio sorgente non e nativo 2K.
+Il base color e una tinta neutra costruita dal rilievo, non un albedo acquisito.
+Roughness e AO sono approssimazioni artistiche, specular e metallic costanti.
+Le height map sono salvate in un contenitore PNG 16 bit; la sorgente generata
+puo avere precisione inferiore: non e una scansione nativa a 16 bit.
+La continuita ai bordi e ottenuta mediante sovrapposizione periodica morbida.
+Non ci sono nei, cicatrici o macchie grandi che rendano evidente il tile.
+Qualunque singolo tile si ripete matematicamente; su grandi superfici usare
+un materiale con tiling stocastico o variazioni UV e corretta rotazione normal.
+
+PROMPT BASE (imagegen integrato)
+Production seamless PBR human skin microdisplacement height map, square
+2048x2048, grayscale, flat orthographic, fine irregular skin microrelief,
+shallow pores and fine branching creases, patch approximately 5 x 5 cm,
+no hairs, moles, freckles, wounds, deep wrinkles or distinctive marks.
+White = high, dark = recessed; moderate contrast around mid gray.
+No lighting, shadows, highlights or broad gradients; stationary stochastic
+detail, tileable in both axes; no text, labels, borders or panels.

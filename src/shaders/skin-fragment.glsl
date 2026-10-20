@@ -1,8 +1,10 @@
-// Eyelid skin and lid margin. The skin: micro-relief of crossing furrows,
-// a fine network and pores, fine wrinkles along the lids and crow's feet
-// (skin-relief.glsl); an albedo of melanin, blood and the veins seen through
-// the thin skin, mottled, with freckles, darker in the folds and toward the
-// canthi; shade in the geometric folds; oilier and wetter toward the margin.
+// Eyelid skin and lid margin. The skin: micro-relief of stars of furrows out
+// of the follicles, the dimples of the pores and the secondary furrows, fine
+// wrinkles along the lids and crow's feet (skin-relief.glsl), softened in the
+// diffuse by the light scattered under the skin; an albedo of melanin, blood
+// and the veins seen through the thin skin, mottled, with freckles, darker in
+// the folds and toward the canthi; shade in the geometric folds; oilier and
+// wetter toward the margin.
 // The intermarginal strip: wet conjunctiva behind, the mucocutaneous
 // junction, the row of meibomian orifices, the grey line, the keratinized
 // anterior margin. Wrapped diffuse, GGX specular, mirror reflection where wet.
@@ -56,6 +58,8 @@ varying vec4 vCenterFrame;
 const vec2 ORIFICES = vec2(34.0, 24.0);
 // Approximate width of the intermarginal strip (mm).
 const float STRIP = 1.25;
+// The share of the relief's slopes the diffuse sees, red, green, blue.
+const vec3 SCATTERED_RELIEF = vec3(0.2, 0.5, 0.8);
 
 // Gradient along the surface of a scalar varying (Mikkelsen 2010), from
 // screen-space derivatives: constant per triangle for an interpolated value.
@@ -107,14 +111,15 @@ void main() {
 	vec3 gradAcross = surfaceGradient(vCenterFrame.w / uSkin2.z * STRIP, geometric, dpdx, dpdy);
 
 	// The pixel footprint (mm), widened by the depth of field's blur circle
-	// on the skin (aperture × defocus / focus distance): furrows and wrinkles
-	// fade where either is wider than them, the fine network, the pores and
-	// the orifices earlier. Blurred, they would only average out (and cost).
+	// on the skin (aperture × defocus / focus distance): the relief fades
+	// where either is wider than the dimples of the pores, the secondary
+	// furrows, the follicles' openings and the orifices earlier. Blurred, they
+	// would only average out (and cost).
 	float distanceToCamera = length(cameraPosition - vWorldPos);
 	float depth = -(viewMatrix * vec4(vWorldPos, 1.0)).z;
 	float blur = uDefocus.x * abs(depth - uDefocus.y) / uDefocus.y;
 	float footprint = sqrt(sq(distanceToCamera * uPixelAngle) + sq(0.5 * blur));
-	float relief = 1.0 - smoothstep(0.05, 0.16, footprint);
+	float relief = 1.0 - smoothstep(0.1, 0.3, footprint);
 	float detail = 1.0 - smoothstep(0.015, 0.05, footprint);
 
 	// Regions of the skin.
@@ -126,10 +131,10 @@ void main() {
 	canthi = 0.0;
 #endif
 
-	// Micro-relief (furrows, fine network, pores) and fine wrinkles
-	// (skin-relief.glsl): the front-plane gradient of their height (mm), and
-	// their terms in the albedo (furrows darker) and the occlusion. The
-	// anterior edge of the margin is skin too.
+	// Micro-relief (furrows, follicles, pores, secondary furrows) and fine
+	// wrinkles (skin-relief.glsl): the front-plane gradient of their height
+	// (mm), and their terms in the albedo (furrows darker) and the occlusion.
+	// The anterior edge of the margin is skin too.
 	vec2 reliefGradient = vec2(0.0);
 	float reliefShade = 0.0;
 	float reliefOcclusion = 0.0;
@@ -150,12 +155,13 @@ void main() {
 		vec2 across = normalize(vRelief.xy + vec2(1e-6, 0.0));
 		MicroRelief r =
 			skinMicroRelief(p, a, along, alongMm, upper, across, uCanthi, uSkin.w, uSkin2.x, footprint, detail, seed);
-		vec3 furrowed = relief * keratinized * r.furrowed;
-		vec3 network = relief * keratinized * detail * r.network;
-		vec3 wrinkles = relief * onSkin * r.wrinkles;
-		reliefGradient = furrowed.yz + network.yz + wrinkles.yz;
-		reliefShade = 3.0 * furrowed.x + network.x;
-		reliefOcclusion = 4.0 * (furrowed.x + network.x) + 1.5 * wrinkles.x;
+		float weight = relief * keratinized;
+		vec4 terms = reliefTerms(
+			weight * r.furrowed, weight * detail * r.network, weight * detail * r.openings, relief * onSkin * r.wrinkles
+		);
+		reliefGradient = terms.xy;
+		reliefShade = terms.z;
+		reliefOcclusion = terms.w;
 	}
 #endif
 
@@ -197,7 +203,17 @@ void main() {
 	vec3 gradient = vec3(reliefGradient, 0.0);
 	gradient -= geometric * dot(gradient, geometric);
 #endif
-	vec3 n = normalize(geometric - gradient - marginGradient * onMargin);
+	vec3 tilt = gradient + marginGradient * onMargin;
+	vec3 n = normalize(geometric - tilt);
+	// Light scattered under the skin blurs the shading of its relief, the red
+	// over a millimeter or so, the blue the least (d'Eon et al. 2007): the
+	// diffuse sees the relief's slopes weakened per channel, the specular
+	// all of them.
+	mat3 diffuse = mat3(
+		normalize(geometric - SCATTERED_RELIEF.r * tilt),
+		normalize(geometric - SCATTERED_RELIEF.g * tilt),
+		normalize(geometric - SCATTERED_RELIEF.b * tilt)
+	);
 
 	// Albedo: melanin, blood and the venous tint over the skin color.
 	float melanin = (pattern.r - 0.5) * 1.3;
@@ -253,9 +269,9 @@ void main() {
 	float lit = keyShadow(vWorldPos + geometric * 0.02, geometric);
 	// Light scattered under the skin softens the red edge of the shadows.
 	vec3 shadow = mix(vec3(lit), vec3(sqrt(lit), lit, lit * lit), uSkin2.y);
-	vec3 color = litSurface(vWorldPos, n, v, albedo * occlusion, wrap, roughness, 0.028, occlusion, shadow);
+	vec3 color = litSurface(vWorldPos, n, diffuse, v, albedo * occlusion, wrap, roughness, 0.028, occlusion, shadow);
 	// The light shafts crossing the skin.
-	color += albedo * occlusion * INV_PI * shaftIrradiance(vWorldPos, n, 0.15);
+	color += albedo * occlusion * INV_PI * shaftIrradiance(vWorldPos, diffuse[1], 0.15);
 	// The tear film makes the margin a mirror. On the skin the moisture follows
 	// the relief, so it reflects roughly (litSurface() above), and the mirror
 	// image fades out within half a millimeter: further out, where the folds of
