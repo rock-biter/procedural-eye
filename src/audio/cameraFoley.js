@@ -127,7 +127,7 @@ export default class CameraFoley {
 		].sort((a, b) => b[0] - a[0])
 		const creak = strainDrive(pulls[0][0], pulls[0][1])
 		const set = (param, value) => param.setTargetAtTime(value, now, LEVEL_LAG)
-		set(this.strain.gain.gain, creak.gain * levels.strain * 0.25)
+		set(this.strain.gain.gain, creak.gain * levels.volumes.strain * 0.25)
 		set(this.strain.stick.frequency, creak.rate)
 		set(this.strain.resonance.frequency, creak.resonance)
 	}

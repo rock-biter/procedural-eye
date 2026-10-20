@@ -66,5 +66,5 @@ export function createGui({ schema, params, onChange, actions = [], presets = nu
 			refreshing = false
 		}
 	}
-	return { pane, fps, refresh, actions: actions.length }
+	return { pane, fps, refresh }
 }

@@ -64,7 +64,7 @@ test('every sound has its takes or its synth, and a level in the params', () => 
 	for (const [name, entry] of Object.entries(SOUNDS)) {
 		assert.ok(takesOf(entry).length > 0, name)
 		if (entry.synthTakes) assert.equal(takesOf(entry).length, entry.synthTakes, name)
-		assert.ok(sound[entry.gain], `${name}: sound.${entry.gain}`)
+		assert.ok(sound.volumes[entry.gain], `${name}: sound.volumes.${entry.gain}`)
 		assert.ok(entry.voices >= 1 && entry.gap >= 0 && entry.vary >= 0 && entry.vary <= 1, name)
 	}
 })

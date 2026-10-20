@@ -635,20 +635,19 @@ async function createPanel() {
 		step: 0.1,
 		index: 3,
 	})
-	// Any sound of the foley on demand, to tune the `sound` group by ear: after
-	// the actions (the frame rate, the preset, the ancestry and the transition
-	// come before them).
-	if (audition) {
+	// Any sound of the foley on demand, to tune the volumes by ear: in the
+	// `sound` folder, after the master volume and the volumes.
+	const soundFolder = gui.pane.children.find((child) => child.title === 'sound')
+	if (audition && soundFolder) {
 		const sounds = Object.keys(SOUNDS)
 		const heard = { sound: sounds[0] }
-		const index = 4 + gui.actions
-		gui.pane.addBinding(heard, 'sound', {
-			label: 'sound',
+		soundFolder.addBinding(heard, 'sound', {
+			label: 'listen to',
 			options: Object.fromEntries(sounds.map((name) => [name, name])),
-			index,
+			index: 2,
 		})
-		gui.pane
-			.addButton({ title: 'Play sound', index: index + 1 })
+		soundFolder
+			.addButton({ title: 'Play sound', index: 3 })
 			.on('click', () => audition(heard.sound))
 	}
 	app.listeners.add((path) => {

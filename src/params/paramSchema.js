@@ -506,25 +506,26 @@ export const BASE_PARAM_SCHEMA = {
 		zoomLag: num(0.15, 0, 1, 0.01, 's', 'uniform', 'wheel zoom lag'),
 		inertia: num(0.2, 0, 1, 0.01, 's', 'uniform', 'orbit inertia'),
 	},
-	// The sound design (src/audio/, docs/AUDIO.md): the master volume and
-	// the controls' bus, the level of each sound of the camera foley, how far a
-	// sound's pitch varies from one play to the next, the zoom ring's detents
-	// across the knob's track and the aperture ring's per stop, the aperture's
-	// ticks (a bicycle freewheel's or synthesized fine ones) and how Random
-	// eye advances the film (a lever or a motor). The mute is the viewer's,
-	// kept by the browser, not a parameter.
+	// The sound design (src/audio/, docs/AUDIO.md): the master volume, the
+	// volume of each sound of the camera foley, how far a sound's pitch varies
+	// from one play to the next, the zoom ring's detents across the knob's
+	// track and the aperture ring's per stop, the aperture's ticks (a bicycle
+	// freewheel's or synthesized fine ones) and how Random eye advances the
+	// film (a lever or a motor). The mute is the viewer's, kept by the
+	// browser, not a parameter.
 	sound: {
-		volume: num(0.8, 0, 1, 0.01, '', 'uniform', 'volume'),
-		controls: num(0.8, 0, 1, 0.01, '', 'uniform', 'controls bus'),
-		press: num(0.35, 0, 1, 0.01, '', 'uniform', 'button press'),
-		hover: num(0.3, 0, 1, 0.01, '', 'uniform', 'hover tick'),
-		zoom: num(0.2, 0, 1, 0.01, '', 'uniform', 'zoom detents'),
-		aperture: num(0.15, 0, 1, 0.01, '', 'uniform', 'aperture detents'),
-		strain: num(0.35, 0, 1, 0.01, '', 'uniform', 'creak past an end'),
-		advance: num(0.42, 0, 1, 0.01, '', 'uniform', 'film advance (Random eye)'),
-		shutter: num(0.56, 0, 1, 0.01, '', 'uniform', 'shutter (Snapshot)'),
-		mirror: num(0.35, 0, 1, 0.01, '', 'uniform', 'mirror (photo mode)'),
-		beep: num(0.08, 0, 1, 0.01, '', 'uniform', 'focus beep'),
+		volume: num(0.64, 0, 1, 0.01, '', 'uniform', 'master volume'),
+		volumes: {
+			press: num(0.35, 0, 1, 0.01, '', 'uniform', 'button press'),
+			hover: num(0.3, 0, 1, 0.01, '', 'uniform', 'hover'),
+			zoom: num(0.2, 0, 1, 0.01, '', 'uniform', 'zoom ring'),
+			aperture: num(0.15, 0, 1, 0.01, '', 'uniform', 'aperture ring'),
+			strain: num(0.35, 0, 1, 0.01, '', 'uniform', 'creak past an end'),
+			advance: num(0.42, 0, 1, 0.01, '', 'uniform', 'film advance (Random eye)'),
+			shutter: num(0.56, 0, 1, 0.01, '', 'uniform', 'shutter (Snapshot)'),
+			mirror: num(0.35, 0, 1, 0.01, '', 'uniform', 'mirror (photo mode)'),
+			beep: num(0.08, 0, 1, 0.01, '', 'uniform', 'focus beep'),
+		},
 		variation: num(60, 0, 200, 1, 'cents', 'uniform', 'pitch variation'),
 		zoomDetents: num(16, 2, 60, 1, '', 'uniform', 'zoom detents across the track'),
 		detents: num(6, 1, 16, 1, 'per stop', 'uniform', 'aperture detents per stop'),

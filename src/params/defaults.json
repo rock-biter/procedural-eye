@@ -386,6 +386,25 @@
     "zoomLag": 0.15,
     "inertia": 0.2
   },
+  "sound": {
+    "volume": 0.64,
+    "volumes": {
+      "press": 0.35,
+      "hover": 0.5,
+      "zoom": 0.1,
+      "aperture": 0.05,
+      "strain": 0.35,
+      "advance": 0.42,
+      "shutter": 0.56,
+      "mirror": 0.35,
+      "beep": 0.08
+    },
+    "variation": 60,
+    "zoomDetents": 16,
+    "detents": 6,
+    "apertureTicks": "freewheel",
+    "film": "lever"
+  },
   "post": {
     "toneMapping": "agx",
     "grain": 0.035,

@@ -1,8 +1,8 @@
 // The sounds the foley plays (docs/AUDIO.md): the recorded takes of each
 // (src/audio/sounds/, cut by `pnpm sounds`) or the synthesized buffer
-// (src/audio/synth.js), the leaf of the `sound` params group that sets its
-// gain, how much of `sound.variation` (cents) its rate varies by, and at
-// most how many play at once, at least `gap` s apart. A sound asked for
+// (src/audio/synth.js), the leaf of `sound.volumes` that sets its gain, how
+// much of `sound.variation` (cents) its rate varies by, and at most how many
+// play at once, at least `gap` s apart. A sound asked for
 // sooner than `gap` after the last one plays no new voice: its level adds to
 // that one's instead (src/audio/audioEngine.js).
 import advance from './sounds/advance.mp3?url'

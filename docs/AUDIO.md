@@ -7,7 +7,7 @@ The interface sounds like a camera. Every control of the HUD makes the mechanica
 [`src/audio/audioEngine.js`](../src/audio/audioEngine.js) (`AudioEngine`) owns the Web Audio graph.
 
 - **Start**: a page may make sound only after a gesture. The recordings are fetched when the page loads, but the `AudioContext` is created at the first press or key (capture-phase listeners on `window`), and the recordings are decoded then. A sound asked for while they decode plays if they arrive within 0.15 s. So the first press of a control is heard, and no autoplay warning is logged.
-- **Graph**: the controls bus (`sound.controls`) feeds the master gain (`sound.volume`). From there the signal goes through a limiter (a `DynamicsCompressorNode`: threshold −6 dB, ratio 12, attack 2 ms) and an analyser (for `getSoundStats()`) to the output.
+- **Graph**: the controls bus feeds the master gain (`sound.volume`, the master volume). From there the signal goes through a limiter (a `DynamicsCompressorNode`: threshold −6 dB, ratio 12, attack 2 ms) and an analyser (for `getSoundStats()`) to the output.
 - **One-shots**: `play(name, { gain, rate, pan, delay })` plays a sound of the bank on the controls bus, `delay` s from now.
   - Each play draws a take other than the last one, a rate within ±`sound.variation` cents and a gain within ±1.5 dB, both scaled by the sound's `vary`.
   - A sound may have at most `voices` copies playing at once. A sound asked for less than `gap` s after the last one plays no new voice; half its level is added to the last one's instead (detents passed in a single frame sound as one louder click).
@@ -27,7 +27,7 @@ The app itself emits no events; everything is read per frame.
 
 ## The Camera Foley
 
-[`src/audio/cameraFoley.js`](../src/audio/cameraFoley.js) (`CameraFoley`) turns the HUD's cues and the camera's motion into sounds. [`src/audio/foley.js`](../src/audio/foley.js) * holds its arithmetic, [`src/audio/soundBank.js`](../src/audio/soundBank.js) * the bank (takes or synth, with `synthTakes` buffers of a synth, the `sound.*` leaf of the gain, `vary`, `voices`, `gap`) and [`src/audio/synth.js`](../src/audio/synth.js) * the synthesized buffers.
+[`src/audio/cameraFoley.js`](../src/audio/cameraFoley.js) (`CameraFoley`) turns the HUD's cues and the camera's motion into sounds. [`src/audio/foley.js`](../src/audio/foley.js) * holds its arithmetic, [`src/audio/soundBank.js`](../src/audio/soundBank.js) * the bank (takes or synth, with `synthTakes` buffers of a synth, the `sound.volumes` leaf of the gain, `vary`, `voices`, `gap`) and [`src/audio/synth.js`](../src/audio/synth.js) * the synthesized buffers.
 
 | Event | Where it comes from | Sound |
 | --- | --- | --- |
@@ -52,8 +52,8 @@ The `sound` group of [`src/params/paramSchema.js`](../src/params/paramSchema.js)
 
 | Leaf | Default | Effect |
 | --- | --- | --- |
-| `volume`, `controls` | 0.8, 0.8 | The master and the controls bus. |
-| `press`, `hover`, `zoom`, `aperture`, `strain`, `advance`, `shutter`, `mirror`, `beep` | 0.35, 0.3, 0.2, 0.15, 0.35, 0.42, 0.56, 0.35, 0.08 | Each sound's level (`advance` also sets `wind`; `beep` both beeps). |
+| `volume` | 0.64 | The master volume, over every sound. |
+| `volumes.press`, `.hover`, `.zoom`, `.aperture`, `.strain`, `.advance`, `.shutter`, `.mirror`, `.beep` | 0.35, 0.3, 0.2, 0.15, 0.35, 0.42, 0.56, 0.35, 0.08 | Each sound's own volume, under the master (`advance` also sets `wind`, `aperture` both kinds of ticks, `beep` both beeps). |
 | `variation` | 60 cents | How far a sound's pitch varies from one play to the next. |
 | `zoomDetents` | 16 | The zoom ring's detents across the knob's track. |
 | `detents` | 6 per stop | The aperture ring's detents. |
@@ -85,7 +85,7 @@ The cuts were chosen from measurements (onsets, transients, spectral flatness an
 
 ## Tuning and Checking
 
-- **By ear**: with `#debug`, the panel has a **sound** list and **Play sound** after its actions (`audition` in `main.js`), and the `sound` folder holds the levels. **Export defaults JSON** writes them into `defaults.json`.
+- **By ear**: with `#debug`, the panel's `sound` folder holds the master volume, a `volumes` folder with each sound's volume, then **listen to** (a list of the bank's sounds) and **Play sound** (`audition` in `main.js`), then the rest of the group. **Export defaults JSON** writes them into `defaults.json`.
 - **By numbers**: `__EYE__.getSoundStats()` (with the interface only). The measured levels in headless Chrome at 1600 × 1000 with the defaults (dBFS) are:
 
   | Sound | Peak |

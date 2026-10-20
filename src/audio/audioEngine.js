@@ -2,8 +2,9 @@
 // lets a page make sound only after a gesture, so the context is created at
 // the first press or key (the recordings are fetched before, decoded then);
 // a sound asked for while they decode plays if they arrive within LATE s.
-// The controls' bus feeds the master, which a limiter keeps under 0 dBFS. Muted, the master fades out and the
-// context suspends; a hidden page suspends it too.
+// The controls' bus feeds the master (`sound.volume`), which a limiter keeps
+// under 0 dBFS. Muted, the master fades out and the context suspends; a
+// hidden page suspends it too.
 import { SOUNDS, SOUND_FILES, takesOf } from './soundBank'
 import { beep, fineTick, tick } from './synth'
 
@@ -82,10 +83,7 @@ export default class AudioEngine {
 		this.samples = new Float32Array(this.analyser.fftSize)
 		this.master.connect(limiter).connect(this.analyser).connect(context.destination)
 		this.buses = { controls: context.createGain() }
-		for (const [name, bus] of Object.entries(this.buses)) {
-			bus.gain.value = this.params.sound[name]
-			bus.connect(this.master)
-		}
+		this.buses.controls.connect(this.master)
 		for (const sound of Object.values(SOUNDS)) {
 			if (!sound.synth) continue
 			for (const key of takesOf(sound)) {
@@ -132,7 +130,7 @@ export default class AudioEngine {
 	play(name, { gain = 1, rate = 1, pan = 0, delay = 0 } = {}) {
 		const sound = SOUNDS[name]
 		const levels = this.params.sound
-		const level = gain * levels[sound.gain]
+		const level = gain * levels.volumes[sound.gain]
 		if (!this.context || this.muted || level <= 0) return null
 		if (!this.ready && !sound.synth) {
 			this.pending.push({
@@ -195,15 +193,12 @@ export default class AudioEngine {
 			)
 	}
 
-	// Once a frame: the levels of the master and the buses from the params,
-	// and the loudest sample and the power of the master since the last
-	// stats().
+	// Once a frame: the master volume from the params, and the loudest sample
+	// and the power of the master since the last stats().
 	update() {
 		if (!this.context) return
-		const { volume, controls } = this.params.sound
 		const now = this.context.currentTime
-		this.master.gain.setTargetAtTime(this.muted ? 0 : volume, now, FADE)
-		this.buses.controls.gain.setTargetAtTime(controls, now, FADE)
+		this.master.gain.setTargetAtTime(this.muted ? 0 : this.params.sound.volume, now, FADE)
 		this.analyser.getFloatTimeDomainData(this.samples)
 		for (const sample of this.samples) {
 			this.peak = Math.max(this.peak, Math.abs(sample))
