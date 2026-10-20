@@ -1,0 +1,160 @@
+{
+  "sources": {
+    "minolta": {
+      "id": 637342,
+      "title": "camera 35mm SLR Minolta XE-7 single shot and advance film shutter clicks various",
+      "author": "kyles",
+      "preview": "https://cdn.freesound.org/previews/637/637342_612689-hq.mp3"
+    },
+    "olympus": {
+      "id": 851291,
+      "title": "80s Film Camera (shutter, film loading and winding, flash charging, general foley)",
+      "author": "RealSquink",
+      "preview": "https://cdn.freesound.org/previews/851/851291_12262933-hq.mp3"
+    },
+    "fm2": {
+      "id": 412546,
+      "title": "Nikon FM2 dial a.wav",
+      "author": "hmilleo",
+      "preview": "https://cdn.freesound.org/previews/412/412546_3482955-hq.mp3"
+    },
+    "dslr": {
+      "id": 571483,
+      "title": "DSLR Camera Sounds",
+      "author": "Rvgerxini",
+      "preview": "https://cdn.freesound.org/previews/571/571483_9453283-hq.mp3"
+    },
+    "lens": {
+      "id": 516490,
+      "title": "Old SLR manual lens - Taking out and putting back in camera",
+      "author": "khenshom",
+      "preview": "https://cdn.freesound.org/previews/516/516490_6652872-hq.mp3"
+    },
+    "compact": {
+      "id": 826117,
+      "title": "Camera - Modern Compact (Lens, AF and Shutter)",
+      "author": "RealSquink",
+      "preview": "https://cdn.freesound.org/previews/826/826117_12262933-hq.mp3"
+    }
+  },
+  "sounds": [
+    {
+      "name": "shutter",
+      "source": "minolta",
+      "start": 2.6,
+      "duration": 0.4,
+      "fadeOut": 0.1
+    },
+    {
+      "name": "mirror-up",
+      "source": "minolta",
+      "start": 2.6,
+      "duration": 0.07,
+      "fadeOut": 0.02,
+      "gate": -45
+    },
+    {
+      "name": "mirror-down",
+      "source": "minolta",
+      "start": 2.674,
+      "duration": 0.16,
+      "fadeOut": 0.05,
+      "gate": -45
+    },
+    {
+      "name": "advance",
+      "source": "minolta",
+      "start": 3.98,
+      "duration": 0.92,
+      "fadeOut": 0.06,
+      "gate": -52
+    },
+    {
+      "name": "wind",
+      "source": "olympus",
+      "start": 44.6,
+      "duration": 1.12,
+      "fadeOut": 0.08
+    },
+    {
+      "name": "dial-1",
+      "source": "fm2",
+      "start": 0.465,
+      "duration": 0.07,
+      "gate": -40
+    },
+    {
+      "name": "dial-2",
+      "source": "fm2",
+      "start": 0.705,
+      "duration": 0.07,
+      "gate": -40
+    },
+    {
+      "name": "dial-3",
+      "source": "fm2",
+      "start": 0.955,
+      "duration": 0.07,
+      "gate": -40
+    },
+    {
+      "name": "dial-4",
+      "source": "fm2",
+      "start": 1.74,
+      "duration": 0.07,
+      "gate": -40
+    },
+    {
+      "name": "dial-5",
+      "source": "fm2",
+      "start": 3.13,
+      "duration": 0.07,
+      "gate": -40
+    },
+    {
+      "name": "press-1",
+      "source": "dslr",
+      "start": 20.675,
+      "duration": 0.05,
+      "gate": -40
+    },
+    {
+      "name": "press-2",
+      "source": "dslr",
+      "start": 20.732,
+      "duration": 0.05,
+      "gate": -40
+    },
+    {
+      "name": "press-3",
+      "source": "dslr",
+      "start": 20.8,
+      "duration": 0.05,
+      "gate": -40
+    },
+    {
+      "name": "stop",
+      "source": "lens",
+      "start": 21.22,
+      "duration": 0.14,
+      "fadeOut": 0.04,
+      "gate": -45
+    },
+    {
+      "name": "settle",
+      "source": "lens",
+      "start": 3.3,
+      "duration": 0.12,
+      "fadeOut": 0.04,
+      "gate": -45
+    },
+    {
+      "name": "motor",
+      "source": "compact",
+      "start": 16.78,
+      "duration": 0.26,
+      "loop": 0.04,
+      "highpass": 120
+    }
+  ]
+}

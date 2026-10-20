@@ -6,6 +6,7 @@
 - pnpm `9.15.9`, pinned by the `packageManager` field (pnpm switches to it automatically).
 - A browser with WebGL2 and `EXT_color_buffer_float`; every desktop browser on Apple Silicon has both.
 - Google Chrome for the capture script. Elsewhere than the default install path, pass `--chrome <path>` or set `CHROME_PATH`.
+- ffmpeg with libmp3lame, only to cut the recorded sounds again (`pnpm sounds`); the cut files are in the repository.
 
 ## Commands
 
@@ -21,6 +22,7 @@ pnpm preview
 pnpm capture        # headless captures, contact sheet, optional bench (docs/QUALITY.md)
 pnpm compare        # captures against a baseline: metrics, difference images (docs/QUALITY.md)
 pnpm brand          # renders the favicon, the touch icons and the Open Graph image into public/
+pnpm sounds         # cuts the recorded sounds from their CC0 sources into src/audio/sounds/ (docs/AUDIO.md)
 ```
 
 `pnpm test` loads `test/support/register.mjs`, whose hooks let Node import modules written for Vite:
@@ -38,6 +40,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
   - The panel is generated from the schema, so the library stays replaceable.
 - **`alea`** seeds the CPU generators.
 - **`gsap`** with its TextPlugin retypes the HUD's zoom value.
+- **Web Audio** plays the sound design directly, without a library ([`docs/AUDIO.md`](AUDIO.md)).
 - **Kode Mono** sets the title, **JetBrains Mono** the credit line and the frame rate (both Google Fonts, SIL OFL 1.1). Their latin subsets of weight 400 are files of the repository, [`fonts/`](../fonts/) with their licenses (`kode-mono-OFL.txt`, `OFL.txt`), which Vite bundles from `style.css`; the page loads no font from a CDN.
 - Plain JavaScript, no TypeScript step.
 
@@ -47,6 +50,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 - **Images** ([`public/`](../public/), copied as they are into `dist/`): `favicon.ico` (16, 32 and 48 px), `icon-192.png` and `apple-touch-icon.png` (180 px, square, opaque), all the default eye's iris seen from the front, and `og-image.jpg` (1200×630), the opening desktop scene. [`scripts/brand.mjs`](../scripts/brand.mjs) (`pnpm brand [--samples 128]`) renders them with the app in headless Chrome, converged in photo mode: rerun it when the default eye or the opening framing changes.
   - The iris: a still eye from the front, without the lids, lashes and tear meniscus, cut to a circle around the limbus as the camera projects it.
   - The scene: `?gui=0` at 1200×630, rendered at twice the size and scaled down.
+- **Sounds** ([`src/audio/sounds/`](../src/audio/sounds/), imported with `?url`; the files under 4 KB are inlined): mono MP3 cuts of CC0 camera recordings from Freesound and one WAV loop, about 124 KB, with their sources in `CREDITS.md`. [`scripts/sounds.mjs`](../scripts/sounds.mjs) (`pnpm sounds [--only <name>]`) cuts them from the manifest [`scripts/sounds.json`](../scripts/sounds.json) ([`docs/AUDIO.md`](AUDIO.md#recordings)).
 - **`VITE_SITE_URL`** ([`.env`](../.env), empty by default): the site's origin, such as `https://example.com`. Social cards need absolute image URLs; Vite writes it in front of `/og-image.jpg` at build time. Set it on the host or in `.env.production.local`.
 
 ## Code Conventions
@@ -84,7 +88,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 | `?state=<string>` | Applies the non-default values encoded by **Copy state URL** or **Save PNG** (base64url JSON), on top of the preset. |
 | `?photo=<n>` | Sets `quality.photoSamples` to `n` and starts in photo mode (frozen clock); the accumulation stops after `n` samples. |
 | `?view=<name>` | Sets `debug.view`; see [`docs/RENDERING.md`](RENDERING.md#debug-views) for the list. |
-| `?gui=0` | Hides the frame, the HUD, the title, the credit line, the frame rate and the panel (captures). |
+| `?gui=0` | Hides the frame, the HUD, the title, the credit line, the frame rate and the panel, and makes no sound (captures). |
 | `?dpr=<ratio>` | Pins the pixel ratio (0.5–2) and turns the adaptive resolution off. |
 | `?debug=1` | Exposes the app object as `window.__EYE_APP__` for console debugging. |
 | `?meshtree=1` | Shows the mesh tree at the left (loaded on demand, with or without the HUD): see [Mesh Tree](#mesh-tree). |
@@ -99,6 +103,7 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 - Over the HUD's aperture knob (desktop) the wheel changes `camera.fNumber` instead, between `aperture.open` and `aperture.closed` (`CameraControls.fNumberLimits`), up the wheel stopping down as it zooms in (a notch of 100 about 0.4 stop): the same eased target as the zoom's, with `controls.zoomLag`, on the log of the f-number (`apertureWheel()`, `stepAperture()`); from outside the range it only moves back toward it, and the knob, a right-drag, a glide or a preset that sets the f-number meanwhile takes over.
 - A double tap never zooms the page on touch screens (`touch-action: manipulation` on the page, `style.css`; the canvas takes every touch itself, `touch-action: none`).
 - **Space** toggles photo mode when the page, not a panel control, has the focus.
+- **Sound** ([`docs/AUDIO.md`](AUDIO.md)): every control sounds like a camera, over an ambient drone. The sound starts at the first press or key, because a browser plays none before a gesture. **M**, when the page has the focus, and the sound toggle at the end of the credit line (**sound on** / **sound off**, in the accent, underlined as the link; it blurs itself after a click) turn it off and on. The choice is kept in `localStorage` (`random-eyes:muted`); where storage fails, the sound is on and the choice holds for the page. Off, no audio context is created until it is turned on; a hidden page suspends it.
 
 **The frame** runs around the page, 24 px inside the window's safe area (8 px on phones and tablets): a cross of 1 px arms at each corner (14 px, 12 px on phones and tablets; white at 25%) and a dashed line along each side (an SVG pattern of `FRAME_DASH` px dashes every `FRAME_DASH_PERIOD` px, in `main.js`: 3 every 8; white at 15%). The lines run across the whole window, past the crosses, and are cut `--frame-cut` (14 px) to either side of each cross. Each side is two lines, from either window edge to the middle, the second mirrored, so the four corners look the same; the dashes are centered every 8 px from the edge and the insets are multiples of 8, so the cuts fall between dashes. On phones and tablets nothing is left beyond the crosses. At the middle of the left and right sides, 8 px inside the lines, stands a bracket (a 33 px upright with an 8 px tick inward from its middle; white at 25%, as the crosses). It is an overlay that never takes the pointer. The rest of the interface stays inside it, 16 px in (12 px on phones and tablets): `--frame-inset`, `--frame-gap` and `--ui-inset` in `style.css` place everything, the panel included.
 
@@ -137,15 +142,15 @@ pnpm brand          # renders the favicon, the touch icons and the Open Graph im
 
 **The skin tones**: five interrupted square reticles, each containing a flat 20 px swatch of its color with a white outline. A click glides `skin.color` to that tone ([`src/params/skinTones.js`](../src/params/skinTones.js): light, medium, brown, dark, deep) over the panel's **transition (s)**; nothing else of the skin changes, and the other params keep heading where they were. The button of the color the params are heading for is pressed (`aria-pressed`), also after the panel or a preset changes the color; a color of no tone presses none. The selected shape is full size and opaque, with its brackets visible. The others scale the entire glyph to 75% (`HUD.toneScale`) at 30% opacity; on hover or keyboard focus they grow to 85% and brighten to 80%. Their hit areas stay full size.
 
-**The title and the credit line** (`style.css`): **Random-eyes** in Kode Mono in white at the top left, with a line about the project under it at 12 px (*Your personal digital eye configurator*, and a joke about configuring your avatar or your household robot one day; at most 46 characters wide), the credit line in JetBrains Mono at 12 px at the bottom left. The credit links **rockbiter** to the author's X account; only the link takes the pointer, so drags across the text still orbit the camera, and it blurs itself after a click. On narrow screens it wraps, aligned left.
+**The title and the credit line** (`style.css`): **Random-eyes** in Kode Mono in white at the top left, with a line about the project under it at 12 px (*Your personal digital eye configurator*, and a joke about configuring your avatar or your household robot one day; at most 46 characters wide), the credit line in JetBrains Mono at 12 px at the bottom left, ending with the sound toggle after a middle dot. The credit links **rockbiter** to the author's X account; only the link takes the pointer, so drags across the text still orbit the camera, and it blurs itself after a click. On narrow screens it wraps, aligned left.
 
 **On phones** (`max-width: 640px`, `style.css`) the title drops its dash (`.title-dash`) and breaks before **eyes** (`.title-eyes`), and spans the frame: its size, `--title-size`, puts the ink of **RANDOM** (3.269 em of Kode Mono at this letter spacing, measured in the font) between the left and right insets, the first glyph's side bearing (0.078 em) taken back by the margin. Its line height drops to 0.8, and a top margin of −0.04 em starts the capitals of the first line at `--ui-inset`, the second's one `--title-size` lower. The line about the project is hidden under the title: **More info** (in the accent, underlined, at the right on the baseline of **EYES**) opens it in a dropdown (`.info`) across the frame, from 16 px below the title to 16 px above Snapshot, on white at 8% over a 16 px backdrop blur, with 24 px of padding and its top left and bottom right corners cut at 45° (24 px); it fades in, and a second press, Escape or a press outside it closes it. Neither shows on wider screens. The viewport size and the frame rate move to the bottom right, beside the credit line, on its last baseline. In their place, at the right with their capitals aligned with the top of **EYES**, the HUD's camera angles (on a phone held upright, a split HUD). Snapshot and the credit line stack in a column across the frame (`.footer`, which has no box on wider screens): Snapshot above, full width; the credit line below, at most 75% of the width.
 
-**Snapshot**, at the bottom right, its box ending on the credit line's bottom (`main.js`, `style.css`): the word in white Kode Mono at 28 px, centered inside four open corners of 12 px in the accent, as the HUD's reticles (padding 4 × 16 px). A click saves the image as the panel's **Save PNG** does (`savePng()`: the current image, its state in a `tEXt` chunk named `eye-state`), and the button blurs itself. Hovered or focused it brightens. On wider screens the credit line leaves it `--snapshot-room` (200 px); pressed, it shrinks a little.
+**Snapshot**, at the bottom right, its box ending on the credit line's bottom (`main.js`, `style.css`): the word in white Kode Mono at 28 px, centered inside four open corners of 12 px in the accent, as the HUD's reticles (padding 4 × 16 px). A click saves the image as the panel's **Save PNG** does (`savePng()`: the current image, its state in a `tEXt` chunk named `eye-state`), to the sound of a shutter, and the button blurs itself. Hovered or focused it brightens. On wider screens the credit line leaves it `--snapshot-room` (200 px); pressed, it shrinks a little.
 
 **The frame rate**, top right in the credit line's style, counts the frames the page shows per second, over half a second, with a `requestAnimationFrame` loop of its own in `main.js`. A converged photo draws nothing, so it then shows the display's refresh rate. Above it, the viewport's size in CSS pixels (`widthxheight`, `window.innerWidth` × `window.innerHeight`), updated on every resize.
 
-The panel shows only while the URL ends in `#debug`, and starts collapsed, below the viewport size and the frame rate (and, on phones, below the title, at the height `main.js` measures into `--masthead-height`). When its open folders outgrow the viewport it scrolls, and it stops at the frame (on phones above Snapshot and the credit line, at the height `main.js` measures into `--footer-height`; `style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, and **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once).
+The panel shows only while the URL ends in `#debug`, and starts collapsed, below the viewport size and the frame rate (and, on phones, below the title, at the height `main.js` measures into `--masthead-height`). When its open folders outgrow the viewport it scrolls, and it stops at the frame (on phones above Snapshot and the credit line, at the height `main.js` measures into `--footer-height`; `style.css`). It has the actions **Photo (freeze / live)**, **Save PNG**, **Export defaults JSON** (downloads the values as `defaults.json`, see Parameters above) and **Copy state URL**, the **random ancestry** of the random eye, **transition (s)**, how long a preset or a random eye takes to glide in (0 switches at once), and after the actions a **sound** list with **Play sound**, which plays any sound of the foley to tune the `sound` group by ear.
 
 ### Mesh Tree
 
@@ -179,6 +184,7 @@ With `?meshtree=1` a second Tweakpane panel, **Mesh tree**, lists the main scene
 | `getZoomLevel()`, `setZoomLevel(level)` | The bounded zoom level (0 zoomed out, 1 in); setting it moves the camera at once. The HUD also supplies small resisted values outside [0, 1] while dragging elastically. |
 | `getApertureLevel()`, `setApertureLevel(level)` | The bounded aperture level (0 at `aperture.open`, 1 at `aperture.closed`, on a log scale); setting it sets `camera.fNumber` at once, as the HUD's aperture knob does (also past the ends, while dragging elastically). |
 | `skinTone(name, duration)` | Glide `skin.color` to a tone of `src/params/skinTones.js`, as the HUD's skin tones do; `false` for an unknown name. |
+| `getSoundStats()` | With the interface only (not `?gui=0`): the audio context's state (`none` before the first gesture), whether the sounds are decoded, the mute, each sound's play count, and the master's peak and RMS (dBFS) since the last call ([`docs/AUDIO.md`](AUDIO.md#engine)). |
 
 ## Debugging Notes
 

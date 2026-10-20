@@ -132,7 +132,11 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // segmented rings' sizes and turns, and showZoomValue(text), the zoom's
 // value by the knob; showApertureLevel(level), where the aperture knob goes
 // and the tones' arcs' size, and showApertureValue(text), the f-number by
-// the zoom's value.
+// the zoom's value. onCue(name, detail), if given, hears the controls for the
+// sound design (src/audio/cameraFoley.js): 'press' and 'hover' of a button
+// or knob, 'grab', 'release' and 'tap' of a knob, 'tones' as the tones turn
+// by (`steps`, `start` at the start of a turn) and 'random'; `detail.element`
+// is the control, `detail.control` its name.
 export function createHud({
 	tones,
 	onTone,
@@ -145,6 +149,7 @@ export function createHud({
 	onApertureWheel,
 	getApertureElasticity = () => 0,
 	onRandom,
+	onCue = () => {},
 }) {
 	const element = document.createElement('div')
 	element.className = 'hud'
@@ -229,12 +234,28 @@ export function createHud({
 		return circle
 	}
 
+	// A button's or knob's cues: a mouse entering it and, for a button, a
+	// press (pointerdown, or a click from the keyboard, which has no pointer).
+	const sounding = (element, control, press = true) => {
+		element.addEventListener('pointerenter', (event) => {
+			if (event.pointerType === 'mouse') onCue('hover', { control, element })
+		})
+		if (!press) return
+		element.addEventListener('pointerdown', (event) => {
+			if (event.button === 0) onCue('press', { control, element })
+		})
+		element.addEventListener('click', (event) => {
+			if (event.detail === 0) onCue('press', { control, element })
+		})
+	}
+
 	const toneGroup = group('Skin tone')
 	const toneButtons = tones.map((tone) => {
 		const button = hudButton('skin', `${tone.label} skin`, '<span class="tone-fill"></span>', () =>
 			onTone(tone.name),
 		)
 		button.style.setProperty('--tone', tone.color)
+		sounding(button, 'tone')
 		return button
 	})
 	toneGroup.append(...toneButtons)
@@ -288,10 +309,14 @@ export function createHud({
 		stretch: HUD.zoom.stretch,
 		snapEnd: (level, { track, radius }) => knobSnap(knobAngle(level, track), track, radius),
 		onSnap: (end) => onZoom(end === 1 ? 'in' : 'out', SNAP_GLIDE),
+		onCue: (name) => onCue(name, { control: 'zoom', element: knob.element }),
 		cut: cut(),
 	})
 	knob.cut.style.r = `${HUD.marker / 2 + HUD.gap}px`
 	zoomGroup.append(zoomIn, knob.element, zoomOut)
+	sounding(zoomIn, 'zoom-in')
+	sounding(zoomOut, 'zoom-out')
+	sounding(knob.element, 'zoom', false)
 
 	// The aperture knob of a desktop HUD (HUD.aperture): a convex lens in
 	// profile across the circle, between the zoom's circle and the spinning
@@ -312,11 +337,13 @@ export function createHud({
 		stretch: HUD.aperture.stretch,
 		snapEnd: (level) => (level < 0 ? 0 : level > 1 ? 1 : null),
 		onSnap: (end) => onAperture(end, SNAP_GLIDE),
+		onCue: (name) => onCue(name, { control: 'aperture', element: apertureKnob.element }),
 		// Its cut in the dashed arc of its track, as the zoom knob's in the
 		// circle: the lens's half width and the gap (none without the knob).
 		cut: cut(),
 	})
 	apertureGroup.append(apertureKnob.element)
+	sounding(apertureKnob.element, 'aperture', false)
 	const apertureMarker = apertureKnob.element.firstElementChild
 	// Its lens, `length` px across the circle, centered in its hit area, as
 	// long as the lens hovered.
@@ -342,8 +369,10 @@ export function createHud({
 		spinTurns++
 		placeSpin()
 		activate('random')
+		onCue('random', { control: 'random', element: random })
 		onRandom()
 	})
+	sounding(random, 'random')
 
 	// The HUD's layers take the accent while their control is in use, as if
 	// they lit up (style.css eases the color from white and back): the zoom
@@ -426,12 +455,18 @@ export function createHud({
 			placeTones()
 			return
 		}
+		// The turn's cues: the steps it starts from, then each frame's.
+		const element = toneButtons[tone]
+		onCue('tones', { control: 'tone', element, steps: toneShift.steps, start: true })
 		gsap.to(toneShift, {
 			steps,
 			duration: 1,
 			ease: 'elastic.out(1, 0.75)',
 			overwrite: true,
-			onUpdate: placeTones,
+			onUpdate: () => {
+				placeTones()
+				onCue('tones', { control: 'tone', element, steps: toneShift.steps })
+			},
 		})
 	}
 	for (const item of items) item.cut = cut()
@@ -882,7 +917,7 @@ function typedText(element, motionless, onFirst) {
 // `snapEnd(level, circle)` gives an end (0 or 1, else null) glides there,
 // `onSnap(end)`. Past an end the marker runs `stretch` times as far as the
 // level (knobLevel()). `cut`: its circle in the mask of the HUD's line, if
-// any.
+// any. `onCue(name)` hears a 'grab', its 'release' and a 'tap' (a click).
 function trackKnob({
 	className,
 	marker: markerHtml,
@@ -895,6 +930,7 @@ function trackKnob({
 	getElasticity = () => 0,
 	stretch,
 	cut = null,
+	onCue = () => {},
 }) {
 	const element = document.createElement('div')
 	element.className = `hud-button ${className}`
@@ -957,6 +993,7 @@ function trackKnob({
 		const offset = angle - knobAngle(pullLevel(level, getElasticity()), circle.track)
 		drag = { id, x, y, offset, angle, level, moved: false }
 		recovering = false
+		onCue('grab')
 		// Grabbing a returning marker stops its glide at this point.
 		onLevel(level)
 	})
@@ -975,13 +1012,17 @@ function trackKnob({
 		const { moved, level } = drag
 		drag = null
 		element.classList.remove('dragging')
+		onCue('release')
 		if (moved || level < 0 || level > 1) {
 			const end = snapEnd(level, circle)
 			if (end !== null) {
 				recovering = level < 0 || level > 1
 				onSnap(end)
 			}
-		} else if (click) pulse()
+		} else if (click) {
+			pulse()
+			onCue('tap')
+		}
 		element.blur()
 	}
 	element.addEventListener('pointerup', (event) => release(event, true))

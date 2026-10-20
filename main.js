@@ -1,5 +1,9 @@
 import './style.css'
 import EyeApp from './src/app'
+import AmbientDrone from './src/audio/ambientDrone'
+import AudioEngine from './src/audio/audioEngine'
+import CameraFoley from './src/audio/cameraFoley'
+import { SOUNDS } from './src/audio/soundBank'
 import { PARAM_SCHEMA } from './src/params/paramSchema'
 import {
 	allValues,
@@ -237,8 +241,16 @@ window.__EYE__ = {
 	skinTone,
 }
 
-// Downloads the current (accumulated) image with its state in a tEXt chunk.
-async function savePng() {
+// The sound design's cues (src/audio/cameraFoley.js), once the HUD has set
+// them up: nothing without it (?gui=0).
+let cue = () => {}
+// Plays a sound of src/audio/soundBank.js by its name, for the panel.
+let audition = null
+
+// Downloads the current (accumulated) image with its state in a tEXt chunk,
+// to the sound of a shutter (from `element`, Snapshot, if given).
+async function savePng(element) {
+	cue('snapshot', { element })
 	const { insertPngText } = await import('./src/render/pngMetadata')
 	const dataUrl = window.__EYE__.capture()
 	const bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) =>
@@ -246,6 +258,23 @@ async function savePng() {
 	)
 	const tagged = insertPngText(bytes, 'eye-state', window.__EYE__.getState())
 	download(new Blob([tagged], { type: 'image/png' }), `eye-${Date.now()}.png`)
+}
+
+// The viewer's mute, kept in the browser (none in a private window: on).
+const MUTED_KEY = 'random-eyes:muted'
+function readMuted() {
+	try {
+		return window.localStorage.getItem(MUTED_KEY) === '1'
+	} catch {
+		return false
+	}
+}
+function writeMuted(muted) {
+	try {
+		window.localStorage.setItem(MUTED_KEY, muted ? '1' : '0')
+	} catch {
+		// The choice holds for this page only.
+	}
 }
 
 // Downloads the values the panel is heading for (not a transition's in-between
@@ -307,6 +336,66 @@ if (urlParams.get('gui') !== '0') {
 	// The frame around the page; the rest of the interface stays inside it.
 	document.body.appendChild(frame())
 
+	// The sound design (src/audio/, docs/AUDIO.md): the camera foley of the
+	// controls and the ambient drone, which start at the first press or key.
+	// The viewer's mute (the sound toggle, M) is kept in the browser.
+	const audio = new AudioEngine({ params: app.params, muted: readMuted() })
+	const foley = new CameraFoley(audio)
+	const drone = new AmbientDrone(audio)
+	cue = (name, detail) => foley.cue(name, detail)
+	window.__EYE__.getSoundStats = () => audio.stats()
+	audition = (name) => {
+		audio.unlock()
+		return audio.play(name) !== null
+	}
+	// A press on a control of the page, also from the keyboard, and a mouse
+	// entering it.
+	const sounding = (element, control) => {
+		element.addEventListener('pointerenter', (event) => {
+			if (event.pointerType === 'mouse') cue('hover', { control, element })
+		})
+		element.addEventListener('pointerdown', (event) => {
+			if (event.button === 0) cue('press', { control, element })
+		})
+		element.addEventListener('click', (event) => {
+			if (event.detail === 0) cue('press', { control, element })
+		})
+	}
+	app.listeners.add((path) => {
+		if (path === 'frozen') cue('frozen', { frozen: app.frozen })
+	})
+	// Once a frame, what the sounds follow: the knobs' levels (past their
+	// ends while dragged), the f-number, the orbit, the photo, and for the
+	// drone the eye's seed, pupil and blink.
+	let soundTime = null
+	const soundFrame = (time) => {
+		requestAnimationFrame(soundFrame)
+		const dt = soundTime === null ? 0 : Math.min((time - soundTime) / 1000, 0.1)
+		soundTime = time
+		const { camera, zoom, aperture, irisStructure } = app.params
+		const zoomed = zoomProgress(camera.distance, zoomLimits())
+		audio.update()
+		foley.update(dt, {
+			zoom: zoomed,
+			aperture: apertureProgress(camera.fNumber, apertureLimits()),
+			fNumber: camera.fNumber,
+			zoomElasticity: zoom.elasticity,
+			apertureElasticity: aperture.elasticity,
+			azimuth: camera.azimuth,
+			elevation: camera.elevation,
+			frozen: app.frozen,
+			converged: app.converged,
+		})
+		drone.update(dt, {
+			seed: irisStructure.seed,
+			pupil: app.pupilDiameter,
+			blink: app.lastPose?.blink ?? 0,
+			zoom: Math.min(Math.max(zoomed, 0), 1),
+			frozen: app.frozen,
+		})
+	}
+	requestAnimationFrame(soundFrame)
+
 	// The HUD around the eye (src/ui/hud.js): the skin tones, the zoom, the
 	// aperture (desktop only) and Random eye on a dashed circle. The tone of
 	// the color the params are heading for is pressed, also after the panel or
@@ -326,6 +415,7 @@ if (urlParams.get('gui') !== '0') {
 		onApertureWheel: (deltaY) => app.controls.apertureWheel(deltaY),
 		getApertureElasticity: () => app.params.aperture.elasticity,
 		onRandom: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
+		onCue: (name, detail) => cue(name, detail),
 	})
 	document.body.appendChild(hud.element)
 	hud.mount()
@@ -399,6 +489,7 @@ if (urlParams.get('gui') !== '0') {
 		moreInfo.blur()
 		showInfo(!info.classList.contains('open'))
 	})
+	sounding(moreInfo, 'more-info')
 	window.addEventListener('keydown', (event) => {
 		if (event.key === 'Escape') showInfo(false)
 	})
@@ -413,6 +504,39 @@ if (urlParams.get('gui') !== '0') {
 		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
 	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
 
+	// The sound toggle, at the end of the credit line, and M (while the page,
+	// not a control, has the focus, as Space): sound on or off, kept in the
+	// browser. It blurs itself after a click, as the HUD buttons do.
+	const soundToggle = document.createElement('button')
+	soundToggle.type = 'button'
+	soundToggle.className = 'sound-toggle'
+	const showSound = () => {
+		soundToggle.textContent = audio.muted ? 'sound off' : 'sound on'
+		soundToggle.setAttribute('aria-pressed', String(!audio.muted))
+		soundToggle.title = audio.muted ? 'Turn the sound on (M)' : 'Turn the sound off (M)'
+	}
+	const toggleSound = () => {
+		const muted = !audio.muted
+		audio.setMuted(muted)
+		if (!muted) audio.unlock()
+		writeMuted(muted)
+		showSound()
+		cue('press', { control: 'sound', element: soundToggle })
+	}
+	showSound()
+	soundToggle.addEventListener('click', () => {
+		soundToggle.blur()
+		toggleSound()
+	})
+	sounding(soundToggle, 'sound')
+	window.addEventListener('keydown', (event) => {
+		if (event.target !== document.body || event.repeat) return
+		if (event.key !== 'm' && event.key !== 'M') return
+		if (event.metaKey || event.ctrlKey || event.altKey) return
+		toggleSound()
+	})
+	credit.append(' · ', soundToggle)
+
 	// Snapshot, bottom right: saves the image as the panel's Save PNG does
 	// (the state in a tEXt chunk). The word inside the HUD's reticle corners
 	// (style.css); it blurs itself after a click, as the HUD buttons do (Space
@@ -424,7 +548,10 @@ if (urlParams.get('gui') !== '0') {
 	snapshot.textContent = 'Snapshot'
 	snapshot.addEventListener('click', () => {
 		snapshot.blur()
-		savePng()
+		savePng(snapshot)
+	})
+	snapshot.addEventListener('pointerenter', (event) => {
+		if (event.pointerType === 'mouse') cue('hover', { control: 'snapshot', element: snapshot })
 	})
 
 	// The two share a footer: no box of its own on wide screens, where each
@@ -520,6 +647,22 @@ async function createPanel() {
 		step: 0.1,
 		index: 3,
 	})
+	// Any sound of the foley on demand, to tune the `sound` group by ear: after
+	// the actions (the frame rate, the preset, the ancestry and the transition
+	// come before them).
+	if (audition) {
+		const sounds = Object.keys(SOUNDS)
+		const heard = { sound: sounds[0] }
+		const index = 4 + gui.actions
+		gui.pane.addBinding(heard, 'sound', {
+			label: 'sound',
+			options: Object.fromEntries(sounds.map((name) => [name, name])),
+			index,
+		})
+		gui.pane
+			.addButton({ title: 'Play sound', index: index + 1 })
+			.on('click', () => audition(heard.sound))
+	}
 	app.listeners.add((path) => {
 		if (path === 'camera' || path === '*') gui.refresh()
 	})

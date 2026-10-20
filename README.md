@@ -8,6 +8,7 @@ An exploratory demo of a digital eye configurator: a hyper-realistic, fully proc
 - **Light and life**: an analytic light rig gives exact reflections; the pupil reacts to light, the eye moves like a living one and blinks now and then.
 - **Air**: tiny fibers and flakes of dust drift very slowly around the eye, sharp near the focus and soft away from it, over a light haze that deepens with distance; a few soft shafts of light cross it, and the skin patch casts a soft shadow below.
 - **Photo mode**: a thin-lens camera with progressive accumulation renders real macro depth of field.
+- **Sound**: every control sounds like a camera (the zoom's motor and ring, the aperture's clicks, the mode dial, the film advance, the shutter), over a slow drone that follows the eye.
 
 Every structure and color is a parameter.
 
@@ -25,6 +26,7 @@ pnpm capture    # renders presets headlessly next to the reference photos
 - **Aperture** (desktop only: the small lens across the circle just outside the zoom knob, its f-number beside the zoom's value): drag it (or scroll over it) from f/10 by − to f/22.5 by + (it starts at f/15, halfway), for a thinner or deeper focus.
 - **Skin tone** (the dots at the left of the circle): glide the skin color from light to deep.
 - **Space** toggles photo mode: the eye freezes (open, even mid-blink) and the image converges.
+- **M** (or **sound on/off** at the end of the credit line) turns the sound off and on; it starts with your first click or key.
 
 **Random eye** (the eye button, below the zoom): an eye drawn from measured population data for the chosen ancestry.
 

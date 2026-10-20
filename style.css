@@ -914,6 +914,23 @@ canvas {
 	color: #ffb700;
 }
 
+/* The sound toggle at the end of the credit line, in its type, in the
+   accent as the link. */
+.sound-toggle {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: #ffb700;
+	font: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	pointer-events: auto;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
 .fps {
 	top: calc(var(--ui-inset) + env(safe-area-inset-top));
 	right: calc(var(--ui-inset) + env(safe-area-inset-right));

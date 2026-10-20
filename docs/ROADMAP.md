@@ -16,6 +16,7 @@
 | 9 | Animation: pupil light reflex and hippus, gaze, saccades, microsaccades, drift, lid follow, photo mode | Done |
 | 10 | Presets per reference photograph, random eye from population priors | Done |
 | 11 | Optional refinements (below) | Open |
+| 12 | Sound: camera foley for every control (CC0 recordings and synthesized voices that follow the camera), the shutter on Snapshot, the mirror and the focus beep in photo mode, a generative drone that follows the eye, mute toggle and M ([`docs/AUDIO.md`](AUDIO.md)) | Done |
 
 ## Changes From the Plan
 
@@ -53,6 +54,12 @@
 - **Self-test**: there is no `?selftest=1` comparison of GLSL twins against their JS versions. Shader–CPU agreement is checked visually (the refraction checker, captures).
 - **Dust**: a mote's occlusion compares its distance with the sharp one in the accumulated mean, so a surface out of focus cuts a blurred mote behind it along its sharp outline; the casters' shadow reaches the motes only through the soft coverages, which ignore the gaze follow and the blink; the motes' cube (`dust.extent`) is centered on the globe and covers the desktop zoom-out framing, so the portrait zoom-out shows fewer at its edges; the haze lifts the backdrop a little from the tone it is matched to (`skin.backdrop`).
 - **Light shafts and floor shadow**: the blades' σ widens from the source at the ray's densest point only (an approximation of a cone); on the iris they scale the key's term instead of adding their own; the shafts' coverage ignores the gaze follow and the blink; the floor under the face is unseen from below (the default camera) and edge-on at the eye's height, and its shadow comes from the shafts' source even with the shafts off.
+- **Sound** ([`docs/AUDIO.md`](AUDIO.md)):
+  - The recordings were cut from measurements, not by ear, and the levels were balanced on headless meters: both need a listen and a pass in the panel.
+  - The sounds are not placed in space beyond a pan by the control's place on the screen.
+  - On iOS the ringer switch silences Web Audio.
+  - The drone follows the pupil, the blinks, the zoom and photo mode, not the dust or the light shafts.
+  - A key step of the zoom (an instant jump) gives a short blip of the motor rather than a step of its own.
 - **Gaze and orbit**: a living eye with `animation.gaze` = `camera` turns toward the camera as it orbits. Use the default `wander`, `fixed`, photo mode, or a still eye to look at grazing angles.
 
 ## Future Work

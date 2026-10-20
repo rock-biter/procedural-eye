@@ -506,6 +506,38 @@ export const BASE_PARAM_SCHEMA = {
 		zoomLag: num(0.15, 0, 1, 0.01, 's', 'uniform', 'wheel zoom lag'),
 		inertia: num(0.2, 0, 1, 0.01, 's', 'uniform', 'orbit inertia'),
 	},
+	// The sound design (src/audio/, docs/AUDIO.md): the master volume and its
+	// two buses, the level of each sound of the camera foley, how far a
+	// sound's pitch varies from one play to the next, the aperture ring's
+	// detents per stop, how Random eye advances the film (a lever or a
+	// motor), and the ambient drone: its low-pass at a mid pupil, how far the
+	// pupil moves it (octaves either way), its reverb and the time between its
+	// chords. The mute is the viewer's, kept by the browser, not a parameter.
+	sound: {
+		volume: num(0.8, 0, 1, 0.01, '', 'uniform', 'volume'),
+		controls: num(0.8, 0, 1, 0.01, '', 'uniform', 'controls bus'),
+		ambient: num(0.5, 0, 1, 0.01, '', 'uniform', 'ambient bus'),
+		press: num(0.5, 0, 1, 0.01, '', 'uniform', 'button press'),
+		hover: num(0.12, 0, 1, 0.01, '', 'uniform', 'hover tick'),
+		dial: num(0.45, 0, 1, 0.01, '', 'uniform', 'tone dial'),
+		detent: num(0.3, 0, 1, 0.01, '', 'uniform', 'aperture detents'),
+		stop: num(0.5, 0, 1, 0.01, '', 'uniform', 'end stops'),
+		strain: num(0.5, 0, 1, 0.01, '', 'uniform', 'creak past an end'),
+		motor: num(0.35, 0, 1, 0.01, '', 'uniform', 'zoom motor'),
+		ring: num(0.4, 0, 1, 0.01, '', 'uniform', 'zoom ring by hand'),
+		orbit: num(0.3, 0, 1, 0.01, '', 'uniform', 'orbit swish'),
+		advance: num(0.6, 0, 1, 0.01, '', 'uniform', 'film advance (Random eye)'),
+		shutter: num(0.8, 0, 1, 0.01, '', 'uniform', 'shutter (Snapshot)'),
+		mirror: num(0.5, 0, 1, 0.01, '', 'uniform', 'mirror (photo mode)'),
+		beep: num(0.12, 0, 1, 0.01, '', 'uniform', 'focus beep'),
+		variation: num(60, 0, 200, 1, 'cents', 'uniform', 'pitch variation'),
+		detents: num(3, 1, 6, 1, 'per stop', 'uniform', 'aperture detents per stop'),
+		film: choice('lever', ['lever', 'motor'], 'uniform', 'Random eye film advance'),
+		droneBrightness: num(700, 150, 4000, 10, 'Hz', 'uniform', 'drone low-pass'),
+		droneMotion: num(0.6, 0, 1.5, 0.05, 'oct', 'uniform', 'drone pupil reach'),
+		droneReverb: num(0.55, 0, 1, 0.01, '', 'uniform', 'drone reverb'),
+		droneChord: num(24, 6, 90, 1, 's', 'uniform', 'drone chord length'),
+	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),
 		grain: num(0.035, 0, 0.3, 0.001),

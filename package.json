@@ -15,6 +15,7 @@
     "capture": "node scripts/capture.mjs",
     "compare": "node scripts/compare.mjs",
     "brand": "node scripts/brand.mjs",
+    "sounds": "node scripts/sounds.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
