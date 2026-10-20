@@ -165,12 +165,15 @@ export function createHud({
 	// The sliders' tracks, white (style.css): the zoom's circle between its
 	// buttons, drawn again over it with its dashes and cuts, and the dashed
 	// arc that marks the aperture knob's track, end to end, under the knob
-	// (desktop only).
+	// (desktop only), cut around it by the same mask.
 	const zoomTrackLine = svgElement('path', {
 		class: 'hud-line hud-zoom-track',
 		mask: 'url(#hud-ring-cuts)',
 	})
-	const apertureLine = svgElement('path', { class: 'hud-line hud-aperture-track' })
+	const apertureLine = svgElement('path', {
+		class: 'hud-line hud-aperture-track',
+		mask: 'url(#hud-ring-cuts)',
+	})
 	// The two segmented zoom rings, each an SVG drawn about the center of its
 	// wrapper (orbitArt()) at the layout's size, its dashes in px; the
 	// wrappers sit on the HUD's center and turn about it. Their strokes take
@@ -309,6 +312,9 @@ export function createHud({
 		stretch: HUD.aperture.stretch,
 		snapEnd: (level) => (level < 0 ? 0 : level > 1 ? 1 : null),
 		onSnap: (end) => onAperture(end, SNAP_GLIDE),
+		// Its cut in the dashed arc of its track, as the zoom knob's in the
+		// circle: the lens's half width and the gap (none without the knob).
+		cut: cut(),
 	})
 	apertureGroup.append(apertureKnob.element)
 	const apertureMarker = apertureKnob.element.firstElementChild
@@ -528,8 +534,7 @@ export function createHud({
 		)
 		if (!force && layers.every((layer, i) => dragged[layer] === turns[i])) return
 		layers.forEach((layer, i) => (dragged[layer] = turns[i]))
-		const degrees = (dragged.track * 180) / Math.PI
-		apertureLine.setAttribute('transform', `rotate(${degrees} ${placed.cx} ${placed.cy})`)
+		placeApertureLine()
 		const zoomCircle = { ...placed, radius: placed.zoomRadius }
 		for (const item of items) {
 			if (!item.follow) continue
@@ -541,6 +546,18 @@ export function createHud({
 		const zoomRing = placed.split ? zoomLine : line
 		zoomRing.style.strokeDashoffset = `${-dragged.zoom * placed.zoomRadius}px`
 		placeZoomTrack()
+	}
+	// The dashed arc of the aperture's track, drawn turned (not by a
+	// transform, which would turn the mask's cuts with it; its dashes depend
+	// only on its length).
+	let apertureRing = null
+	const placeApertureLine = () => {
+		if (!placed.aperture || !apertureTrackAngles) return
+		const [from, to] = apertureTrackAngles
+		const turned = [from + dragged.track, to + dragged.track]
+		const trackArc = apertureTrackArc(placed, apertureRing, turned)
+		apertureLine.setAttribute('d', trackArc.d)
+		apertureLine.setAttribute('stroke-dasharray', trackArc.dashArray.join(' '))
 	}
 	// The zoom's white track, between its buttons, turned with them and the
 	// circle's dashes.
@@ -681,11 +698,11 @@ export function createHud({
 			const { radius: ring, length, track } = fit.aperture
 			apertureKnob.setTrack({ ...circle, radius: ring, track })
 			drawApertureLens(length)
-			const trackArc = apertureTrackArc(circle, ring, track)
-			apertureLine.setAttribute('d', trackArc.d)
-			apertureLine.setAttribute('stroke-dasharray', trackArc.dashArray.join(' '))
 			apertureTrackAngles = track
+			apertureRing = ring
 		}
+		const apertureCut = withAperture ? HUD.aperture.width / 2 + HUD.gap : 0
+		apertureKnob.cut.style.r = `${apertureCut}px`
 		const middle = (angles.track[0] + angles.track[1]) / 2
 		const reach = zoomValueRadius(radius, HUD, split)
 		zoomReadout.place(circle, reach, middle, width)

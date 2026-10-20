@@ -710,6 +710,9 @@ test('a dashed arc marks the track of the aperture knob, a whole dash at either 
 	const count = (length + gap) / (dash + gap)
 	assert.ok(near(count, Math.round(count), 1e-9))
 	assert.ok(Math.abs(dash + gap - HUD.dashPeriod) < 1)
+	// Drawn turned (dragged past an end), it keeps its dashes.
+	const turned = aperture.track.map((angle) => angle - 0.05)
+	assert.deepEqual(apertureTrackArc(center, aperture.radius, turned).dashArray, dashArray)
 })
 
 test('the aperture knob is a biconvex lens in profile, thickest at its middle', () => {
