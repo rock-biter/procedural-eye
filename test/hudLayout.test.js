@@ -10,6 +10,8 @@ import {
 	apertureRadius,
 	apertureTrack,
 	apertureTrackArc,
+	apertureTrackTurn,
+	circleDashes,
 	elasticZoomLevel,
 	hudAngles,
 	hudLayout,
@@ -33,6 +35,7 @@ import {
 	zoomProgress,
 	zoomRadius,
 	zoomSensor,
+	zoomTrackArc,
 } from '../src/ui/hudLayout'
 
 // The HUD's box on a desktop window (1600 × 1000), on a phone held upright
@@ -600,6 +603,48 @@ test('a desktop HUD has the aperture knob between the zoom and the spinning circ
 		for (let level = 0; level <= 1; level += 0.05) {
 			const [x, y] = point(fit.aperture.radius, knobAngle(level, fit.aperture.track))
 			assert.ok(Math.abs(x) <= width / 2 - reach && Math.abs(y) <= height / 2 - reach)
+		}
+	}
+})
+
+test('past an end the dashed arc of the aperture track follows the knob, half as far', () => {
+	const track = [-0.2, 0.2]
+	for (const level of [0, 0.3, 1]) assert.ok(near(apertureTrackTurn(level, track), 0))
+	for (const level of [-0.2, -0.05, 1.05, 1.2]) {
+		const marker = knobAngle(level, track) - knobAngle(Math.min(Math.max(level, 0), 1), track)
+		const turn = apertureTrackTurn(level, track)
+		assert.ok(near(turn, marker * HUD.aperture.follow, 1e-12), `${level}`)
+		assert.ok(Math.sign(turn) === Math.sign(marker) && Math.abs(turn) < Math.abs(marker))
+	}
+	assert.equal(HUD.aperture.follow, 0.5)
+})
+
+test('the zoom track lies on the zoom circle between its buttons, its dashes on the circle', () => {
+	for (const [screen, [width, height]] of Object.entries(SCREENS)) {
+		const { zoomRadius: radius, angles } = hudLayout(width, height, TONES)
+		const center = { cx: width / 2, cy: height / 2 }
+		const { d, dashArray, dashOffset } = zoomTrackArc(center, radius, angles.track)
+		const [x0, y0, r, , , , , x1, y1] = d.match(/-?[\d.]+/g).map(Number)
+		for (const [[x, y], angle] of [
+			[[x0, y0], angles.zoomIn],
+			[[x1, y1], angles.zoomOut],
+		]) {
+			assert.ok(near(x, center.cx + radius * Math.cos(angle), 0.01), screen)
+			assert.ok(near(y, center.cy + radius * Math.sin(angle), 0.01), screen)
+		}
+		assert.ok(near(r, radius, 0.01) && d.includes(' 0 0 1 '), screen)
+		// The circle's dashes, a whole number around, laid on the circle's own:
+		// a point `s` px along the arc falls where the circle's pattern has it.
+		assert.deepEqual(dashArray, circleDashes(radius))
+		const period = dashArray[0] + dashArray[1]
+		assert.ok(
+			near((2 * Math.PI * radius) / period, Math.round((2 * Math.PI * radius) / period), 1e-9),
+		)
+		for (const s of [0, 7.5, 40]) {
+			const angle = angles.zoomIn + s / radius
+			const onCircle = (((angle * radius) % period) + period) % period
+			const onArc = (s + dashOffset) % period
+			assert.ok(near(onArc, onCircle, 1e-6) || near(Math.abs(onArc - onCircle), period, 1e-6))
 		}
 	}
 })

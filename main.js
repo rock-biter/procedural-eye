@@ -20,6 +20,8 @@ import { createHud } from './src/ui/hud'
 import {
 	apertureFNumber,
 	apertureProgress,
+	elasticZoomLevel,
+	pullLevel,
 	zoomDistance,
 	zoomLevel,
 	zoomProgress,
@@ -171,6 +173,40 @@ function aperture(end, duration) {
 	app.transitionTo(target, duration)
 }
 
+// A right-drag over the image moves the aperture as the HUD's knob does
+// (`sideDrag`, src/camera/cameraControls.js), from its horizontal motion,
+// rightward stopping down, APERTURE_DRAG_PX px across the knob's range: past
+// an end resisted (aperture.elasticity), and let go there after moving, it
+// glides back in APERTURE_SPRING_BACK s, as the knob does. From an f-number
+// off the range (a preset's) it starts at the nearer end. holdAperture(held)
+// shows it on the HUD's knob, once there is one.
+const APERTURE_DRAG_PX = 525
+const APERTURE_SPRING_BACK = 0.25
+let holdAperture = () => {}
+let apertureDrag = null
+app.controls.sideDrag = {
+	start() {
+		const elasticity = app.params.aperture.elasticity
+		const level = apertureProgress(app.params.camera.fNumber, apertureLimits())
+		const reachable = level > -elasticity && level < 1 + elasticity
+		const pull = reachable ? pullLevel(level, elasticity) : Math.min(Math.max(level, 0), 1)
+		apertureDrag = { pull, moved: false }
+		holdAperture(true)
+	},
+	move(dx) {
+		apertureDrag.pull += dx / APERTURE_DRAG_PX
+		apertureDrag.moved = true
+		setApertureLevel(elasticZoomLevel(apertureDrag.pull, app.params.aperture.elasticity))
+	},
+	end() {
+		const { moved } = apertureDrag
+		apertureDrag = null
+		holdAperture(false)
+		const level = apertureProgress(app.params.camera.fNumber, apertureLimits())
+		if (moved && (level < 0 || level > 1)) aperture(level < 0 ? 0 : 1, APERTURE_SPRING_BACK)
+	},
+}
+
 // Glides `skin.color` to the tone `name` (src/params/skinTones.js), as the
 // skin buttons do. The rest keeps the values a running transition is heading
 // for.
@@ -293,6 +329,7 @@ if (urlParams.get('gui') !== '0') {
 	})
 	document.body.appendChild(hud.element)
 	hud.mount()
+	holdAperture = (held) => hud.holdAperture(held)
 	const pressTone = () => hud.pressTone(app.targetParams.skin.color)
 	pressTone()
 	app.listeners.add((path) => {

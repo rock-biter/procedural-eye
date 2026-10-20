@@ -52,9 +52,10 @@ export const HUD = Object.freeze({
 	// edges (`edge` px from their centers along the circle, their 30 px
 	// reticles'; apertureTrack()). It runs from the widest f-number by −
 	// (level 0) to the narrowest by + (level 1). Its hit area is `hit` px
-	// along the circle and as long as the lens hovered. The
-	// tones' arcs scale with it, from `arcs[0]` wide open to `arcs[1]`
-	// stopped down (apertureArcScale()).
+	// along the circle and as long as the lens hovered. Past an end, the
+	// dashed arc of its track follows it `follow` as far
+	// (apertureTrackTurn()). The tones' arcs scale with it, from `arcs[0]`
+	// wide open to `arcs[1]` stopped down (apertureArcScale()).
 	aperture: Object.freeze({
 		share: 0.55,
 		grow: 1.3,
@@ -65,6 +66,7 @@ export const HUD = Object.freeze({
 		rim: 2,
 		hit: 24,
 		stretch: 5,
+		follow: 0.5,
 		arcs: Object.freeze([1.05, 0.9]),
 	}),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
@@ -274,13 +276,52 @@ export function apertureTrack([zoomIn, zoomOut], ring, elasticity = 0, hud = HUD
 // path and dashes, the frame's (HUD.dash px every about HUD.dashPeriod px),
 // starting and ending on a whole dash, so a dash marks either end
 // (dashFit()).
-export function apertureTrackArc({ cx, cy }, ring, [from, to], hud = HUD) {
-	const at = (angle) =>
-		`${round(cx + ring * Math.cos(angle))} ${round(cy + ring * Math.sin(angle))}`
+export function apertureTrackArc(center, ring, [from, to], hud = HUD) {
 	return {
-		d: `M${at(from)}A${round(ring)} ${round(ring)} 0 0 1 ${at(to)}`,
+		d: arcPath(center, ring, from, to),
 		dashArray: dashFit((to - from) * ring, hud.dash, hud.dashPeriod - hud.dash),
 	}
+}
+
+// The turn (radians, clockwise) of the dashed arc of the aperture knob's
+// `track` with the knob's marker at `level` (past an end while stretched):
+// none along the track; past an end, HUD.aperture.follow of the marker's
+// turn past it, the same way, so the arc is dragged along and comes back
+// with it.
+export function apertureTrackTurn(level, [from, to], hud = HUD) {
+	const past = level - Math.min(Math.max(level, 0), 1)
+	return (from - to) * past * hud.aperture.follow
+}
+
+// The dashes of a dashed circle of `radius` px, [dash, gap]: HUD.dash px
+// every about HUD.dashPeriod px, a whole number of periods around, so it has
+// no seam.
+export function circleDashes(radius, hud = HUD) {
+	const circumference = 2 * Math.PI * radius
+	const period = circumference / Math.max(1, Math.round(circumference / hud.dashPeriod))
+	return [hud.dash, period - hud.dash]
+}
+
+// The arc of the zoom's dashed circle of `radius` px about (cx, cy) between
+// its buttons, from zoom in to zoom out (`track`), drawn over the circle:
+// its SVG path, the circle's dashes (circleDashes()) and the dash offset
+// that lays them on the circle's own (an SVG circle's dashes start at its
+// right and run clockwise).
+export function zoomTrackArc(center, radius, [zoomIn, zoomOut], hud = HUD) {
+	const turn = 2 * Math.PI
+	return {
+		d: arcPath(center, radius, zoomIn, zoomOut),
+		dashArray: circleDashes(radius, hud),
+		dashOffset: (((zoomIn % turn) + turn) % turn) * radius,
+	}
+}
+
+// An SVG path along the circle of `ring` px about (cx, cy), clockwise from
+// angle `from` to angle `to`, less than a half turn on.
+function arcPath({ cx, cy }, ring, from, to) {
+	const at = (angle) =>
+		`${round(cx + ring * Math.cos(angle))} ${round(cy + ring * Math.sin(angle))}`
+	return `M${at(from)}A${round(ring)} ${round(ring)} 0 0 1 ${at(to)}`
 }
 
 // Whether every button, and the knobs anywhere along their tracks, lie inside

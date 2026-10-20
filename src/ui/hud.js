@@ -6,6 +6,8 @@ import {
 	apertureArcScale,
 	apertureLens,
 	apertureTrackArc,
+	apertureTrackTurn,
+	circleDashes,
 	hudLayout,
 	knobAngle,
 	knobLevel,
@@ -19,6 +21,7 @@ import {
 	toneSteps,
 	trackLevel,
 	turnTones,
+	zoomTrackArc,
 	zoomValueRadius,
 } from './hudLayout'
 import { gsap } from 'gsap'
@@ -99,13 +102,8 @@ function group(label) {
 	return element
 }
 
-// The dashes of a circle of `radius` px: HUD.dash px every about
-// HUD.dashPeriod px, a whole number of periods around, so it has no seam.
-function dashes(radius) {
-	const circumference = 2 * Math.PI * radius
-	const period = circumference / Math.max(1, Math.round(circumference / HUD.dashPeriod))
-	return `${HUD.dash} ${period - HUD.dash}`
-}
+// The dashes of a circle of `radius` px (circleDashes()).
+const dashes = (radius) => circleDashes(radius).join(' ')
 
 // Centers `element` and its cut in the circle's line, if any, at `angle` on a
 // circle.
@@ -164,8 +162,14 @@ export function createHud({
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
 	const zoomLine = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
-	// The dashed arc that marks the aperture knob's track, end to end, under
-	// the knob (desktop only).
+	// The sliders' tracks, white (style.css): the zoom's circle between its
+	// buttons, drawn again over it with its dashes and cuts, and the dashed
+	// arc that marks the aperture knob's track, end to end, under the knob
+	// (desktop only).
+	const zoomTrackLine = svgElement('path', {
+		class: 'hud-line hud-zoom-track',
+		mask: 'url(#hud-ring-cuts)',
+	})
 	const apertureLine = svgElement('path', { class: 'hud-line hud-aperture-track' })
 	// The two segmented zoom rings, each an SVG drawn about the center of its
 	// wrapper (orbitArt()) at the layout's size, its dashes in px; the
@@ -215,7 +219,7 @@ export function createHud({
 	// The spinning circle and its teeth sway together.
 	const spinGroup = svgElement('g')
 	spinGroup.append(spin, spinTeeth)
-	ring.append(mask, line, zoomLine, apertureLine, spinGroup, ...arcs)
+	ring.append(mask, line, zoomLine, zoomTrackLine, apertureLine, spinGroup, ...arcs)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -505,6 +509,20 @@ export function createHud({
 		const degrees = (turn * 180) / Math.PI
 		element.setAttribute('transform', `rotate(${degrees} ${placed.cx} ${placed.cy})`)
 	}
+	// Past an end, the dashed arc of the aperture's track turns about the
+	// center with the knob's marker, half as far (apertureTrackTurn()), and
+	// follows it back as it springs back.
+	let apertureTrackAngles = null
+	let apertureLineTurn = null
+	const turnApertureLine = () => {
+		const level = apertureKnob.level
+		if (!placed?.aperture || !apertureTrackAngles || level === null) return
+		const turn = apertureTrackTurn(level, apertureTrackAngles)
+		const transform = `rotate(${(turn * 180) / Math.PI} ${placed.cx} ${placed.cy})`
+		if (transform === apertureLineTurn) return
+		apertureLineTurn = transform
+		apertureLine.setAttribute('transform', transform)
+	}
 	// The arcs also grow and shrink with the aperture about the center
 	// (apertureArcScale(); on a HUD without the knob they keep their size),
 	// their line kept 2 px wide (--arc-scale, style.css).
@@ -617,6 +635,10 @@ export function createHud({
 		zoomLine.setAttribute('cy', circle.cy)
 		zoomLine.setAttribute('r', zoomCircle.radius)
 		zoomLine.setAttribute('stroke-dasharray', dashes(zoomCircle.radius))
+		const zoomTrack = zoomTrackArc(zoomCircle, zoomCircle.radius, angles.track)
+		zoomTrackLine.setAttribute('d', zoomTrack.d)
+		zoomTrackLine.setAttribute('stroke-dasharray', zoomTrack.dashArray.join(' '))
+		zoomTrackLine.style.strokeDashoffset = `${zoomTrack.dashOffset}px`
 		for (const element of [spin, spinTeeth]) {
 			element.setAttribute('cx', circle.cx)
 			element.setAttribute('cy', circle.cy)
@@ -637,6 +659,7 @@ export function createHud({
 			const trackArc = apertureTrackArc(circle, ring, track)
 			apertureLine.setAttribute('d', trackArc.d)
 			apertureLine.setAttribute('stroke-dasharray', trackArc.dashArray.join(' '))
+			apertureTrackAngles = track
 		}
 		const middle = (angles.track[0] + angles.track[1]) / 2
 		const reach = zoomValueRadius(radius, HUD, split)
@@ -650,6 +673,7 @@ export function createHud({
 			track: angles.track,
 			aperture: withAperture,
 		}
+		turnApertureLine()
 		placeSpin()
 		placeArcs()
 		// The sway turns about the center, which moved with the layout.
@@ -690,6 +714,12 @@ export function createHud({
 		},
 		// The zoom's value as text (main.js formats it).
 		showZoomValue: (text) => zoomValue.show(text),
+		// Whether a right-drag over the image holds the aperture (main.js): the
+		// knob shows it past an end, lit, as under its own drag.
+		holdAperture(value) {
+			apertureKnob.held = value
+			if (value) activate('aperture')
+		},
 		// The f-number as text (main.js formats it), also the knob's value
 		// for assistive technology.
 		showApertureValue(text) {
@@ -704,6 +734,7 @@ export function createHud({
 			// Its track keeps clear of + and − for the drag's elasticity.
 			if (getApertureElasticity() !== laidElasticity) layout()
 			apertureKnob.show(shown)
+			turnApertureLine()
 			if (apertureKnob.dragging) activate('aperture')
 			if (aperture !== null && Math.abs(shown - aperture) < 1e-4) return
 			if (aperture !== null) activate('aperture')
@@ -866,6 +897,9 @@ function trackKnob({
 	// a held drag. Recovery follows the level back from outside the track.
 	let drag = null
 	let recovering = false
+	// Held from outside (a right-drag over the image, `held`): the marker
+	// shows the level past an end as under a drag of its own.
+	let held = false
 	element.addEventListener('pointerdown', (event) => {
 		if (!circle || drag || event.button !== 0) return
 		element.setPointerCapture(event.pointerId)
@@ -932,7 +966,14 @@ function trackKnob({
 			return shown === null ? null : marker()
 		},
 		get dragging() {
-			return drag !== null
+			return drag !== null || held
+		},
+		// Whether a drag from outside holds the level; let go past an end, the
+		// marker follows it back, as after a drag of its own.
+		set held(value) {
+			if (!value && held && shown !== null && (shown < 0 || shown > 1)) recovering = true
+			held = value
+			element.classList.toggle('dragging', value)
 		},
 		setTrack(value) {
 			if (drag) release({ pointerId: drag.id }, false)
@@ -941,7 +982,7 @@ function trackKnob({
 		},
 		show(level) {
 			if (level >= 0 && level <= 1) recovering = false
-			if (!drag && !recovering) level = clamp01(level)
+			if (!drag && !held && !recovering) level = clamp01(level)
 			if (shown !== null && Math.abs(level - shown) < 1e-4) return
 			shown = level
 			element.setAttribute('aria-valuenow', String(Math.round(clamp01(level) * 100)))

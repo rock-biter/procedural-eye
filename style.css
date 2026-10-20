@@ -435,6 +435,13 @@ canvas {
 	opacity: 0.2;
 }
 
+/* The sliders' tracks in full white, on any HUD: the zoom's circle between
+   + and − (drawn over it, src/ui/hud.js) and the aperture's dashed arc; the
+   rest of the circles keeps its transparency. */
+.hud .hud-line:is(.hud-zoom-track, .hud-aperture-track) {
+	opacity: 1;
+}
+
 .hud.split .hud-spin {
 	opacity: 0.1;
 }
@@ -663,6 +670,8 @@ canvas {
 	background-size:
 		5px 1px,
 		1px 5px;
+	/* Always in full white, as their + and −. */
+	opacity: 1;
 }
 
 /* A symbol over the reticle, in the same place, which keeps its own

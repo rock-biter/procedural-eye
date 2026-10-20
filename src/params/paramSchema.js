@@ -483,12 +483,13 @@ export const BASE_PARAM_SCHEMA = {
 	},
 	// The HUD's aperture knob (desktop only, main.js): the camera.fNumber it
 	// sets, from `open` by Zoom out to `closed` by Zoom in, on a log
-	// scale, as f-stops run. A drag can pull it past either end by up to
+	// scale, as f-stops run; 10 and 22.5 put the default f/15 halfway (their
+	// geometric mean). A drag can pull it past either end by up to
 	// `elasticity` of its track (resisted, as the zoom's), and released there
 	// it springs back; kept small, so the f-number stays inside its range.
 	aperture: {
 		open: num(10, 1.4, 32, 0.1, '', 'uniform', 'widest f-number (by −)'),
-		closed: num(30, 1.4, 32, 0.1, '', 'uniform', 'narrowest f-number (by +)'),
+		closed: num(22.5, 1.4, 32, 0.1, '', 'uniform', 'narrowest f-number (by +)'),
 		elasticity: num(0.05, 0, 0.1, 0.01, '', 'uniform', 'aperture drag overshoot'),
 	},
 	// The pointer controls (src/camera/cameraControls.js): how far the mouse

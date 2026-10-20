@@ -93,6 +93,13 @@ test('exported values become the defaults; unnamed leaves keep the fallback', ()
 	assert.deepEqual(encodeState(schema, params), encodeState(schema, createDefaults(schema)))
 })
 
+test('the default f-number sits halfway along the aperture knob', async () => {
+	const { apertureProgress } = await import('../src/ui/hudLayout')
+	const { camera, aperture } = createDefaults(PARAM_SCHEMA)
+	const level = apertureProgress(camera.fNumber, [aperture.open, aperture.closed])
+	assert.ok(Math.abs(level - 0.5) < 1e-9, `${camera.fNumber}: ${level}`)
+})
+
 test('every preset names only existing parameters', async () => {
 	const { PRESETS } = await import('../src/params/presets')
 	for (const [name, preset] of Object.entries(PRESETS)) {

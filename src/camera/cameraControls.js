@@ -1,10 +1,11 @@
 // Pointer controls that edit params.camera directly (the params stay the single
-// source of truth): drag orbits, shift- or right-drag pans the target, the
-// wheel changes the focus distance (and with it the magnification) within
-// `distanceLimits`, and the sensor height with it (`zoomSensor`); over the
-// HUD's aperture knob it changes the f-number within `fNumberLimits`
-// (apertureWheel()). An orbit coasts after the drag lets go, for
-// `controls.inertia`. The mouse also turns the view a little toward itself
+// source of truth): drag orbits, a right-drag hands its horizontal motion to
+// `sideDrag` (main.js: the f-number, as the HUD's aperture knob moves it),
+// the wheel changes the focus distance (and with it the magnification)
+// within `distanceLimits`, and the sensor height with it (`zoomSensor`); over
+// the HUD's aperture knob it changes the f-number (apertureWheel()). Nothing
+// pans the target (the panel still sets it). An orbit coasts after the drag
+// lets go, for `controls.inertia`. The mouse also turns the view a little toward itself
 // (`controls.parallax` zoomed in, `controls.parallaxOut` zoomed out): a turn
 // of the orbit kept in `parallax`, not in the params, which
 // src/camera/physicalCamera.js adds to the camera's.
@@ -53,6 +54,9 @@ export default class CameraControls {
 		this.fNumberLimits = null
 		this.fNumberTarget = null
 		this.fNumberSet = null
+		// A right-drag's handler, or null: { start(), move(dx), end() }, as it is
+		// pressed, with each horizontal move (px) and as it lets go.
+		this.sideDrag = null
 		this.handleDown = this.handleDown.bind(this)
 		this.handleMove = this.handleMove.bind(this)
 		this.handleUp = this.handleUp.bind(this)
@@ -92,10 +96,15 @@ export default class CameraControls {
 			id: event.pointerId,
 			x: event.clientX,
 			y: event.clientY,
-			pan: event.shiftKey || event.button === 2,
+			// A right-drag goes to `sideDrag` instead of orbiting.
+			side: event.button === 2,
 			// The orbit after each move, for the release speed.
 			track: [],
 		}
+		if (!this.pointer.side) return
+		// It takes the f-number over from the aperture wheel's easing.
+		this.fNumberTarget = null
+		this.sideDrag?.start()
 	}
 
 	handleMove(event) {
@@ -104,29 +113,24 @@ export default class CameraControls {
 		const dy = event.clientY - this.pointer.y
 		this.pointer.x = event.clientX
 		this.pointer.y = event.clientY
-		const camera = this.params.camera
-		if (this.pointer.pan) {
-			// Millimeters per CSS pixel at the focus plane: the sensor height over
-			// the magnification f / (s - f), spread over the canvas height.
-			const scale =
-				(camera.sensorHeight * (camera.distance - camera.focalLength)) /
-				(camera.focalLength * this.element.clientHeight)
-			this.set('camera.targetX', camera.targetX - dx * scale)
-			this.set('camera.targetY', camera.targetY + dy * scale)
-		} else {
-			this.set('camera.azimuth', camera.azimuth - dx * ORBIT_DEGREES_PER_PIXEL)
-			this.set('camera.elevation', camera.elevation + dy * ORBIT_DEGREES_PER_PIXEL)
-			const time = event.timeStamp / 1000
-			const track = this.pointer.track
-			track.push({ time, azimuth: camera.azimuth, elevation: camera.elevation })
-			while (time - track[0].time > RELEASE_WINDOW) track.shift()
+		if (this.pointer.side) {
+			if (dx !== 0) this.sideDrag?.move(dx)
+			return
 		}
+		const camera = this.params.camera
+		this.set('camera.azimuth', camera.azimuth - dx * ORBIT_DEGREES_PER_PIXEL)
+		this.set('camera.elevation', camera.elevation + dy * ORBIT_DEGREES_PER_PIXEL)
+		const time = event.timeStamp / 1000
+		const track = this.pointer.track
+		track.push({ time, azimuth: camera.azimuth, elevation: camera.elevation })
+		while (time - track[0].time > RELEASE_WINDOW) track.shift()
 		this.onChange()
 	}
 
 	handleUp(event) {
 		if (this.pointer?.id !== event.pointerId) return
-		if (!this.pointer.pan && this.params.controls.inertia > 0) {
+		if (this.pointer.side) this.sideDrag?.end()
+		else if (this.params.controls.inertia > 0) {
 			const velocity = releaseVelocity(this.pointer.track, event.timeStamp / 1000)
 			if (velocity.azimuth !== 0 || velocity.elevation !== 0) this.velocity = velocity
 		}
