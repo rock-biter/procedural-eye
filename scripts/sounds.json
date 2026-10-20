@@ -23,18 +23,6 @@
       "title": "DSLR Camera Sounds",
       "author": "Rvgerxini",
       "preview": "https://cdn.freesound.org/previews/571/571483_9453283-hq.mp3"
-    },
-    "lens": {
-      "id": 516490,
-      "title": "Old SLR manual lens - Taking out and putting back in camera",
-      "author": "khenshom",
-      "preview": "https://cdn.freesound.org/previews/516/516490_6652872-hq.mp3"
-    },
-    "compact": {
-      "id": 826117,
-      "title": "Camera - Modern Compact (Lens, AF and Shutter)",
-      "author": "RealSquink",
-      "preview": "https://cdn.freesound.org/previews/826/826117_12262933-hq.mp3"
     }
   },
   "sounds": [
@@ -133,28 +121,49 @@
       "gate": -40
     },
     {
-      "name": "stop",
-      "source": "lens",
-      "start": 21.22,
-      "duration": 0.14,
-      "fadeOut": 0.04,
-      "gate": -45
+      "name": "ratchet-1",
+      "source": "minolta",
+      "start": 7.537,
+      "duration": 0.04,
+      "fadeOut": 0.015,
+      "highpass": 800,
+      "gate": -30
     },
     {
-      "name": "settle",
-      "source": "lens",
-      "start": 3.3,
-      "duration": 0.12,
-      "fadeOut": 0.04,
-      "gate": -45
+      "name": "ratchet-2",
+      "source": "minolta",
+      "start": 9.19,
+      "duration": 0.04,
+      "fadeOut": 0.015,
+      "highpass": 800,
+      "gate": -30
     },
     {
-      "name": "motor",
-      "source": "compact",
-      "start": 16.78,
-      "duration": 0.26,
-      "loop": 0.04,
-      "highpass": 120
+      "name": "ratchet-3",
+      "source": "minolta",
+      "start": 9.483,
+      "duration": 0.04,
+      "fadeOut": 0.015,
+      "highpass": 800,
+      "gate": -30
+    },
+    {
+      "name": "ratchet-4",
+      "source": "minolta",
+      "start": 18.347,
+      "duration": 0.04,
+      "fadeOut": 0.015,
+      "highpass": 800,
+      "gate": -30
+    },
+    {
+      "name": "ratchet-5",
+      "source": "minolta",
+      "start": 18.528,
+      "duration": 0.04,
+      "fadeOut": 0.015,
+      "highpass": 800,
+      "gate": -30
     }
   ]
 }

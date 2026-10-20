@@ -134,9 +134,8 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // and the tones' arcs' size, and showApertureValue(text), the f-number by
 // the zoom's value. onCue(name, detail), if given, hears the controls for the
 // sound design (src/audio/cameraFoley.js): 'press' and 'hover' of a button
-// or knob, 'grab', 'release' and 'tap' of a knob, 'tones' as the tones turn
-// by (`steps`, `start` at the start of a turn) and 'random'; `detail.element`
-// is the control, `detail.control` its name.
+// or knob, 'tap' of a knob and 'random'; `detail.element` is the control,
+// `detail.control` its name.
 export function createHud({
 	tones,
 	onTone,
@@ -455,18 +454,12 @@ export function createHud({
 			placeTones()
 			return
 		}
-		// The turn's cues: the steps it starts from, then each frame's.
-		const element = toneButtons[tone]
-		onCue('tones', { control: 'tone', element, steps: toneShift.steps, start: true })
 		gsap.to(toneShift, {
 			steps,
 			duration: 1,
 			ease: 'elastic.out(1, 0.75)',
 			overwrite: true,
-			onUpdate: () => {
-				placeTones()
-				onCue('tones', { control: 'tone', element, steps: toneShift.steps })
-			},
+			onUpdate: placeTones,
 		})
 	}
 	for (const item of items) item.cut = cut()
@@ -917,7 +910,7 @@ function typedText(element, motionless, onFirst) {
 // `snapEnd(level, circle)` gives an end (0 or 1, else null) glides there,
 // `onSnap(end)`. Past an end the marker runs `stretch` times as far as the
 // level (knobLevel()). `cut`: its circle in the mask of the HUD's line, if
-// any. `onCue(name)` hears a 'grab', its 'release' and a 'tap' (a click).
+// any. `onCue(name)` hears a 'tap' (a click).
 function trackKnob({
 	className,
 	marker: markerHtml,
@@ -993,7 +986,6 @@ function trackKnob({
 		const offset = angle - knobAngle(pullLevel(level, getElasticity()), circle.track)
 		drag = { id, x, y, offset, angle, level, moved: false }
 		recovering = false
-		onCue('grab')
 		// Grabbing a returning marker stops its glide at this point.
 		onLevel(level)
 	})
@@ -1012,7 +1004,6 @@ function trackKnob({
 		const { moved, level } = drag
 		drag = null
 		element.classList.remove('dragging')
-		onCue('release')
 		if (moved || level < 0 || level > 1) {
 			const end = snapEnd(level, circle)
 			if (end !== null) {

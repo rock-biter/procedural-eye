@@ -6,5 +6,3 @@ The recordings these sounds are cut from, all dedicated to the public domain (CC
 - [80s Film Camera (shutter, film loading and winding, flash charging, general foley)](https://freesound.org/s/851291/) by RealSquink, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 - [Nikon FM2 dial a.wav](https://freesound.org/s/412546/) by hmilleo, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 - [DSLR Camera Sounds](https://freesound.org/s/571483/) by Rvgerxini, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
-- [Old SLR manual lens - Taking out and putting back in camera](https://freesound.org/s/516490/) by khenshom, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
-- [Camera - Modern Compact (Lens, AF and Shutter)](https://freesound.org/s/826117/) by RealSquink, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)

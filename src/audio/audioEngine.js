@@ -2,8 +2,7 @@
 // lets a page make sound only after a gesture, so the context is created at
 // the first press or key (the recordings are fetched before, decoded then);
 // a sound asked for while they decode plays if they arrive within LATE s.
-// Two buses, the controls' foley and the ambient drone, meet in the master,
-// which a limiter keeps under 0 dBFS. Muted, the master fades out and the
+// The controls' bus feeds the master, which a limiter keeps under 0 dBFS. Muted, the master fades out and the
 // context suspends; a hidden page suspends it too.
 import { SOUNDS, SOUND_FILES } from './soundBank'
 import { beep, tick } from './synth'
@@ -82,10 +81,7 @@ export default class AudioEngine {
 		this.analyser.fftSize = 2048
 		this.samples = new Float32Array(this.analyser.fftSize)
 		this.master.connect(limiter).connect(this.analyser).connect(context.destination)
-		this.buses = {
-			controls: context.createGain(),
-			ambient: context.createGain(),
-		}
+		this.buses = { controls: context.createGain() }
 		for (const [name, bus] of Object.entries(this.buses)) {
 			bus.gain.value = this.params.sound[name]
 			bus.connect(this.master)
@@ -121,19 +117,23 @@ export default class AudioEngine {
 		return buffer
 	}
 
-	// Plays the sound `name` (src/audio/soundBank.js) on the controls bus:
-	// `gain` on top of its params level, `rate` before its variation, `pan`
-	// from −1 (left) to 1. Returns its source, or null.
-	play(name, { gain = 1, rate = 1, pan = 0 } = {}) {
+	// Plays the sound `name` (src/audio/soundBank.js) on the controls bus,
+	// `delay` s from now: `gain` on top of its params level, `rate` before its
+	// variation, `pan` from −1 (left) to 1. Returns its source, or null.
+	play(name, { gain = 1, rate = 1, pan = 0, delay = 0 } = {}) {
 		const sound = SOUNDS[name]
 		const levels = this.params.sound
 		const level = gain * levels[sound.gain]
 		if (!this.context || this.muted || level <= 0) return null
 		if (!this.ready && !sound.synth) {
-			this.pending.push({ name, options: { gain, rate, pan }, time: performance.now() / 1000 })
+			this.pending.push({
+				name,
+				options: { gain, rate, pan, delay },
+				time: performance.now() / 1000,
+			})
 			return null
 		}
-		const now = this.context.currentTime
+		const now = this.context.currentTime + delay
 		// Too soon after the last: its level adds to that one's.
 		const last = this.last[name]
 		if (last && now - last.time < sound.gap) {
@@ -172,32 +172,6 @@ export default class AudioEngine {
 		return takes[index]
 	}
 
-	// The looped sound `name`, silent, playing on the controls bus: its gain
-	// node and its playbackRate for the caller to drive. Null before the
-	// sounds are decoded.
-	loop(name) {
-		const sound = SOUNDS[name]
-		const { buffer } = (this.ready && this.buffers.get(sound.takes[0])) ?? {}
-		if (!buffer) return null
-		const source = this.context.createBufferSource()
-		source.buffer = buffer
-		source.loop = true
-		const gain = this.context.createGain()
-		gain.gain.value = 0
-		source.connect(gain).connect(this.buses.controls)
-		source.start()
-		return { gain, rate: source.playbackRate, level: () => this.params.sound[sound.gain] }
-	}
-
-	// A looped noise source of `samples` (src/audio/synth.js), not connected.
-	noise(samples) {
-		const source = this.context.createBufferSource()
-		source.buffer = this.buffer(samples)
-		source.loop = true
-		source.start()
-		return source
-	}
-
 	setMuted(muted) {
 		this.muted = muted
 		if (!this.context) return
@@ -217,11 +191,10 @@ export default class AudioEngine {
 	// stats().
 	update() {
 		if (!this.context) return
-		const { volume, controls, ambient } = this.params.sound
+		const { volume, controls } = this.params.sound
 		const now = this.context.currentTime
 		this.master.gain.setTargetAtTime(this.muted ? 0 : volume, now, FADE)
 		this.buses.controls.gain.setTargetAtTime(controls, now, FADE)
-		this.buses.ambient.gain.setTargetAtTime(ambient, now, FADE)
 		this.analyser.getFloatTimeDomainData(this.samples)
 		for (const sample of this.samples) {
 			this.peak = Math.max(this.peak, Math.abs(sample))

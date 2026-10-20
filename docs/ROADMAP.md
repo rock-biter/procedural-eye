@@ -16,7 +16,7 @@
 | 9 | Animation: pupil light reflex and hippus, gaze, saccades, microsaccades, drift, lid follow, photo mode | Done |
 | 10 | Presets per reference photograph, random eye from population priors | Done |
 | 11 | Optional refinements (below) | Open |
-| 12 | Sound: camera foley for every control (CC0 recordings and synthesized voices that follow the camera), the shutter on Snapshot, the mirror and the focus beep in photo mode, a generative drone that follows the eye, mute toggle and M ([`docs/AUDIO.md`](AUDIO.md)) | Done |
+| 12 | Sound: camera foley for every control (CC0 recordings: the buttons, the detents of the zoom and aperture rings, the film advance, the shutter; synthesized: the hover, the focus beep, the creak past a knob's end), a focus beep before Snapshot's shutter, the mirror and the focus beep in photo mode, mute toggle and M ([`docs/AUDIO.md`](AUDIO.md)) | Done |
 
 ## Changes From the Plan
 
@@ -56,10 +56,9 @@
 - **Light shafts and floor shadow**: the blades' σ widens from the source at the ray's densest point only (an approximation of a cone); on the iris they scale the key's term instead of adding their own; the shafts' coverage ignores the gaze follow and the blink; the floor under the face is unseen from below (the default camera) and edge-on at the eye's height, and its shadow comes from the shafts' source even with the shafts off.
 - **Sound** ([`docs/AUDIO.md`](AUDIO.md)):
   - The recordings were cut from measurements, not by ear, and the levels were balanced on headless meters: both need a listen and a pass in the panel.
+  - There is no background sound: the first ambient drone was removed, and a new design is open.
   - The sounds are not placed in space beyond a pan by the control's place on the screen.
   - On iOS the ringer switch silences Web Audio.
-  - The drone follows the pupil, the blinks, the zoom and photo mode, not the dust or the light shafts.
-  - A key step of the zoom (an instant jump) gives a short blip of the motor rather than a step of its own.
 - **Gaze and orbit**: a living eye with `animation.gaze` = `camera` turns toward the camera as it orbits. Use the default `wander`, `fixed`, photo mode, or a still eye to look at grazing angles.
 
 ## Future Work

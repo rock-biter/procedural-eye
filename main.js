@@ -1,6 +1,5 @@
 import './style.css'
 import EyeApp from './src/app'
-import AmbientDrone from './src/audio/ambientDrone'
 import AudioEngine from './src/audio/audioEngine'
 import CameraFoley from './src/audio/cameraFoley'
 import { SOUNDS } from './src/audio/soundBank'
@@ -248,7 +247,8 @@ let cue = () => {}
 let audition = null
 
 // Downloads the current (accumulated) image with its state in a tEXt chunk,
-// to the sound of a shutter (from `element`, Snapshot, if given).
+// to the sound of a focus beep and a shutter (from `element`, Snapshot, if
+// given).
 async function savePng(element) {
 	cue('snapshot', { element })
 	const { insertPngText } = await import('./src/render/pngMetadata')
@@ -337,11 +337,10 @@ if (urlParams.get('gui') !== '0') {
 	document.body.appendChild(frame())
 
 	// The sound design (src/audio/, docs/AUDIO.md): the camera foley of the
-	// controls and the ambient drone, which start at the first press or key.
-	// The viewer's mute (the sound toggle, M) is kept in the browser.
+	// controls, which starts at the first press or key. The viewer's mute (the
+	// sound toggle, M) is kept in the browser.
 	const audio = new AudioEngine({ params: app.params, muted: readMuted() })
 	const foley = new CameraFoley(audio)
-	const drone = new AmbientDrone(audio)
 	cue = (name, detail) => foley.cue(name, detail)
 	window.__EYE__.getSoundStats = () => audio.stats()
 	audition = (name) => {
@@ -365,33 +364,22 @@ if (urlParams.get('gui') !== '0') {
 		if (path === 'frozen') cue('frozen', { frozen: app.frozen })
 	})
 	// Once a frame, what the sounds follow: the knobs' levels (past their
-	// ends while dragged), the f-number, the orbit, the photo, and for the
-	// drone the eye's seed, pupil and blink.
+	// ends while dragged), the f-number and the photo.
 	let soundTime = null
 	const soundFrame = (time) => {
 		requestAnimationFrame(soundFrame)
 		const dt = soundTime === null ? 0 : Math.min((time - soundTime) / 1000, 0.1)
 		soundTime = time
-		const { camera, zoom, aperture, irisStructure } = app.params
-		const zoomed = zoomProgress(camera.distance, zoomLimits())
+		const { camera, zoom, aperture } = app.params
 		audio.update()
 		foley.update(dt, {
-			zoom: zoomed,
+			zoom: zoomProgress(camera.distance, zoomLimits()),
 			aperture: apertureProgress(camera.fNumber, apertureLimits()),
 			fNumber: camera.fNumber,
 			zoomElasticity: zoom.elasticity,
 			apertureElasticity: aperture.elasticity,
-			azimuth: camera.azimuth,
-			elevation: camera.elevation,
 			frozen: app.frozen,
 			converged: app.converged,
-		})
-		drone.update(dt, {
-			seed: irisStructure.seed,
-			pupil: app.pupilDiameter,
-			blink: app.lastPose?.blink ?? 0,
-			zoom: Math.min(Math.max(zoomed, 0), 1),
-			frozen: app.frozen,
 		})
 	}
 	requestAnimationFrame(soundFrame)
