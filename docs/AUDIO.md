@@ -1,6 +1,6 @@
 # Audio
 
-The interface sounds like a camera. Every control of the HUD makes the mechanical noise of the part it stands for: the zoom and the aperture click through the detents of their rings, the buttons click, Random eye advances the film, and Snapshot beeps for focus and fires a shutter. The recorded sounds are real cameras (CC0 recordings from Freesound); the hover's tick, the focus beep and the creak of a knob pulled past its end are synthesized with Web Audio. There is no audio library and, for now, no background sound: the first ambient drone was removed, to be replaced by another design.
+The interface sounds like a camera. Every control of the HUD makes the mechanical noise of the part it stands for: the zoom and the aperture click through the detents of their rings, the buttons click, Random eye advances the film, and Snapshot beeps for focus and fires a shutter. The recorded sounds are real cameras (CC0 recordings from Freesound); the hover's tick, the focus beep, the creak of a knob pulled past its end and one choice of the aperture's ticks are synthesized with Web Audio. There is no audio library and, for now, no background sound: the first ambient drone was removed, to be replaced by another design.
 
 ## Engine
 
@@ -27,22 +27,22 @@ The app itself emits no events; everything is read per frame.
 
 ## The Camera Foley
 
-[`src/audio/cameraFoley.js`](../src/audio/cameraFoley.js) (`CameraFoley`) turns the HUD's cues and the camera's motion into sounds. [`src/audio/foley.js`](../src/audio/foley.js) * holds its arithmetic, [`src/audio/soundBank.js`](../src/audio/soundBank.js) * the bank (takes or synth, the `sound.*` leaf of the gain, `vary`, `voices`, `gap`) and [`src/audio/synth.js`](../src/audio/synth.js) * the synthesized buffers.
+[`src/audio/cameraFoley.js`](../src/audio/cameraFoley.js) (`CameraFoley`) turns the HUD's cues and the camera's motion into sounds. [`src/audio/foley.js`](../src/audio/foley.js) * holds its arithmetic, [`src/audio/soundBank.js`](../src/audio/soundBank.js) * the bank (takes or synth, with `synthTakes` buffers of a synth, the `sound.*` leaf of the gain, `vary`, `voices`, `gap`) and [`src/audio/synth.js`](../src/audio/synth.js) * the synthesized buffers.
 
 | Event | Where it comes from | Sound |
 | --- | --- | --- |
 | A press on +, −, a skin tone, Random eye, More info or the sound toggle | `pointerdown` (or a click from the keyboard, `detail` 0): `sounding()` in [`src/ui/hud.js`](../src/ui/hud.js) and `main.js` | `press`: a DSLR button's click (3 takes). A skin tone makes this click only. |
 | A tap on a knob (a click without a drag) | `trackKnob()`'s release | `press`, 0.6 as loud |
-| A mouse entering a control | `pointerenter` (mouse only), and only if the mouse moved in the last 150 ms, so a knob sliding under a still mouse is silent | `tick`: 4 ms of high noise (synthesized) |
-| The zoom moving | `crossings()` of `zoomProgress()`, `sound.zoomDetents` across the knob's track: a drag, the wheel (over the canvas or the knob), the keys, + and −'s glide, a snap, a spring back | `zoom`: a Nikon FM2's dial (5 takes) played 1.3 to 1.45 times as fast, higher as it zooms in |
-| The f-number moving | `crossings()` of `stops()` (2·log₂ N), `sound.detents` per stop: the knob, the wheel over it, a right-drag, the keys, a glide | `aperture`: single ticks of a film advance lever's ratchet (5 takes, 30 ms), lighter than the zoom's, played 1 to 1.15 times as fast, higher as it stops down |
+| A mouse entering a control (the HUD's buttons and knobs, Snapshot, More info, the sound toggle, the credit's **rockbiter** link) | `pointerenter` (mouse only), and only if the mouse moved in the last 150 ms, so a knob sliding under a still mouse is silent | `tick`: 4 ms of high noise (synthesized) |
+| The zoom moving | `crossings()` of `zoomProgress()`, `sound.zoomDetents` (16) across the knob's track: a drag, the wheel (over the canvas or the knob), the keys, + and −'s glide, a snap, a spring back | `zoom`: a Nikon FM2's dial (5 takes) played 1.3 to 1.45 times as fast, higher as it zooms in |
+| The f-number moving | `crossings()` of `stops()` (2·log₂ N), `sound.detents` (6) per stop, about 14 across the knob's track: the knob, the wheel over it, a right-drag, the keys, a glide | finer and lighter than the zoom's, by `sound.apertureTicks`: `aperture`, the pawl of a bicycle's freewheel (5 ticks, 23–30 ms, `freewheel`), or `apertureFine`, a synthesized tick (`fine`: a 0.25 ms knock ringing three small metal modes near 4.2, 6.9 and 9.8 kHz that die in 0.6–1.4 ms, 6 ms in all, 5 tunings); played 1 to 1.15 times as fast, higher as it stops down |
 | A knob pulled past its end | `overshoot()` of the level against its elasticity | the creak: a sawtooth (stick-slip, 16–62 Hz) ringing a band-pass (650–1750 Hz, Q 9) as it is pulled further, louder while it moves (`strainDrive()`) |
 | Random eye | its click (`random` cue) | `advance`: the film advance lever of a Minolta XE-7 (`sound.film` `lever`), or `wind`: the motor winder of a point-and-shoot (`motor`) |
 | Snapshot (and the panel's Save PNG) | `savePng()` | `beep`, then 0.22 s later `shutter`: a Minolta XE-7 firing |
 | Photo mode on and off | the `'frozen'` notification | `mirrorUp` and `mirrorDown`: the first and the last part of the same shot |
 | The photo converging | `app.converged` turning true while frozen, at most once a second | `beep`: two 2.8 kHz blips of 55 ms, 45 ms apart, the autofocus confirmation (synthesized) |
 
-- **Detents**: `crossings(from, to, step)` counts a detent when it is reached, not when it is left, signed with the move. A move that starts on a detent does not count it again. The zoom's detents follow the camera, whatever moves it, so a glide of + or − runs through them as a quick ratchet (ten across the whole track by default).
+- **Detents**: `crossings(from, to, step)` counts a detent when it is reached, not when it is left, signed with the move. A move that starts on a detent does not count it again. The detents a frame crossed (at most 8) play spread evenly over the next frame's time (`delay`), so a fast turn keeps its density at any frame rate; clicks closer than a sound's `gap` (12 ms for the zoom, 8 ms for the aperture) merge. The zoom's detents follow the camera, whatever moves it, so a glide of + or − runs through them as a quick ratchet.
 - **Panning**: a cue's control pans with its place on the screen, 0.6 at the window's edges, so the tones sound from the left and the zoom from the right. The detents and the beep of a converged photo pan a little to the right; the mirror sits in the middle.
 - **Smoothing**: the creak follows the knobs' speeds with a time constant of 0.04 s (`follow()` of [`src/camera/orbitMotion.js`](../src/camera/orbitMotion.js)), and its gain, rate and resonance follow with 0.03 s.
 
@@ -53,10 +53,11 @@ The `sound` group of [`src/params/paramSchema.js`](../src/params/paramSchema.js)
 | Leaf | Default | Effect |
 | --- | --- | --- |
 | `volume`, `controls` | 0.8, 0.8 | The master and the controls bus. |
-| `press`, `hover`, `zoom`, `aperture`, `strain`, `advance`, `shutter`, `mirror`, `beep` | 0.5, 0.3, 0.3, 0.3, 0.5, 0.6, 0.8, 0.5, 0.12 | Each sound's level (`advance` also sets `wind`; `beep` both beeps). |
+| `press`, `hover`, `zoom`, `aperture`, `strain`, `advance`, `shutter`, `mirror`, `beep` | 0.35, 0.3, 0.2, 0.15, 0.35, 0.42, 0.56, 0.35, 0.08 | Each sound's level (`advance` also sets `wind`; `beep` both beeps). |
 | `variation` | 60 cents | How far a sound's pitch varies from one play to the next. |
-| `zoomDetents` | 10 | The zoom ring's detents across the knob's track. |
-| `detents` | 3 per stop | The aperture ring's detents. |
+| `zoomDetents` | 16 | The zoom ring's detents across the knob's track. |
+| `detents` | 6 per stop | The aperture ring's detents. |
+| `apertureTicks` | `freewheel` | The aperture's ticks: `freewheel` (recorded) or `fine` (synthesized). |
 | `film` | `lever` | Random eye's film advance: `lever` or `motor`. |
 
 ## Recordings
@@ -65,12 +66,12 @@ The recorded sounds are cut from CC0 recordings on Freesound. CC0 needs no attri
 
 | Source | Freesound | Sounds |
 | --- | --- | --- |
-| Minolta XE-7, single shots and film advance (kyles) | [637342](https://freesound.org/s/637342/) | `shutter`, `mirror-up`, `mirror-down`, `advance`, `ratchet-1` to `ratchet-5` |
+| Minolta XE-7, single shots and film advance (kyles) | [637342](https://freesound.org/s/637342/) | `shutter`, `mirror-up`, `mirror-down`, `advance` |
 | 80s point-and-shoot film camera (RealSquink) | [851291](https://freesound.org/s/851291/) | `wind` |
 | Nikon FM2 dial (hmilleo) | [412546](https://freesound.org/s/412546/) | `dial-1` to `dial-5` |
 | DSLR camera sounds (Rvgerxini) | [571483](https://freesound.org/s/571483/) | `press-1` to `press-3` |
+| Bike freewheel (donkpow) | [161966](https://freesound.org/s/161966/) | `freewheel-1` to `freewheel-5` (single ticks, high-passed at 1.5 kHz to drop the hub's hum) |
 
-The ratchet's ticks come from the louder advances of the Minolta recording (the first one, which `advance` plays, is too close to the recording's noise to cut single ticks from).
 
 `pnpm sounds` ([`scripts/sounds.mjs`](../scripts/sounds.mjs), which needs ffmpeg with libmp3lame) builds them into [`src/audio/sounds/`](../src/audio/sounds/), about 100 KB in all.
 - **Download**: it fetches each source's HQ preview, which needs no account, into `node_modules/.cache/eye-sounds/`.
@@ -89,8 +90,9 @@ The cuts were chosen from measurements (onsets, transients, spectral flatness an
 
   | Sound | Peak |
   | --- | --- |
-  | The clicks, the film advance, the mirror and the shutter | −9 to −14 |
-  | The hover's tick | −16 |
-  | The zoom's and the aperture's detents | −18 to −20 |
+  | The clicks, the film advance, the mirror and the shutter | −11 to −16 |
+  | The hover's tick | −17 |
+  | The zoom's detents | −15 to −21 |
+  | The aperture's ticks (either kind) | −16 to −23 |
 
   Silence elsewhere: no sound plays at rest, and the orbit is silent.

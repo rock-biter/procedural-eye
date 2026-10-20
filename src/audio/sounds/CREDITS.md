@@ -6,3 +6,4 @@ The recordings these sounds are cut from, all dedicated to the public domain (CC
 - [80s Film Camera (shutter, film loading and winding, flash charging, general foley)](https://freesound.org/s/851291/) by RealSquink, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 - [Nikon FM2 dial a.wav](https://freesound.org/s/412546/) by hmilleo, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 - [DSLR Camera Sounds](https://freesound.org/s/571483/) by Rvgerxini, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+- [Bike freewheel 1.wav](https://freesound.org/s/161966/) by donkpow, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)

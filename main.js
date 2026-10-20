@@ -347,12 +347,13 @@ if (urlParams.get('gui') !== '0') {
 		audio.unlock()
 		return audio.play(name) !== null
 	}
-	// A press on a control of the page, also from the keyboard, and a mouse
-	// entering it.
-	const sounding = (element, control) => {
+	// A mouse entering a control of the page and, unless `press` is false, a
+	// press on it, also from the keyboard.
+	const sounding = (element, control, press = true) => {
 		element.addEventListener('pointerenter', (event) => {
 			if (event.pointerType === 'mouse') cue('hover', { control, element })
 		})
+		if (!press) return
 		element.addEventListener('pointerdown', (event) => {
 			if (event.button === 0) cue('press', { control, element })
 		})
@@ -491,6 +492,7 @@ if (urlParams.get('gui') !== '0') {
 	credit.innerHTML =
 		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
 	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
+	sounding(credit.querySelector('a'), 'credit', false)
 
 	// The sound toggle, at the end of the credit line, and M (while the page,
 	// not a control, has the focus, as Space): sound on or off, kept in the
@@ -538,9 +540,7 @@ if (urlParams.get('gui') !== '0') {
 		snapshot.blur()
 		savePng(snapshot)
 	})
-	snapshot.addEventListener('pointerenter', (event) => {
-		if (event.pointerType === 'mouse') cue('hover', { control: 'snapshot', element: snapshot })
-	})
+	sounding(snapshot, 'snapshot', false)
 
 	// The two share a footer: no box of its own on wide screens, where each
 	// keeps its corner; on phones a column across the frame, Snapshot above

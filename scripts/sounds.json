@@ -23,6 +23,12 @@
       "title": "DSLR Camera Sounds",
       "author": "Rvgerxini",
       "preview": "https://cdn.freesound.org/previews/571/571483_9453283-hq.mp3"
+    },
+    "freewheel": {
+      "id": 161966,
+      "title": "Bike freewheel 1.wav",
+      "author": "donkpow",
+      "preview": "https://cdn.freesound.org/previews/161/161966_2284406-hq.mp3"
     }
   },
   "sounds": [
@@ -121,49 +127,49 @@
       "gate": -40
     },
     {
-      "name": "ratchet-1",
-      "source": "minolta",
-      "start": 7.537,
-      "duration": 0.04,
-      "fadeOut": 0.015,
-      "highpass": 800,
-      "gate": -30
+      "name": "freewheel-1",
+      "source": "freewheel",
+      "start": 4.112,
+      "duration": 0.03,
+      "fadeOut": 0.008,
+      "highpass": 1500,
+      "gate": -35
     },
     {
-      "name": "ratchet-2",
-      "source": "minolta",
-      "start": 9.19,
-      "duration": 0.04,
-      "fadeOut": 0.015,
-      "highpass": 800,
-      "gate": -30
+      "name": "freewheel-2",
+      "source": "freewheel",
+      "start": 4.232,
+      "duration": 0.03,
+      "fadeOut": 0.008,
+      "highpass": 1500,
+      "gate": -35
     },
     {
-      "name": "ratchet-3",
-      "source": "minolta",
-      "start": 9.483,
-      "duration": 0.04,
-      "fadeOut": 0.015,
-      "highpass": 800,
-      "gate": -30
+      "name": "freewheel-3",
+      "source": "freewheel",
+      "start": 4.262,
+      "duration": 0.03,
+      "fadeOut": 0.008,
+      "highpass": 1500,
+      "gate": -35
     },
     {
-      "name": "ratchet-4",
-      "source": "minolta",
-      "start": 18.347,
-      "duration": 0.04,
-      "fadeOut": 0.015,
-      "highpass": 800,
-      "gate": -30
+      "name": "freewheel-4",
+      "source": "freewheel",
+      "start": 4.292,
+      "duration": 0.03,
+      "fadeOut": 0.008,
+      "highpass": 1500,
+      "gate": -35
     },
     {
-      "name": "ratchet-5",
-      "source": "minolta",
-      "start": 18.528,
-      "duration": 0.04,
-      "fadeOut": 0.015,
-      "highpass": 800,
-      "gate": -30
+      "name": "freewheel-5",
+      "source": "freewheel",
+      "start": 4.082,
+      "duration": 0.03,
+      "fadeOut": 0.008,
+      "highpass": 1500,
+      "gate": -35
     }
   ]
 }

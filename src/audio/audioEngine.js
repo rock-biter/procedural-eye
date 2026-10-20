@@ -4,10 +4,10 @@
 // a sound asked for while they decode plays if they arrive within LATE s.
 // The controls' bus feeds the master, which a limiter keeps under 0 dBFS. Muted, the master fades out and the
 // context suspends; a hidden page suspends it too.
-import { SOUNDS, SOUND_FILES } from './soundBank'
-import { beep, tick } from './synth'
+import { SOUNDS, SOUND_FILES, takesOf } from './soundBank'
+import { beep, fineTick, tick } from './synth'
 
-const SYNTHS = { tick, beep }
+const SYNTHS = { tick, beep, fine: fineTick }
 const LATE = 0.15
 // The master's time constant (s) toward a new volume or mute.
 const FADE = 0.08
@@ -86,8 +86,17 @@ export default class AudioEngine {
 			bus.gain.value = this.params.sound[name]
 			bus.connect(this.master)
 		}
-		for (const [name, generate] of Object.entries(SYNTHS))
-			this.buffers.set(name, { buffer: this.buffer(generate(context.sampleRate)), offset: 0 })
+		for (const sound of Object.values(SOUNDS)) {
+			if (!sound.synth) continue
+			for (const key of takesOf(sound)) {
+				const [name, take] = key.split(':')
+				const samples =
+					take === undefined
+						? SYNTHS[name](context.sampleRate)
+						: SYNTHS[name](context.sampleRate, Number(take))
+				this.buffers.set(key, { buffer: this.buffer(samples), offset: 0 })
+			}
+		}
 		this.update()
 		this.decode()
 	}
@@ -142,7 +151,7 @@ export default class AudioEngine {
 			return null
 		}
 		if ((this.voices[name] ?? 0) >= sound.voices) return null
-		const { buffer, offset } = this.buffers.get(sound.synth ?? this.take(name, sound)) ?? {}
+		const { buffer, offset } = this.buffers.get(this.take(name, takesOf(sound))) ?? {}
 		if (!buffer) return null
 		const source = this.context.createBufferSource()
 		source.buffer = buffer
@@ -164,8 +173,8 @@ export default class AudioEngine {
 		return source
 	}
 
-	// A take of `sound` other than its last one.
-	take(name, { takes }) {
+	// One of `takes` (the keys of a sound's buffers) other than its last one.
+	take(name, takes) {
 		let index = Math.floor(Math.random() * takes.length)
 		if (takes.length > 1 && index === this.lastTake[name]) index = (index + 1) % takes.length
 		this.lastTake[name] = index

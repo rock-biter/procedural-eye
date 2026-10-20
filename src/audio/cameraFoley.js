@@ -17,6 +17,8 @@ const PAN = 0.6
 const HOVER_MOVE = 150
 // Snapshot's shutter fires this long (s) after its focus beep starts.
 const SHUTTER_DELAY = 0.22
+// At most this many detents of one frame sound.
+const MAX_RUN = 8
 
 export default class CameraFoley {
 	constructor(engine) {
@@ -86,21 +88,25 @@ export default class CameraFoley {
 		const levels = this.params.sound
 		const pan = PAN * 0.6
 		const clamp01 = (value) => Math.min(Math.max(value, 0), 1)
-		// Several detents in one frame sound as one louder click.
-		const louder = (count) => Math.min(0.75 + 0.15 * (Math.abs(count) - 1), 1.2)
+		// The detents a frame crossed, spread evenly over the next frame's
+		// time, so a fast turn keeps its density at any frame rate.
+		const run = (name, count, rate) => {
+			const clicks = Math.min(Math.abs(count), MAX_RUN)
+			for (let i = 0; i < clicks; i++) engine.play(name, { pan, rate, delay: (i * dt) / clicks })
+		}
 
 		// The zoom ring's detents, higher as it zooms in; the aperture ring's,
-		// lighter, higher as it stops down.
-		const zoom = crossings(previous.zoom, state.zoom, 1 / levels.zoomDetents)
-		if (zoom !== 0)
-			engine.play('zoom', { pan, rate: 1.3 + 0.15 * clamp01(state.zoom), gain: louder(zoom) })
-		const aperture = crossings(stops(previous.fNumber), stops(state.fNumber), 1 / levels.detents)
-		if (aperture !== 0)
-			engine.play('aperture', {
-				pan,
-				rate: 1 + 0.15 * clamp01(state.aperture),
-				gain: louder(aperture),
-			})
+		// finer and lighter, higher as it stops down.
+		run(
+			'zoom',
+			crossings(previous.zoom, state.zoom, 1 / levels.zoomDetents),
+			1.3 + 0.15 * clamp01(state.zoom),
+		)
+		run(
+			levels.apertureTicks === 'fine' ? 'apertureFine' : 'aperture',
+			crossings(stops(previous.fNumber), stops(state.fNumber), 1 / levels.detents),
+			1 + 0.15 * clamp01(state.aperture),
+		)
 
 		const now = engine.context?.currentTime ?? 0
 		if (state.frozen && state.converged && !previous.converged && now - this.beepTime > 1) {

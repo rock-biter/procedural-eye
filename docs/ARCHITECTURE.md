@@ -86,7 +86,7 @@
 | [`src/audio/cameraFoley.js`](../src/audio/cameraFoley.js) | `CameraFoley`: the HUD's cues as sounds (presses, hovers, Random eye, Snapshot's beep and shutter, photo mode's mirror), and once a frame the sounds that follow the camera (the zoom's and the aperture's detents, the creak past a knob's end, the autofocus beep of a converged photo). |
 | [`src/audio/foley.js`](../src/audio/foley.js) * | Detents crossed between two values, stops of an f-number, a level's overshoot and the creak's drive. |
 | [`src/audio/soundBank.js`](../src/audio/soundBank.js) * | `SOUNDS`: each sound's takes or synth, the `sound` leaf of its level, its variation, voices and gap; `SOUND_FILES`. |
-| [`src/audio/synth.js`](../src/audio/synth.js) * | The synthesized buffers: the hover's tick and the autofocus beep. |
+| [`src/audio/synth.js`](../src/audio/synth.js) * | The synthesized buffers: the hover's tick, the aperture's fine ticks and the autofocus beep. |
 | [`src/meshLayout.js`](../src/meshLayout.js) * | Vertices spaced by the surface's bend (the chord's sagitta under a tolerance), density integrals and even placement under them, rings of different counts zipped by angle: for the lids, the back shell and the eyeball. |
 | [`src/math.js`](../src/math.js) *, [`src/random.js`](../src/random.js) * | Scalar and vector helpers; seeds, PCG hash twin, weighted picks, Gaussian samples. |
 | [`src/frameStats.js`](../src/frameStats.js), [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | Frame telemetry and the adaptive resolution rules (from the terrain project). |

@@ -18,6 +18,36 @@ export function tick(rate, seed = 'tick') {
 	return normalize(out)
 }
 
+// A fine detent: a tooth a fraction of a millimeter high snapping past its
+// pawl. A 0.25 ms knock of noise rings three small metal modes (about 4.2,
+// 6.9 and 9.8 kHz, dying in 1.4, 0.9 and 0.6 ms), each `take` tuned a little
+// differently; 6 ms in all.
+export function fineTick(rate, take = 0) {
+	const random = createRandom(`fine:${take}`)
+	const modes = [
+		[4200, 0.0014, 1],
+		[6900, 0.0009, 0.7],
+		[9800, 0.0006, 0.45],
+	].map(([frequency, decay, amplitude]) => ({
+		frequency: frequency * (0.92 + 0.16 * random()),
+		decay,
+		amplitude,
+		phase: random() * 2 * Math.PI,
+	}))
+	const knock = Math.round(0.00025 * rate)
+	const out = Float32Array.from({ length: Math.round(0.006 * rate) }, (_, i) => {
+		const t = i / rate
+		let value = i < knock ? 0.6 * (random() * 2 - 1) * (1 - i / knock) : 0
+		for (const mode of modes)
+			value +=
+				mode.amplitude *
+				Math.exp(-t / mode.decay) *
+				Math.sin(2 * Math.PI * mode.frequency * t + mode.phase)
+		return value
+	})
+	return normalize(out)
+}
+
 // The autofocus confirmation: two 2.8 kHz blips of 55 ms, 45 ms apart, each
 // with 3 ms ramps.
 export function beep(rate, frequency = 2800) {
