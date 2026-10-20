@@ -481,6 +481,16 @@ export const BASE_PARAM_SCHEMA = {
 		duration: num(1.2, 0, 4, 0.05, 's', 'uniform', 'zoom duration'),
 		elasticity: num(0.12, 0, 0.25, 0.01, '', 'uniform', 'zoom drag overshoot'),
 	},
+	// The HUD's aperture knob (desktop only, main.js): the camera.fNumber it
+	// sets, from `open` by Zoom out to `closed` by Zoom in, on a log
+	// scale, as f-stops run. A drag can pull it past either end by up to
+	// `elasticity` of its track (resisted, as the zoom's), and released there
+	// it springs back; kept small, so the f-number stays inside its range.
+	aperture: {
+		open: num(10, 1.4, 32, 0.1, '', 'uniform', 'widest f-number (by −)'),
+		closed: num(30, 1.4, 32, 0.1, '', 'uniform', 'narrowest f-number (by +)'),
+		elasticity: num(0.05, 0, 0.1, 0.01, '', 'uniform', 'aperture drag overshoot'),
+	},
 	// The pointer controls (src/camera/cameraControls.js): how far the mouse
 	// turns the view toward itself at the window's edge, zoomed in and zoomed
 	// out (linear in the zoom level between, src/camera/orbitMotion.js), how

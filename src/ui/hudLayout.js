@@ -8,6 +8,8 @@
 // about the same center (HUD.split).
 
 const DEGREE = Math.PI / 180
+// A coordinate of an SVG path, to a hundredth of a px.
+const round = (value) => Math.round(value * 100) / 100
 
 export const HUD = Object.freeze({
 	// The circle's size: `scale` times the circle inscribed in the box, its
@@ -37,6 +39,34 @@ export const HUD = Object.freeze({
 	// the camera by zoom.elasticity, the knob `stretch` times as far
 	// (knobLevel()).
 	zoom: Object.freeze({ center: 0, span: 32 * DEGREE, minArc: 160, snap: 20, stretch: 5 }),
+	// The aperture knob of a desktop HUD: a convex lens in profile across the
+	// circle (apertureLens()), `width` px thick at its middle and `rim` px at
+	// its flat ends, `share` of the gap between the zoom's circle and the
+	// spinning circle long (apertureLength()), which slides along the circle
+	// halfway between them (apertureRadius()). Hovered or held it grows
+	// `grow` times as long, and a click bounces it to `pulse` times, still
+	// inside the gap (style.css). A drag can pull it
+	// past either end of its track, the knob `stretch` times as far as the
+	// f-number (knobLevel()); its track keeps short enough of + and − that,
+	// even so stretched, the lens stays `padding` px short of their inner
+	// edges (`edge` px from their centers along the circle, their 30 px
+	// reticles'; apertureTrack()). It runs from the widest f-number by −
+	// (level 0) to the narrowest by + (level 1). Its hit area is `hit` px
+	// along the circle and as long as the lens hovered. The
+	// tones' arcs scale with it, from `arcs[0]` wide open to `arcs[1]`
+	// stopped down (apertureArcScale()).
+	aperture: Object.freeze({
+		share: 0.55,
+		grow: 1.3,
+		pulse: 1.5,
+		edge: 15,
+		padding: 8,
+		width: 8,
+		rim: 2,
+		hit: 24,
+		stretch: 5,
+		arcs: Object.freeze([1.05, 0.9]),
+	}),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
 	random: Object.freeze({ angle: 33 * DEGREE, spacing: 60 }),
 	// A portrait box splits the HUD. The circle keeps the skin tones, the
@@ -195,12 +225,71 @@ export function toneReach(angles, radius, hud = HUD) {
 	return steps.map((k) => middle + k * step)
 }
 
-// Whether every button, and the knob anywhere along its track, lies inside a
-// box of `width` × `height` px centered on the circle; the tones anywhere
+// The radius (px) of the aperture knob's circle about a desktop HUD's circle
+// of `radius` px: halfway between it, the zoom's, and the spinning circle.
+export function apertureRadius(radius, hud = HUD) {
+	return (radius * (1 + hud.spin.radiusRatio)) / 2
+}
+
+// The length (px) of the aperture knob's lens across the circle, about a
+// desktop HUD's circle of `radius` px: HUD.aperture.share of the gap between
+// the zoom's circle and the spinning circle.
+export function apertureLength(radius, hud = HUD) {
+	return radius * (hud.spin.radiusRatio - 1) * hud.aperture.share
+}
+
+// The aperture knob's handle as an SVG path about its center, in its frame
+// turned with the circle (x along it, y across it): a biconvex lens in
+// profile, `length` px across the circle, HUD.aperture.width px thick at its
+// middle and HUD.aperture.rim px at its flat ends, each face an arc of a
+// circle.
+export function apertureLens(length, hud = HUD) {
+	const { width, rim } = hud.aperture
+	const half = length / 2
+	const sag = (width - rim) / 2
+	const face = round((half * half + sag * sag) / (2 * sag))
+	const [x, y] = [round(rim / 2), round(half)]
+	return `M${-x} ${-y}H${x}A${face} ${face} 0 0 1 ${x} ${y}H${-x}A${face} ${face} 0 0 1 ${-x} ${-y}Z`
+}
+
+// The aperture knob's track on its circle of `ring` px: [the angle by zoom
+// in, by zoom out], the zoom's `track` (its buttons' centers) taken in far
+// enough that the lens, even stretched past an end as far as an elastic drag
+// with `elasticity` can carry it (HUD.aperture.stretch times that share of
+// the track, a bound it never quite reaches; knobLevel()), stays
+// HUD.aperture.padding px short of the inner edge of + and of −: of `inset`
+// px, `clear` (the edge, the padding and half the lens's width) and the
+// stretch of the `span` px between the buttons less both insets.
+export function apertureTrack([zoomIn, zoomOut], ring, elasticity = 0, hud = HUD) {
+	const { edge, padding, width, stretch } = hud.aperture
+	const clear = edge + padding + width / 2
+	const reach = stretch * elasticity
+	const span = (zoomOut - zoomIn) * ring
+	const inset = (clear + reach * span) / (1 + 2 * reach) / ring
+	return [zoomIn + inset, zoomOut - inset]
+}
+
+// The dashed arc that marks the aperture knob's track, on its circle of
+// `ring` px about (cx, cy), from one end of `track` to the other: its SVG
+// path and dashes, the frame's (HUD.dash px every about HUD.dashPeriod px),
+// starting and ending on a whole dash, so a dash marks either end
+// (dashFit()).
+export function apertureTrackArc({ cx, cy }, ring, [from, to], hud = HUD) {
+	const at = (angle) =>
+		`${round(cx + ring * Math.cos(angle))} ${round(cy + ring * Math.sin(angle))}`
+	return {
+		d: `M${at(from)}A${round(ring)} ${round(ring)} 0 0 1 ${at(to)}`,
+		dashArray: dashFit((to - from) * ring, hud.dash, hud.dashPeriod - hud.dash),
+	}
+}
+
+// Whether every button, and the knobs anywhere along their tracks, lie inside
+// a box of `width` × `height` px centered on the circle; the tones anywhere
 // their group turns, their hit areas up to `overhang` px past it. The
 // zoom's buttons and knob lie on a circle of `zoom` px, above `floor` px
-// from the box's top.
-function fits(radius, zoom, angles, width, height, floor, overhang, hud) {
+// from the box's top; the aperture knob, if `aperture` ({ radius, length,
+// track }), on its own.
+function fits(radius, zoom, angles, width, height, floor, overhang, aperture, hud) {
 	const inside = (angle, half, ring = radius, bottom = height) => {
 		const x = width / 2 + ring * Math.cos(angle)
 		const y = height / 2 + ring * Math.sin(angle)
@@ -210,10 +299,16 @@ function fits(radius, zoom, angles, width, height, floor, overhang, hud) {
 	if (!buttons.every((angle) => inside(angle, hud.button / 2 - overhang))) return false
 	const ends = [angles.zoomIn, angles.zoomOut]
 	if (!ends.every((angle) => inside(angle, hud.button / 2, zoom, floor))) return false
-	const [from, to] = angles.track
-	const steps = Math.max(1, Math.ceil(((to - from) * zoom) / 4))
-	for (let i = 0; i <= steps; i++) {
-		if (!inside(from + ((to - from) * i) / steps, hud.knob / 2, zoom, floor)) return false
+	const tracks = [[zoom, angles.track, hud.knob / 2, floor]]
+	if (aperture) {
+		const reach = Math.max(hud.aperture.hit, aperture.length * hud.aperture.grow) / 2
+		tracks.push([aperture.radius, aperture.track, reach, height])
+	}
+	for (const [ring, [from, to], half, bottom] of tracks) {
+		const steps = Math.max(1, Math.ceil(((to - from) * ring) / 4))
+		for (let i = 0; i <= steps; i++) {
+			if (!inside(from + ((to - from) * i) / steps, half, ring, bottom)) return false
+		}
 	}
 	return true
 }
@@ -222,17 +317,32 @@ function fits(radius, zoom, angles, width, height, floor, overhang, hud) {
 // inscribed in it (a whole number of px), or smaller until its buttons fit
 // inside it. A portrait box splits the HUD (HUD.split): the zoom's wider
 // circle keeps `bottom` px at the box's bottom free, and HUD.split's
-// clearance above them. `{ radius, zoomRadius, split, angles }`, or null for
-// a box too small.
-export function hudLayout(width, height, toneCount, hud = HUD, { bottom = 0 } = {}) {
+// clearance above them. `aperture`: the HUD has the aperture knob, unless it
+// is split (a desktop's), `{ elasticity }` its drag's (aperture.elasticity),
+// or null. `{ radius, zoomRadius, aperture, split, angles }`,
+// `aperture` the knob's circle, line and track, `{ radius, length, track }`,
+// or null without it; or null for a box too small.
+export function hudLayout(
+	width,
+	height,
+	toneCount,
+	hud = HUD,
+	{ bottom = 0, aperture = null } = {},
+) {
 	const split = height > width
 	const floor = split && bottom > 0 ? height - bottom - hud.split.zoom.clearance : height
 	const overhang = split ? hud.split.overhang : 0
 	for (let radius = Math.floor((Math.min(width, height) / 2) * hud.scale); radius > 0; radius--) {
 		const angles = hudAngles(radius, toneCount, hud, split)
 		const zoom = zoomRadius(radius, split, hud)
-		if (fits(radius, zoom, angles, width, height, floor, overhang, hud))
-			return { radius, zoomRadius: zoom, split, angles }
+		const ring = aperture && !split ? apertureRadius(radius, hud) : null
+		const knob = ring && {
+			radius: ring,
+			length: apertureLength(radius, hud),
+			track: apertureTrack(angles.track, ring, aperture.elasticity, hud),
+		}
+		if (fits(radius, zoom, angles, width, height, floor, overhang, knob, hud))
+			return { radius, zoomRadius: zoom, aperture: knob, split, angles }
 	}
 	return null
 }
@@ -342,7 +452,6 @@ export function orbitArt(kind, radius, hud = HUD, split = false) {
 	const { dash, gap, tickDash, tickGap } = hud.orbitDash
 	const ring = radius * radiusRatio
 	const foot = ring * (1 + tick)
-	const round = (value) => Math.round(value * 100) / 100
 	const at = (r, angle) => `${round(r * Math.cos(angle))} ${round(r * Math.sin(angle))}`
 	const paths = []
 	// The right half, then the left, clockwise.
@@ -460,4 +569,29 @@ export function zoomDistance(level, [near, far]) {
 export function zoomSensor(level, [sensorIn, sensorOut]) {
 	const t = Math.min(Math.max(level, 0), 1)
 	return sensorOut * (sensorIn / sensorOut) ** (t * t)
+}
+
+// The aperture knob's level for an f-number between the widest, `open`
+// (level 0, by zoom out), and the narrowest, `closed` (1, by zoom in),
+// on a log scale, as f-stops run; unclamped, as zoomProgress(), for the
+// elastic drag and its return.
+export function apertureProgress(fNumber, [open, closed]) {
+	if (!(closed > open)) return 0
+	return Math.log(fNumber / open) / Math.log(closed / open)
+}
+
+// The f-number of an aperture level: the inverse of apertureProgress().
+export function apertureFNumber(level, [open, closed]) {
+	return open * (closed / open) ** level
+}
+
+// The scale of the tones' arcs at an aperture level: from HUD.aperture.arcs[0]
+// wide open to [1] stopped down, linear in the level (so in stops), the arcs
+// wider as the lens opens, like a diaphragm. Past an end it goes on no
+// further than an elastic drag can pull the f-number (`elasticity`), so an
+// f-number off the knob's range (a preset's) cannot widen them more.
+export function apertureArcScale(level, elasticity = 0, hud = HUD) {
+	const [open, closed] = hud.aperture.arcs
+	const t = Math.min(Math.max(level, -elasticity), 1 + elasticity)
+	return open + (closed - open) * t
 }

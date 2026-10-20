@@ -324,9 +324,9 @@ canvas {
 }
 
 /* A layer in use lights up in the accent (src/ui/hud.js `activate()`): the
-   zoom rings, the zoom value and the knob's marker, the arcs, the spinning
-   circle, the camera angles, eased from white and back. The circles also
-   show 0.2 more lit. */
+   zoom rings, the zoom value and the knob's marker, the aperture knob's lens
+   and the f-number, the arcs, the spinning circle, the camera angles, eased
+   from white and back. The circles also show 0.2 more lit. */
 .hud-spin.active,
 .hud-arc.active {
 	stroke: var(--accent);
@@ -340,16 +340,17 @@ canvas {
 	opacity: 0.5;
 }
 
-.hud-readout.active,
+.hud-readout > .active,
 .hud-orbit.active {
 	color: var(--accent);
 }
 
 /* The readouts (src/ui/hud.js), centered between the spinning circle and
    the outer zoom ring on the horizontal: the zoom's value (the macro
-   magnification) by the knob's track, the camera's polar angles opposite.
-   GSAP retypes them as they change; where they would leave the HUD's box (a
-   phone's circle) they hide. */
+   magnification) by the knob's track, the f-number beside it on a desktop
+   HUD, the camera's polar angles opposite. GSAP retypes each text as it
+   changes, and each lights up on its own; where they would leave the HUD's
+   box (a phone's circle) they hide. */
 .hud-readout.hidden {
 	visibility: hidden;
 }
@@ -366,13 +367,31 @@ canvas {
 	white-space: pre;
 	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 	pointer-events: none;
+}
+
+.hud-readout > span {
 	transition: color 0.4s;
 }
 
+/* The f-number in lowercase, as lenses write it (f/15.0). */
+.hud-f-number {
+	margin-left: 1.5ch;
+	text-transform: none;
+}
+
+/* The aperture knob, the dashed arc of its track and the f-number show
+   only on a desktop HUD (not split, under a mouse: src/ui/hud.js
+   `with-aperture`). */
+.hud:not(.with-aperture) :is(.hud-f-number, .aperture-level, .hud-aperture-track) {
+	display: none;
+}
+
 /* The three arcs inside the inner zoom ring (src/ui/hud.js): solid, in the
-   accent; a change of skin tone carries each to its new place, elastically. */
+   accent; a change of skin tone carries each to its new place, elastically.
+   The aperture scales them about the center (--arc-scale), their line kept
+   2 px wide. */
 .hud-arc {
-	stroke-width: 2;
+	stroke-width: calc(2px / var(--arc-scale, 1));
 	opacity: 0.3;
 	transition:
 		stroke-dashoffset 1s var(--elastic),
@@ -742,12 +761,62 @@ canvas {
 }
 
 .zoom-level.pulse .zoom-marker {
-	animation: zoom-bounce 0.5s var(--spring);
+	animation: knob-bounce 0.5s var(--spring);
 }
 
-@keyframes zoom-bounce {
+@keyframes knob-bounce {
 	35% {
 		scale: 1.5;
+	}
+}
+
+/* The aperture knob (src/ui/hud.js): a hit area turned with its circle,
+   --hud-aperture-hit along it (src/ui/hud.js sets its height, across it),
+   and the convex lens it draws in profile across the circle, solid, its
+   corners sharp, white as the zoom's marker and lit with the f-number. On
+   hover it grows longer (--hud-aperture-grow), and at a click it bounces
+   longer still (--hud-aperture-pulse), not thicker, staying between the
+   circles and clear of + and −. */
+.aperture-level {
+	width: var(--hud-aperture-hit);
+	z-index: 1;
+	rotate: var(--hud-angle);
+	cursor: grab;
+	touch-action: none;
+}
+
+.aperture-level.dragging {
+	cursor: grabbing;
+}
+
+.aperture-marker {
+	display: block;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	fill: #d9d9d9;
+	stroke: none;
+	transition:
+		scale 0.2s,
+		fill 0.4s;
+	pointer-events: none;
+}
+
+.aperture-marker.active {
+	fill: var(--accent);
+}
+
+.aperture-level:is(:hover, :focus-visible, .dragging) .aperture-marker {
+	scale: 1 var(--hud-aperture-grow);
+}
+
+.aperture-level.pulse .aperture-marker {
+	animation: lens-bounce 0.5s var(--spring);
+}
+
+@keyframes lens-bounce {
+	35% {
+		scale: 1 var(--hud-aperture-pulse);
 	}
 }
 

@@ -17,7 +17,14 @@ import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
-import { zoomDistance, zoomLevel, zoomProgress, zoomSensor } from './src/ui/hudLayout'
+import {
+	apertureFNumber,
+	apertureProgress,
+	zoomDistance,
+	zoomLevel,
+	zoomProgress,
+	zoomSensor,
+} from './src/ui/hudLayout'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
 // ?meshtree=1, #debug), creates the params, the renderer and the app, the HUD
@@ -76,6 +83,11 @@ app.controls.zoomSensor = (distance) => {
 		settings.sensorOut,
 	])
 }
+// The f-numbers at the ends of the HUD's aperture knob (desktop only),
+// aperture.open by Zoom out (level 0) and aperture.closed by Zoom in (1),
+// which also bound the wheel over it.
+const apertureLimits = () => [app.targetParams.aperture.open, app.targetParams.aperture.closed]
+app.controls.fNumberLimits = apertureLimits
 
 // ?meshtree=1: the scene graph at the left, each object's visible and each
 // mesh's wireframe, with the frame's draw calls and the scene's vertices
@@ -138,6 +150,27 @@ function setZoomLevel(level) {
 	app.onParamChange('camera.sensorHeight')
 }
 
+// The aperture knob's level, 0 at the widest f-number to 1 at the narrowest,
+// on their log scale (src/ui/hudLayout.js); setting it sets camera.fNumber
+// at once, as the knob does (with its elastic drag, past the ends), and stops
+// a glide of it.
+const getApertureLevel = () =>
+	Math.min(Math.max(apertureProgress(app.params.camera.fNumber, apertureLimits()), 0), 1)
+function setApertureLevel(level) {
+	setValue(PARAM_SCHEMA, app.params, 'camera.fNumber', apertureFNumber(level, apertureLimits()))
+	app.onParamChange('camera.fNumber')
+}
+
+// Glides camera.fNumber to the widest f-number (`end` 0) or the narrowest (1)
+// over `duration` s (the HUD's aperture knob springing back from past an
+// end). The rest keeps the values a running transition is heading for.
+function aperture(end, duration) {
+	const target = cloneParams(app.targetParams)
+	const [open, closed] = apertureLimits()
+	setValue(PARAM_SCHEMA, target, 'camera.fNumber', end === 1 ? closed : open)
+	app.transitionTo(target, duration)
+}
+
 // Glides `skin.color` to the tone `name` (src/params/skinTones.js), as the
 // skin buttons do. The rest keeps the values a running transition is heading
 // for.
@@ -163,6 +196,8 @@ window.__EYE__ = {
 	zoom,
 	getZoomLevel,
 	setZoomLevel,
+	getApertureLevel,
+	setApertureLevel,
 	skinTone,
 }
 
@@ -236,10 +271,11 @@ if (urlParams.get('gui') !== '0') {
 	// The frame around the page; the rest of the interface stays inside it.
 	document.body.appendChild(frame())
 
-	// The HUD around the eye (src/ui/hud.js): the skin tones, the zoom and
-	// Random eye on a dashed circle. The tone of the color the params are
-	// heading for is pressed, also after the panel or a preset changes it; the
-	// zoom knob follows the camera every frame, gliding or not.
+	// The HUD around the eye (src/ui/hud.js): the skin tones, the zoom, the
+	// aperture (desktop only) and Random eye on a dashed circle. The tone of
+	// the color the params are heading for is pressed, also after the panel or
+	// a preset changes it; the zoom and aperture knobs follow the camera every
+	// frame, gliding or not.
 	const hud = createHud({
 		tones: SKIN_TONES,
 		onTone: (name) => skinTone(name),
@@ -248,6 +284,11 @@ if (urlParams.get('gui') !== '0') {
 		// The wheel over the knob zooms as over the canvas, smoothly.
 		onZoomWheel: (deltaY) => app.controls.wheel(deltaY),
 		getZoomElasticity: () => app.params.zoom.elasticity,
+		onAperture: (end, duration) => aperture(end, duration),
+		onApertureLevel: (level) => setApertureLevel(level),
+		// The wheel over the aperture knob eases the f-number as the zoom's.
+		onApertureWheel: (deltaY) => app.controls.apertureWheel(deltaY),
+		getApertureElasticity: () => app.params.aperture.elasticity,
 		onRandom: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
 	})
 	document.body.appendChild(hud.element)
@@ -259,7 +300,8 @@ if (urlParams.get('gui') !== '0') {
 	})
 	// The zoom's value by the knob: the macro magnification of the camera at
 	// its focus distance (camera.distance), as a lens's reproduction ratio
-	// reads (1× is life size on the sensor).
+	// reads (1× is life size on the sensor); beside it, on a desktop HUD, the
+	// f-number with one decimal, which the aperture knob follows.
 	// Opposite, the camera's polar angles about the eye, azimuth then
 	// elevation in degrees, the mouse parallax's turn included (it moves the
 	// camera too, CameraControls.parallax): unsigned, without spaces or units.
@@ -269,7 +311,7 @@ if (urlParams.get('gui') !== '0') {
 	let orbit = null
 	const showZoomLevel = () => {
 		requestAnimationFrame(showZoomLevel)
-		const { distance, focalLength, azimuth, elevation } = app.params.camera
+		const { distance, focalLength, fNumber, azimuth, elevation } = app.params.camera
 		const { parallax } = app.controls
 		const orbiting = orbit !== null && (orbit[0] !== azimuth || orbit[1] !== elevation)
 		orbit = [azimuth, elevation]
@@ -279,6 +321,8 @@ if (urlParams.get('gui') !== '0') {
 		)
 		hud.showZoomLevel(zoomProgress(distance, zoomLimits()))
 		hud.showZoomValue(`${magnification(focalLength, distance).toFixed(3)}`)
+		hud.showApertureLevel(apertureProgress(fNumber, apertureLimits()))
+		hud.showApertureValue(`f/${fNumber.toFixed(1)}`)
 	}
 	showZoomLevel()
 

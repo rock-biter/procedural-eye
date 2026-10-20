@@ -3,6 +3,9 @@
 // keyboard behavior, with brackets revealing hover and selection.
 import {
 	HUD,
+	apertureArcScale,
+	apertureLens,
+	apertureTrackArc,
 	hudLayout,
 	knobAngle,
 	knobLevel,
@@ -46,7 +49,7 @@ const PAGE_STEPS = { PageUp: 0.25, PageDown: -0.25 }
 const LEVEL_PER_WHEEL_UNIT = 0.0012
 // How long (ms) a layer stays in the accent past its control's last move:
 // the arcs and the spinning circle past their glides.
-const ACTIVE_HOLD = { zoom: 700, tone: 1300, random: 1000, camera: 700 }
+const ACTIVE_HOLD = { zoom: 700, aperture: 700, tone: 1300, random: 1000, camera: 700 }
 // How far (px) a readout keeps from the HUD box's sides, or it hides.
 const READOUT_MARGIN = 4
 // A press that moves less than this (px) is a click.
@@ -96,7 +99,6 @@ function group(label) {
 	return element
 }
 
-// Centers `element` and its cut in the circle's line at `angle` on a circle.
 // The dashes of a circle of `radius` px: HUD.dash px every about
 // HUD.dashPeriod px, a whole number of periods around, so it has no seam.
 function dashes(radius) {
@@ -105,27 +107,34 @@ function dashes(radius) {
 	return `${HUD.dash} ${period - HUD.dash}`
 }
 
+// Centers `element` and its cut in the circle's line, if any, at `angle` on a
+// circle.
 function place(element, cut, angle, { cx, cy, radius }) {
 	const x = cx + radius * Math.cos(angle)
 	const y = cy + radius * Math.sin(angle)
 	element.style.left = `${x}px`
 	element.style.top = `${y}px`
 	element.style.setProperty('--hud-angle', `${angle - Math.PI / 2}rad`)
-	cut.setAttribute('cx', x)
-	cut.setAttribute('cy', y)
+	cut?.setAttribute('cx', x)
+	cut?.setAttribute('cy', y)
 }
 
 // `tones`: [{ name, label, color }]; onTone(name), onZoom('in' | 'out',
 // duration), onZoomLevel(level, including elastic overshoot),
 // onZoomWheel(deltaY) (the wheel over the knob) and onRandom() run the
 // controls; getZoomElasticity() reads the current drag extension.
-// (onZoom without a duration glides over the zoom's own). Returns the
+// (onZoom without a duration glides over the zoom's own). The aperture knob
+// (desktop only) likewise: onApertureLevel(level), onApertureWheel(deltaY),
+// onAperture(end, duration) (a glide to the widest f-number, end 0, or the
+// narrowest, 1) and getApertureElasticity(). Returns the
 // element, mount() (once it is in the page), reserveBottom(height), the
 // bottom of the box the zoom's circle keeps clear of, pressTone(color), which presses
 // the tone of `color` (none for another color), and showZoomLevel(level),
 // where the knob goes (at an end, its button shows in full) and the two
 // segmented rings' sizes and turns, and showZoomValue(text), the zoom's
-// value by the knob.
+// value by the knob; showApertureLevel(level), where the aperture knob goes
+// and the tones' arcs' size, and showApertureValue(text), the f-number by
+// the zoom's value.
 export function createHud({
 	tones,
 	onTone,
@@ -133,12 +142,19 @@ export function createHud({
 	onZoomLevel,
 	onZoomWheel,
 	getZoomElasticity = () => 0,
+	onAperture,
+	onApertureLevel,
+	onApertureWheel,
+	getApertureElasticity = () => 0,
 	onRandom,
 }) {
 	const element = document.createElement('div')
 	element.className = 'hud'
 	element.style.setProperty('--hud-button', `${HUD.button}px`)
 	element.style.setProperty('--hud-knob', `${HUD.knob}px`)
+	element.style.setProperty('--hud-aperture-hit', `${HUD.aperture.hit}px`)
+	element.style.setProperty('--hud-aperture-grow', HUD.aperture.grow)
+	element.style.setProperty('--hud-aperture-pulse', HUD.aperture.pulse)
 	element.style.setProperty('--tone-scale', HUD.toneScale)
 
 	// The circle, cut around each button by a mask, and the zoom's wider
@@ -148,6 +164,9 @@ export function createHud({
 	mask.append(svgElement('rect', { width: '100%', height: '100%', fill: '#fff' }))
 	const line = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
 	const zoomLine = svgElement('circle', { class: 'hud-line', mask: 'url(#hud-ring-cuts)' })
+	// The dashed arc that marks the aperture knob's track, end to end, under
+	// the knob (desktop only).
+	const apertureLine = svgElement('path', { class: 'hud-line hud-aperture-track' })
 	// The two segmented zoom rings, each an SVG drawn about the center of its
 	// wrapper (orbitArt()) at the layout's size, its dashes in px; the
 	// wrappers sit on the HUD's center and turn about it. Their strokes take
@@ -196,7 +215,7 @@ export function createHud({
 	// The spinning circle and its teeth sway together.
 	const spinGroup = svgElement('g')
 	spinGroup.append(spin, spinTeeth)
-	ring.append(mask, line, zoomLine, spinGroup, ...arcs)
+	ring.append(mask, line, zoomLine, apertureLine, spinGroup, ...arcs)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -251,20 +270,62 @@ export function createHud({
 		engaged.button.classList.remove('engaged')
 		engaged = null
 	}
-	const knob = zoomKnob({
-		onZoomLevel,
+	const knob = trackKnob({
+		className: 'zoom-level',
+		marker: '<span class="zoom-marker"></span>',
+		label: 'Zoom level',
+		title: 'Zoom: drag, scroll or click',
+		onLevel: onZoomLevel,
 		onWheel: onZoomWheel,
-		getZoomElasticity,
+		getElasticity: getZoomElasticity,
+		stretch: HUD.zoom.stretch,
+		snapEnd: (level, { track, radius }) => knobSnap(knobAngle(level, track), track, radius),
 		onSnap: (end) => onZoom(end === 1 ? 'in' : 'out', SNAP_GLIDE),
 		cut: cut(),
 	})
+	knob.cut.style.r = `${HUD.marker / 2 + HUD.gap}px`
 	zoomGroup.append(zoomIn, knob.element, zoomOut)
+
+	// The aperture knob of a desktop HUD (HUD.aperture): a convex lens in
+	// profile across the circle, between the zoom's circle and the spinning
+	// circle, that
+	// slides between + and −, from the widest f-number by − to the narrowest
+	// by +. Released past an end it springs back there;
+	// along its track it stays where it is let go. It shows only on a HUD
+	// that is not split, under a mouse (the HUD's `with-aperture` class).
+	const apertureGroup = group('Aperture')
+	const apertureKnob = trackKnob({
+		className: 'aperture-level',
+		marker: '<svg class="aperture-marker"><path/></svg>',
+		label: 'Aperture (f-number)',
+		title: 'Aperture: drag, scroll or click',
+		onLevel: onApertureLevel,
+		onWheel: onApertureWheel,
+		getElasticity: getApertureElasticity,
+		stretch: HUD.aperture.stretch,
+		snapEnd: (level) => (level < 0 ? 0 : level > 1 ? 1 : null),
+		onSnap: (end) => onAperture(end, SNAP_GLIDE),
+	})
+	apertureGroup.append(apertureKnob.element)
+	const apertureMarker = apertureKnob.element.firstElementChild
+	// Its lens, `length` px across the circle, centered in its hit area, as
+	// long as the lens hovered.
+	const drawApertureLens = (length) => {
+		const { hit, grow } = HUD.aperture
+		const height = length * grow
+		apertureKnob.element.style.height = `${height}px`
+		apertureMarker.setAttribute('viewBox', `${-hit / 2} ${-height / 2} ${hit} ${height}`)
+		apertureMarker.firstElementChild.setAttribute('d', apertureLens(length))
+	}
+	const coarse = window.matchMedia('(pointer: coarse)')
 
 	// Two readouts between the spinning circle and the outer zoom ring, on
 	// the horizontal (main.js gives their text, formatted): the zoom's value
-	// on the middle of the knob's track, the camera's polar angles opposite.
+	// on the middle of the knob's track, with the f-number beside it on a
+	// desktop HUD, the camera's polar angles opposite.
 	const motionless = window.matchMedia('(prefers-reduced-motion: reduce)')
-	const zoomValue = readout('hud-zoom-value', motionless)
+	const zoomReadout = readout('hud-zoom-value', motionless, ['hud-magnification', 'hud-f-number'])
+	const [zoomValue, fNumberValue] = zoomReadout.texts
 	const cameraAngles = readout('hud-camera-angles', motionless)
 
 	const random = hudButton('random-eye', 'Random eye', icon('eye'), () => {
@@ -277,37 +338,46 @@ export function createHud({
 	// The HUD's layers take the accent while their control is in use, as if
 	// they lit up (style.css eases the color from white and back): the zoom
 	// rings, the zoom value and the knob's marker while the zoom moves or the
-	// knob is held, the
+	// knob is held, the aperture knob's lens, the f-number and the arcs
+	// (which it scales, on a HUD with the knob) while the f-number moves or
+	// the knob is held, the
 	// arcs as a new tone is pressed, the spinning circle at a click on Random
 	// eye, the camera angles while the camera orbits. Each stays lit
-	// `ACTIVE_HOLD` ms past the control's last move.
+	// `ACTIVE_HOLD` ms past the control's last move; an element two lit
+	// layers share (the arcs) stays lit while either does.
 	const layers = {
 		zoom: () => [
 			...orbitAssets.map(({ wrapper }) => wrapper),
 			zoomValue.element,
 			knob.element.firstElementChild,
 		],
+		aperture: () => [apertureMarker, fNumberValue.element, ...(placed?.aperture ? arcs : [])],
 		tone: () => arcs,
 		random: () => [spin, spinTeeth],
-		camera: () => [cameraAngles.element],
+		camera: () => [cameraAngles.texts[0].element],
 	}
 	const activeTimers = {}
+	const lit = {}
 	const activate = (name) => {
-		const elements = layers[name]()
+		const elements = [...new Set([...(lit[name] ?? []), ...layers[name]()])]
 		for (const element of elements) element.classList.add('active')
+		lit[name] = elements
 		clearTimeout(activeTimers[name])
 		activeTimers[name] = setTimeout(() => {
-			for (const element of elements) element.classList.remove('active')
+			delete lit[name]
+			const held = new Set(Object.values(lit).flat())
+			for (const element of elements) if (!held.has(element)) element.classList.remove('active')
 		}, ACTIVE_HOLD[name])
 	}
 
 	element.append(
 		...orbitAssets.map(({ wrapper }) => wrapper),
 		ring,
-		zoomValue.element,
+		zoomReadout.element,
 		cameraAngles.element,
 		toneGroup,
 		zoomGroup,
+		apertureGroup,
 		random,
 	)
 
@@ -435,6 +505,30 @@ export function createHud({
 		const degrees = (turn * 180) / Math.PI
 		element.setAttribute('transform', `rotate(${degrees} ${placed.cx} ${placed.cy})`)
 	}
+	// The arcs also grow and shrink with the aperture about the center
+	// (apertureArcScale(); on a HUD without the knob they keep their size),
+	// their line kept 2 px wide (--arc-scale, style.css).
+	let arcScale = 1
+	const transformArc = (i) => {
+		if (!placed) return
+		const { cx, cy } = placed
+		const degrees = (sway.arcs[i] * 180) / Math.PI
+		arcs[i].setAttribute(
+			'transform',
+			`translate(${cx} ${cy}) rotate(${degrees}) scale(${arcScale}) translate(${-cx} ${-cy})`,
+		)
+		arcs[i].style.setProperty('--arc-scale', arcScale)
+	}
+	let aperture = null
+	const scaleArcs = () => {
+		const scale =
+			placed?.aperture && aperture !== null
+				? apertureArcScale(aperture, getApertureElasticity())
+				: 1
+		if (scale === arcScale) return
+		arcScale = scale
+		arcs.forEach((_, i) => transformArc(i))
+	}
 	let swayTime = null
 	const stepSway = (time) => {
 		requestAnimationFrame(stepSway)
@@ -451,10 +545,12 @@ export function createHud({
 		if (rings) placeOrbit()
 		const spinTurn = toward(sway.spin, HUD.sway.spin)
 		if (spinTurn !== sway.spin) rotate(spinGroup, (sway.spin = spinTurn))
-		arcs.forEach((arc, i) => {
+		for (let i = 0; i < arcs.length; i++) {
 			const turn = toward(sway.arcs[i], HUD.sway.arcs[i])
-			if (turn !== sway.arcs[i]) rotate(arc, (sway.arcs[i] = turn))
-		})
+			if (turn === sway.arcs[i]) continue
+			sway.arcs[i] = turn
+			transformArc(i)
+		}
 	}
 
 	// Both segmented rings for the current layout and zoom level.
@@ -496,12 +592,16 @@ export function createHud({
 		}
 	}
 
+	// The aperture drag's elasticity the layout last took (hudLayout()).
+	let laidElasticity = null
 	// The height (px) at the bottom of the HUD's box that the zoom's circle of
 	// a split HUD keeps clear of (reserveBottom()).
 	let bottom = 0
 	const layout = () => {
 		const { clientWidth: width, clientHeight: height } = element
-		const fit = hudLayout(width, height, tones.length, HUD, { bottom })
+		laidElasticity = getApertureElasticity()
+		const knobbed = coarse.matches ? null : { elasticity: laidElasticity }
+		const fit = hudLayout(width, height, tones.length, HUD, { bottom, aperture: knobbed })
 		if (!fit) return
 		const { radius, angles, split } = fit
 		const circle = { cx: width / 2, cy: height / 2, radius }
@@ -528,21 +628,39 @@ export function createHud({
 		}
 		placedAngles = angles
 		knob.setTrack({ ...zoomCircle, track: angles.track })
+		const withAperture = fit.aperture !== null
+		element.classList.toggle('with-aperture', withAperture)
+		if (withAperture) {
+			const { radius: ring, length, track } = fit.aperture
+			apertureKnob.setTrack({ ...circle, radius: ring, track })
+			drawApertureLens(length)
+			const trackArc = apertureTrackArc(circle, ring, track)
+			apertureLine.setAttribute('d', trackArc.d)
+			apertureLine.setAttribute('stroke-dasharray', trackArc.dashArray.join(' '))
+		}
 		const middle = (angles.track[0] + angles.track[1]) / 2
 		const reach = zoomValueRadius(radius, HUD, split)
-		zoomValue.place(circle, reach, middle, width)
+		zoomReadout.place(circle, reach, middle, width)
 		const drop = split ? HUD.split.readouts.drop : 0
 		cameraAngles.place(circle, reach - drop, middle + Math.PI, width)
-		placed = { ...circle, zoomRadius: zoomCircle.radius, split, track: angles.track }
+		placed = {
+			...circle,
+			zoomRadius: zoomCircle.radius,
+			split,
+			track: angles.track,
+			aperture: withAperture,
+		}
 		placeSpin()
 		placeArcs()
 		// The sway turns about the center, which moved with the layout.
 		rotate(spinGroup, sway.spin)
-		arcs.forEach((arc, i) => rotate(arc, sway.arcs[i]))
+		scaleArcs()
+		arcs.forEach((_, i) => transformArc(i))
 		placeOrbit()
 		placeZoomSymbols()
 	}
 	new ResizeObserver(layout).observe(element)
+	coarse.addEventListener('change', layout)
 
 	return {
 		element,
@@ -572,6 +690,26 @@ export function createHud({
 		},
 		// The zoom's value as text (main.js formats it).
 		showZoomValue: (text) => zoomValue.show(text),
+		// The f-number as text (main.js formats it), also the knob's value
+		// for assistive technology.
+		showApertureValue(text) {
+			fNumberValue.show(text)
+			if (apertureKnob.element.getAttribute('aria-valuetext') !== text)
+				apertureKnob.element.setAttribute('aria-valuetext', text)
+		},
+		// The aperture knob at `shown` (its level: past an end while dragged
+		// or springing back) and the tones' arcs scaled with it; the knob's arc
+		// and the f-number light up as it moves or while it is held.
+		showApertureLevel(shown) {
+			// Its track keeps clear of + and − for the drag's elasticity.
+			if (getApertureElasticity() !== laidElasticity) layout()
+			apertureKnob.show(shown)
+			if (apertureKnob.dragging) activate('aperture')
+			if (aperture !== null && Math.abs(shown - aperture) < 1e-4) return
+			if (aperture !== null) activate('aperture')
+			aperture = shown
+			scaleArcs()
+		},
 		// The camera's polar angles as text (main.js formats them).
 		// `orbiting`: the camera's orbit moved (not the mouse parallax alone).
 		showCameraAngles(text, orbiting) {
@@ -594,28 +732,48 @@ export function createHud({
 	}
 }
 
-// A readout of the HUD: small text that GSAP's TextPlugin retypes whenever
-// it changes, one tween at a time, each to the latest text, so a gliding
-// value reads as a running counter that settles. With `motionless` (reduced
-// motion) it switches at once. place() centers it `reach` px from the
-// circle's center at `angle`; where it would leave a box `width` px wide
-// (a phone's circle), it hides.
-function readout(className, motionless) {
+// A readout of the HUD: small texts side by side (`parts`, the class of
+// each; `texts`, their show(text)), the first also its show(). place()
+// centers it `reach` px from the circle's center at `angle`; where it would
+// leave a box `width` px wide (a phone's circle), it hides.
+function readout(className, motionless, parts = ['hud-readout-text']) {
 	const element = document.createElement('div')
 	element.className = `hud-readout ${className}`
 	element.setAttribute('aria-hidden', 'true')
+	// The last placement, redone once there is text to measure.
+	let placement = null
+	const place = (circle, reach, angle, width) => {
+		placement = [circle, reach, angle, width]
+		const x = circle.cx + reach * Math.cos(angle)
+		const half = element.offsetWidth / 2 + READOUT_MARGIN
+		element.style.left = `${x}px`
+		element.style.top = `${circle.cy + reach * Math.sin(angle)}px`
+		element.classList.toggle('hidden', x - half < 0 || x + half > width)
+	}
+	const texts = parts.map((part) => {
+		const span = document.createElement('span')
+		span.className = part
+		element.append(span)
+		return typedText(span, motionless, () => placement && place(...placement))
+	})
+	return { element, texts, show: texts[0].show, place }
+}
+
+// Text that GSAP's TextPlugin retypes whenever it changes, one tween at a
+// time, each to the latest text, so a gliding value reads as a running
+// counter that settles. With `motionless` (reduced motion) it switches at
+// once. `onFirst()` runs as it shows its first text.
+function typedText(element, motionless, onFirst) {
 	let shown = null
 	let next = null
 	let typing = false
-	// The last placement, redone once there is text to measure.
-	let placement = null
 	const type = () => {
 		if (typing || next === shown) return
 		const text = next
 		if (shown === null || motionless.matches) {
 			const first = shown === null
 			element.textContent = shown = text
-			if (first && placement) place(...placement)
+			if (first) onFirst()
 			return
 		}
 		typing = true
@@ -630,51 +788,60 @@ function readout(className, motionless) {
 			},
 		})
 	}
-	const place = (circle, reach, angle, width) => {
-		placement = [circle, reach, angle, width]
-		const x = circle.cx + reach * Math.cos(angle)
-		const half = element.offsetWidth / 2 + READOUT_MARGIN
-		element.style.left = `${x}px`
-		element.style.top = `${circle.cy + reach * Math.sin(angle)}px`
-		element.classList.toggle('hidden', x - half < 0 || x + half > width)
-	}
 	return {
 		element,
 		show(text) {
 			next = text
 			type()
 		},
-		place,
 	}
 }
 
-// The zoom knob: a small square marker that slides along the circle
-// from zoom out (level 0) to zoom in (level 1), over the two buttons, so the
-// pointer always reaches it.
-// `onWheel(deltaY)`, if given, takes the wheel over the knob (else it sets
-// the level at once).
-function zoomKnob({ onZoomLevel, onWheel, onSnap, getZoomElasticity = () => 0, cut }) {
+// A knob that slides along an arc of a circle, from level 0 at the track's
+// second angle to 1 at its first: the zoom knob, a small square marker from
+// zoom out to zoom in, over the zoom's buttons, so the pointer always
+// reaches it, and the aperture knob, a lens in profile across the circle
+// outside it, between them.
+// `marker`: its
+// HTML. `onLevel(level)` sets the level (past an end, resisted, while
+// dragged, `getElasticity()`); `onWheel(deltaY)`, if given, takes the wheel
+// over the knob (else it sets the level at once). A drag released where
+// `snapEnd(level, circle)` gives an end (0 or 1, else null) glides there,
+// `onSnap(end)`. Past an end the marker runs `stretch` times as far as the
+// level (knobLevel()). `cut`: its circle in the mask of the HUD's line, if
+// any.
+function trackKnob({
+	className,
+	marker: markerHtml,
+	label,
+	title,
+	onLevel,
+	onWheel,
+	onSnap,
+	snapEnd,
+	getElasticity = () => 0,
+	stretch,
+	cut = null,
+}) {
 	const element = document.createElement('div')
-	element.className = 'hud-button zoom-level'
-	element.innerHTML = '<span class="zoom-marker"></span>'
+	element.className = `hud-button ${className}`
+	element.innerHTML = markerHtml
 	element.tabIndex = 0
-	element.title = 'Zoom: drag, scroll or click'
+	element.title = title
 	element.setAttribute('role', 'slider')
-	element.setAttribute('aria-label', 'Zoom level')
+	element.setAttribute('aria-label', label)
 	element.setAttribute('aria-valuemin', '0')
 	element.setAttribute('aria-valuemax', '100')
-	cut.style.r = `${HUD.marker / 2 + HUD.gap}px`
 
-	// The circle and the track on it (set by the layout), and the camera's
-	// zoom level shown. Past an end the marker runs further than the camera
-	// (knobLevel()).
+	// The circle and the track on it (set by the layout), and the level
+	// shown. Past an end the marker runs further than the level (knobLevel()).
 	let circle = null
 	let shown = null
-	const marker = () => knobLevel(shown, getZoomElasticity())
+	const marker = () => knobLevel(shown, getElasticity(), stretch)
 	const update = () => {
 		if (circle && shown !== null) place(element, cut, knobAngle(marker(), circle.track), circle)
 	}
-	const set = (level) => onZoomLevel(clamp01(level))
+	const set = (level) => onLevel(clamp01(level))
 
 	// The pointer's angle about the circle's center, near the track.
 	const pointerAngle = (event) => {
@@ -692,11 +859,11 @@ function zoomKnob({ onZoomLevel, onWheel, onSnap, getZoomElasticity = () => 0, c
 		element.classList.add('pulse')
 	}
 	element.addEventListener('animationend', (event) => {
-		if (event.animationName === 'zoom-bounce') element.classList.remove('pulse')
+		if (event.animationName.endsWith('-bounce')) element.classList.remove('pulse')
 	})
 
-	// The camera and marker share the resisted level; no snap interrupts a
-	// held drag. Recovery follows the camera back from outside the track.
+	// The level and the marker share the resisted level; no snap interrupts
+	// a held drag. Recovery follows the level back from outside the track.
 	let drag = null
 	let recovering = false
 	element.addEventListener('pointerdown', (event) => {
@@ -705,13 +872,13 @@ function zoomKnob({ onZoomLevel, onWheel, onSnap, getZoomElasticity = () => 0, c
 		const { pointerId: id, clientX: x, clientY: y } = event
 		const angle = pointerAngle(event)
 		const level = shown ?? 0
-		// Measured from the pull the camera's level resists (past an end, beyond
-		// the marker), so grabbing a returning marker holds the camera there.
-		const offset = angle - knobAngle(pullLevel(level, getZoomElasticity()), circle.track)
+		// Measured from the pull the level resists (past an end, beyond the
+		// marker), so grabbing a returning marker holds the level there.
+		const offset = angle - knobAngle(pullLevel(level, getElasticity()), circle.track)
 		drag = { id, x, y, offset, angle, level, moved: false }
 		recovering = false
-		// Grabbing a returning marker stops its camera glide at this point.
-		onZoomLevel(level)
+		// Grabbing a returning marker stops its glide at this point.
+		onLevel(level)
 	})
 	element.addEventListener('pointermove', (event) => {
 		if (drag?.id !== event.pointerId) return
@@ -720,8 +887,8 @@ function zoomKnob({ onZoomLevel, onWheel, onSnap, getZoomElasticity = () => 0, c
 		drag.moved = true
 		element.classList.add('dragging')
 		drag.angle = pointerAngle(event)
-		drag.level = trackLevel(drag.angle - drag.offset, circle.track, getZoomElasticity())
-		onZoomLevel(drag.level)
+		drag.level = trackLevel(drag.angle - drag.offset, circle.track, getElasticity())
+		onLevel(drag.level)
 	})
 	const release = (event, click) => {
 		if (drag?.id !== event.pointerId) return
@@ -729,7 +896,7 @@ function zoomKnob({ onZoomLevel, onWheel, onSnap, getZoomElasticity = () => 0, c
 		drag = null
 		element.classList.remove('dragging')
 		if (moved || level < 0 || level > 1) {
-			const end = knobSnap(knobAngle(level, circle.track), circle.track, circle.radius)
+			const end = snapEnd(level, circle)
 			if (end !== null) {
 				recovering = level < 0 || level > 1
 				onSnap(end)
@@ -759,6 +926,7 @@ function zoomKnob({ onZoomLevel, onWheel, onSnap, getZoomElasticity = () => 0, c
 
 	return {
 		element,
+		cut,
 		// Where the marker sits, and whether a drag holds it.
 		get level() {
 			return shown === null ? null : marker()

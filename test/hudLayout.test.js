@@ -2,7 +2,16 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
 	HUD,
+	apertureArcScale,
+	apertureFNumber,
+	apertureLength,
+	apertureLens,
+	apertureProgress,
+	apertureRadius,
+	apertureTrack,
+	apertureTrackArc,
 	elasticZoomLevel,
+	hudAngles,
 	hudLayout,
 	knobAngle,
 	knobLevel,
@@ -528,4 +537,152 @@ test('the zoom level is clamped outside the limits', () => {
 	assert.equal(zoomLevel(1000, [180, 480]), 0)
 	assert.equal(zoomLevel(100, [180, 480]), 1)
 	assert.equal(zoomLevel(300, [300, 300]), 1, 'no range')
+})
+
+test('a desktop HUD has the aperture knob between the zoom and the spinning circle, between + and −, inside the box', () => {
+	const elasticity = 0.05
+	const desktop = hudLayout(...SCREENS.desktop, TONES, HUD, { aperture: { elasticity } })
+	const { radius, angles, aperture } = desktop
+	assert.equal(radius, hudLayout(...SCREENS.desktop, TONES).radius)
+	assert.equal(aperture.radius, apertureRadius(radius))
+	assert.equal(aperture.length, apertureLength(radius))
+	assert.deepEqual(aperture.track, apertureTrack(angles.track, aperture.radius, elasticity))
+	assert.equal(hudLayout(...SCREENS.desktop, TONES).aperture, null, 'only when asked')
+	const phone = hudLayout(...SCREENS.phone, TONES, HUD, { aperture: { elasticity } })
+	assert.equal(phone.aperture, null)
+	// Its lens halfway between the zoom's circle and the spinning circle,
+	// HUD.aperture.share of the gap between them long, at any size; hovered
+	// and bouncing at a click, longer, still inside the gap.
+	const { share, grow, pulse } = HUD.aperture
+	assert.ok(share > 0 && grow > 1 && pulse >= grow && share * pulse < 0.9)
+	for (const size of [343, 487, 700]) {
+		const ring = apertureRadius(size)
+		const spin = spinRing(size, 0).radius
+		const length = apertureLength(size)
+		assert.ok(near(ring - size, spin - ring))
+		assert.ok(near(length, (spin - size) * share))
+		assert.ok(ring - (length * pulse) / 2 > size + 2, `${size}: past the zoom's circle`)
+		assert.ok(ring + (length * pulse) / 2 < spin - 2, `${size}: inside the spinning circle`)
+		assert.ok(length > 16, `${size}: ${length}`)
+	}
+	// Stretched as far as the drag can carry it past either end (a bound it
+	// never quite reaches), the line stays HUD.aperture.padding px short of
+	// the line of the button's inner edge, HUD.aperture.edge px from its
+	// center along the circle, so it never meets the button's glyph (30 px,
+	// its brackets as wide); without elasticity, at the ends themselves.
+	assert.ok(HUD.aperture.padding > 0)
+	for (const e of [0, elasticity, 0.1]) {
+		for (const size of [343, 487]) {
+			const zoom = hudAngles(size, TONES)
+			const ring = apertureRadius(size)
+			const track = apertureTrack(zoom.track, ring, e)
+			assert.ok(zoom.zoomIn < track[0] && track[0] < track[1] && track[1] < zoom.zoomOut)
+			const farthest = HUD.aperture.stretch * e
+			for (const [level, button, inward] of [
+				[1 + farthest, zoom.zoomIn, 1],
+				[-farthest, zoom.zoomOut, -1],
+			]) {
+				const angle = knobAngle(level, track)
+				const side = angle - (inward * HUD.aperture.width) / 2 / ring
+				// Its side's distance along the button's tangent from its center.
+				const along = ring * Math.sin(inward * (side - button))
+				const clear = HUD.aperture.edge + HUD.aperture.padding
+				assert.ok(near(along, clear, 0.05), `${e}, ${size}: ${along}`)
+			}
+		}
+	}
+	// Its whole track in the box, on a box about square too, where it can
+	// shrink the circle.
+	for (const [width, height] of [SCREENS.desktop, [700, 640]]) {
+		const fit = hudLayout(width, height, TONES, HUD, { aperture: { elasticity } })
+		const { length } = fit.aperture
+		const reach = Math.max(HUD.aperture.hit, length * HUD.aperture.grow) / 2
+		for (let level = 0; level <= 1; level += 0.05) {
+			const [x, y] = point(fit.aperture.radius, knobAngle(level, fit.aperture.track))
+			assert.ok(Math.abs(x) <= width / 2 - reach && Math.abs(y) <= height / 2 - reach)
+		}
+	}
+})
+
+test('a dashed arc marks the track of the aperture knob, a whole dash at either end', () => {
+	const { radius, aperture } = hudLayout(...SCREENS.desktop, TONES, HUD, {
+		aperture: { elasticity: 0.05 },
+	})
+	const center = { cx: 764, cy: 464 }
+	const { d, dashArray } = apertureTrackArc(center, aperture.radius, aperture.track)
+	const [x0, y0, r, , , , , x1, y1] = d.match(/-?[\d.]+/g).map(Number)
+	// From one end of the track to the other, on the knob's circle, clockwise.
+	for (const [[x, y], angle] of [
+		[[x0, y0], aperture.track[0]],
+		[[x1, y1], aperture.track[1]],
+	]) {
+		assert.ok(near(x, center.cx + aperture.radius * Math.cos(angle), 0.01))
+		assert.ok(near(y, center.cy + aperture.radius * Math.sin(angle), 0.01))
+	}
+	assert.ok(near(r, aperture.radius, 0.01) && d.includes(' 0 0 1 '))
+	assert.ok(aperture.radius > radius)
+	// The frame's dashes, a whole one at either end.
+	const length = (aperture.track[1] - aperture.track[0]) * aperture.radius
+	const [dash, gap] = dashArray
+	assert.equal(dash, HUD.dash)
+	const count = (length + gap) / (dash + gap)
+	assert.ok(near(count, Math.round(count), 1e-9))
+	assert.ok(Math.abs(dash + gap - HUD.dashPeriod) < 1)
+})
+
+test('the aperture knob is a biconvex lens in profile, thickest at its middle', () => {
+	const { width, rim } = HUD.aperture
+	assert.ok(width > rim && rim > 0)
+	for (const length of [22, 38]) {
+		const d = apertureLens(length)
+		const numbers = d.match(/-?[\d.]+/g).map(Number)
+		// M -rim/2 -length/2, H rim/2, A face face 0 0 1 rim/2 length/2, H -rim/2,
+		// A face face 0 0 1 -rim/2 -length/2: flat rims at the ends, a face either
+		// side.
+		const [x0, y0, x1, face, , , , , x2, y2] = numbers
+		assert.ok(near(x0, -rim / 2) && near(x1, rim / 2) && near(x2, rim / 2), d)
+		assert.ok(near(y0, -length / 2) && near(y2, length / 2), d)
+		assert.equal(d.match(/A/g).length, 2)
+		assert.ok(d.endsWith('Z'))
+		// Each face bulges out to half the lens's width at its middle.
+		const sag = face - Math.sqrt(face * face - (length / 2) ** 2)
+		assert.ok(near(rim / 2 + sag, width / 2, 0.01), `${length}: ${rim / 2 + sag}`)
+	}
+})
+
+test('the aperture knob runs from the widest f-number to the narrowest on a log scale, and round-trips', () => {
+	const limits = [10, 30]
+	assert.ok(near(apertureProgress(10, limits), 0))
+	assert.ok(near(apertureProgress(30, limits), 1))
+	// The middle of the track halfway in stops.
+	assert.ok(near(apertureProgress(Math.sqrt(300), limits), 0.5))
+	for (const level of [-0.05, 0, 0.37, 1, 1.05]) {
+		assert.ok(near(apertureProgress(apertureFNumber(level, limits), limits), level, 1e-12))
+	}
+	// Past the ends unclamped, for the elastic drag; the default overshoot keeps
+	// the f-number inside the schema's range (1.4 to 32).
+	assert.ok(apertureProgress(32, limits) > 1 && apertureProgress(9, limits) < 0)
+	assert.ok(apertureFNumber(1 + 0.05, limits) < 32)
+	assert.equal(apertureProgress(10, [10, 10]), 0)
+})
+
+test("the tones' arcs grow as the aperture opens, bounded, inside the inner zoom ring", () => {
+	const [open, closed] = HUD.aperture.arcs
+	assert.ok(open > 1 && closed < 1, 'about their size at rest')
+	assert.equal(apertureArcScale(0), open)
+	assert.equal(apertureArcScale(1), closed)
+	assert.ok(apertureArcScale(0.3) < apertureArcScale(0.2), 'smaller stopped down')
+	// Past the ends no further than the elastic drag, whatever the f-number.
+	const elasticity = 0.05
+	const widest = apertureArcScale(-elasticity, elasticity)
+	assert.ok(widest > open)
+	assert.equal(apertureArcScale(-3, elasticity), widest)
+	assert.equal(apertureArcScale(-3), open)
+	assert.equal(apertureArcScale(5, elasticity), apertureArcScale(1 + elasticity, elasticity))
+	// The widest arcs keep clear of the inner zoom ring's ticks.
+	for (const radius of [280, 460]) {
+		const inner = orbitRing(radius, 0.5, 'inner')
+		const ticks = inner.radius * (1 + HUD.inner.tick)
+		assert.ok(toneArcs(radius, 0)[0].radius * widest < ticks - 4, `${radius}`)
+	}
 })

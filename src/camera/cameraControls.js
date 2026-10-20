@@ -1,7 +1,9 @@
 // Pointer controls that edit params.camera directly (the params stay the single
 // source of truth): drag orbits, shift- or right-drag pans the target, the
 // wheel changes the focus distance (and with it the magnification) within
-// `distanceLimits`, and the sensor height with it (`zoomSensor`). An orbit coasts after the drag lets go, for
+// `distanceLimits`, and the sensor height with it (`zoomSensor`); over the
+// HUD's aperture knob it changes the f-number within `fNumberLimits`
+// (apertureWheel()). An orbit coasts after the drag lets go, for
 // `controls.inertia`. The mouse also turns the view a little toward itself
 // (`controls.parallax` zoomed in, `controls.parallaxOut` zoomed out): a turn
 // of the orbit kept in `parallax`, not in the params, which
@@ -18,6 +20,8 @@ import {
 
 const ORBIT_DEGREES_PER_PIXEL = 0.12
 const ZOOM_PER_WHEEL_UNIT = 0.0012
+// The log of the f-number per wheel unit: a notch of 100 about 0.4 stop.
+const APERTURE_PER_WHEEL_UNIT = 0.0015
 
 export default class CameraControls {
 	constructor(element, schema, params, onChange) {
@@ -43,6 +47,12 @@ export default class CameraControls {
 		// step set (to notice another control taking over).
 		this.zoomTarget = null
 		this.zoomSet = null
+		// () => [widest, narrowest] f-numbers for the wheel over the HUD's
+		// aperture knob, or null; its target f-number, or null, and the
+		// f-number the last step set, as the zoom's.
+		this.fNumberLimits = null
+		this.fNumberTarget = null
+		this.fNumberSet = null
 		this.handleDown = this.handleDown.bind(this)
 		this.handleMove = this.handleMove.bind(this)
 		this.handleUp = this.handleUp.bind(this)
@@ -72,6 +82,7 @@ export default class CameraControls {
 	stop() {
 		this.velocity = null
 		this.zoomTarget = null
+		this.fNumberTarget = null
 	}
 
 	handleDown(event) {
@@ -171,6 +182,40 @@ export default class CameraControls {
 		this.onChange()
 	}
 
+	// A wheel step of `deltaY` over the HUD's aperture knob moves its target
+	// f-number, on a log scale (as f-stops run), up the wheel stopping down
+	// as it zooms in; stepAperture() eases camera.fNumber toward it with the
+	// zoom's lag. Steps add up on the target, which stays within
+	// `fNumberLimits` (from outside them it only moves back toward them).
+	apertureWheel(deltaY) {
+		const from = this.fNumberTarget ?? this.params.camera.fNumber
+		let fNumber = from * Math.exp(-deltaY * APERTURE_PER_WHEEL_UNIT)
+		if (this.fNumberLimits) {
+			const [min, max] = this.fNumberLimits()
+			fNumber = Math.min(Math.max(fNumber, Math.min(min, from)), Math.max(max, from))
+		}
+		if (fNumber === from) return
+		this.fNumberTarget = fNumber
+		this.fNumberSet = null
+	}
+
+	// One step of the f-number toward the aperture wheel's target, as
+	// stepZoom() does the distance; anything else that sets it meanwhile (the
+	// knob, a glide) takes over.
+	stepAperture(dt) {
+		if (this.fNumberTarget === null) return
+		const camera = this.params.camera
+		if (this.fNumberSet !== null && camera.fNumber !== this.fNumberSet) {
+			this.fNumberTarget = null
+			return
+		}
+		const lag = this.params.controls.zoomLag
+		this.set('camera.fNumber', zoomToward(camera.fNumber, this.fNumberTarget, dt, lag))
+		this.fNumberSet = camera.fNumber
+		if (camera.fNumber === this.fNumberTarget) this.fNumberTarget = null
+		this.onChange()
+	}
+
 	// Steps the coasting orbit and the parallax by `dt` seconds. `living`: the
 	// parallax follows the mouse; otherwise (a still eye, photo mode) it
 	// settles back to none, so the image that accumulates is params.camera's.
@@ -178,6 +223,7 @@ export default class CameraControls {
 	update(dt, living) {
 		if (this.velocity) this.coast(dt)
 		this.stepZoom(dt)
+		this.stepAperture(dt)
 		const { controls, camera } = this.params
 		const amplitude = parallaxReach(controls, camera.distance, this.distanceLimits?.())
 		const lag = controls.parallaxLag
