@@ -10,7 +10,7 @@ import {
 	apertureRadius,
 	apertureTrack,
 	apertureTrackArc,
-	apertureTrackTurn,
+	apertureFollowTurn,
 	circleDashes,
 	elasticZoomLevel,
 	hudAngles,
@@ -569,9 +569,10 @@ test('a desktop HUD has the aperture knob between the zoom and the spinning circ
 		assert.ok(length > 16, `${size}: ${length}`)
 	}
 	// Stretched as far as the drag can carry it past either end (a bound it
-	// never quite reaches), the line stays HUD.aperture.padding px short of
+	// never quite reaches), the lens stays HUD.aperture.padding px short of
 	// the line of the button's inner edge, HUD.aperture.edge px from its
-	// center along the circle, so it never meets the button's glyph (30 px,
+	// center along the circle, the button dragged along its share of the way
+	// (apertureFollowTurn()), so it never meets the button's glyph (30 px,
 	// its brackets as wide); without elasticity, at the ends themselves.
 	assert.ok(HUD.aperture.padding > 0)
 	for (const e of [0, elasticity, 0.1]) {
@@ -587,10 +588,21 @@ test('a desktop HUD has the aperture knob between the zoom and the spinning circ
 			]) {
 				const angle = knobAngle(level, track)
 				const side = angle - (inward * HUD.aperture.width) / 2 / ring
+				const dragged = button + apertureFollowTurn(level, track, 'zoom')
 				// Its side's distance along the button's tangent from its center.
-				const along = ring * Math.sin(inward * (side - button))
+				const along = ring * Math.sin(inward * (side - dragged))
 				const clear = HUD.aperture.edge + HUD.aperture.padding
-				assert.ok(near(along, clear, 0.05), `${e}, ${size}: ${along}`)
+				assert.ok(along >= clear - 0.05, `${e}, ${size}: ${along}`)
+				// Exactly clear for the longest track (HUD.aperture.extent 1).
+				const longest = { ...HUD, aperture: { ...HUD.aperture, extent: 1 } }
+				const full = apertureTrack(zoom.track, ring, e, longest)
+				const fullSide = knobAngle(level, full) - (inward * HUD.aperture.width) / 2 / ring
+				const fullDragged = button + apertureFollowTurn(level, full, 'zoom')
+				const fullAlong = ring * Math.sin(inward * (fullSide - fullDragged))
+				assert.ok(near(fullAlong, clear, 0.05), `${e}, ${size}: ${fullAlong}`)
+				// The track is HUD.aperture.extent of it, about the same middle.
+				assert.ok(near((track[1] - track[0]) / (full[1] - full[0]), HUD.aperture.extent))
+				assert.ok(near(track[0] + track[1], full[0] + full[1]))
 			}
 		}
 	}
@@ -607,16 +619,26 @@ test('a desktop HUD has the aperture knob between the zoom and the spinning circ
 	}
 })
 
-test('past an end the dashed arc of the aperture track follows the knob, half as far', () => {
+test("past an end the aperture knob drags its track, the zoom slider, the tones' arcs and Random eye along, less the farther", () => {
 	const track = [-0.2, 0.2]
-	for (const level of [0, 0.3, 1]) assert.ok(near(apertureTrackTurn(level, track), 0))
-	for (const level of [-0.2, -0.05, 1.05, 1.2]) {
-		const marker = knobAngle(level, track) - knobAngle(Math.min(Math.max(level, 0), 1), track)
-		const turn = apertureTrackTurn(level, track)
-		assert.ok(near(turn, marker * HUD.aperture.follow, 1e-12), `${level}`)
-		assert.ok(Math.sign(turn) === Math.sign(marker) && Math.abs(turn) < Math.abs(marker))
+	const { follow } = HUD.aperture
+	assert.ok(follow.track > follow.zoom && follow.zoom > follow.random && follow.random > 0)
+	assert.ok(
+		follow.arcs > follow.random && follow.arcs <= follow.zoom,
+		'the arcs as the zoom at most',
+	)
+	assert.ok(follow.track <= 1, 'no farther than the knob')
+	for (const layer of Object.keys(follow)) {
+		for (const level of [0, 0.3, 1]) assert.ok(near(apertureFollowTurn(level, track, layer), 0))
+		for (const level of [-0.2, -0.05, 1.05, 1.2]) {
+			const end = Math.min(Math.max(level, 0), 1)
+			const marker = knobAngle(level, track) - knobAngle(end, track)
+			const turn = apertureFollowTurn(level, track, layer)
+			assert.ok(near(turn, marker * follow[layer], 1e-12), `${layer} ${level}`)
+			assert.ok(Math.sign(turn) === Math.sign(marker))
+			assert.ok(Math.abs(turn) <= Math.abs(marker) + 1e-15)
+		}
 	}
-	assert.equal(HUD.aperture.follow, 0.5)
 })
 
 test('the zoom track lies on the zoom circle between its buttons, its dashes on the circle', () => {
@@ -644,6 +666,21 @@ test('the zoom track lies on the zoom circle between its buttons, its dashes on 
 			const angle = angles.zoomIn + s / radius
 			const onCircle = (((angle * radius) % period) + period) % period
 			const onArc = (s + dashOffset) % period
+			assert.ok(near(onArc, onCircle, 1e-6) || near(Math.abs(onArc - onCircle), period, 1e-6))
+		}
+		// Turned with its circle (the circle's dashes by a dash offset of
+		// -turn × radius), it moves along it, its dashes still on the circle's.
+		const turn = -0.03
+		const turned = zoomTrackArc(center, radius, angles.track, turn)
+		const [tx, ty] = turned.d.match(/-?[\d.]+/g).map(Number)
+		assert.ok(near(tx, center.cx + radius * Math.cos(angles.zoomIn + turn), 0.01))
+		assert.ok(near(ty, center.cy + radius * Math.sin(angles.zoomIn + turn), 0.01))
+		for (const s of [0, 7.5, 40]) {
+			const angle = angles.zoomIn + turn + s / radius
+			// Where the turned circle's pattern stands at that angle.
+			const along = angle * radius + turn * -radius
+			const onCircle = ((along % period) + period) % period
+			const onArc = (s + turned.dashOffset) % period
 			assert.ok(near(onArc, onCircle, 1e-6) || near(Math.abs(onArc - onCircle), period, 1e-6))
 		}
 	}

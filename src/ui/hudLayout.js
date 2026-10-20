@@ -50,12 +50,16 @@ export const HUD = Object.freeze({
 	// f-number (knobLevel()); its track keeps short enough of + and − that,
 	// even so stretched, the lens stays `padding` px short of their inner
 	// edges (`edge` px from their centers along the circle, their 30 px
-	// reticles'; apertureTrack()). It runs from the widest f-number by −
+	// reticles'), and is `extent` of the longest that could, about the same
+	// middle (apertureTrack()). It runs from the widest f-number by −
 	// (level 0) to the narrowest by + (level 1). Its hit area is `hit` px
-	// along the circle and as long as the lens hovered. Past an end, the
-	// dashed arc of its track follows it `follow` as far
-	// (apertureTrackTurn()). The tones' arcs scale with it, from `arcs[0]`
-	// wide open to `arcs[1]` stopped down (apertureArcScale()).
+	// along the circle and as long as the lens hovered. Past an end it drags
+	// the layers about it along, each about the center a share of its turn
+	// past the end, less the farther it is (`follow`, apertureFollowTurn()):
+	// the dashed arc of its track, the zoom slider as a block, the tones'
+	// three arcs as a block and Random eye.
+	// The tones' arcs scale with it, from `arcs[0]` wide open to `arcs[1]`
+	// stopped down (apertureArcScale()).
 	aperture: Object.freeze({
 		share: 0.55,
 		grow: 1.3,
@@ -65,8 +69,9 @@ export const HUD = Object.freeze({
 		width: 8,
 		rim: 2,
 		hit: 24,
-		stretch: 5,
-		follow: 0.5,
+		stretch: 8,
+		follow: Object.freeze({ track: 1, zoom: 0.6, arcs: 0.6, random: 0.24 }),
+		extent: 0.9,
 		arcs: Object.freeze([1.05, 0.9]),
 	}),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
@@ -259,16 +264,24 @@ export function apertureLens(length, hud = HUD) {
 // enough that the lens, even stretched past an end as far as an elastic drag
 // with `elasticity` can carry it (HUD.aperture.stretch times that share of
 // the track, a bound it never quite reaches; knobLevel()), stays
-// HUD.aperture.padding px short of the inner edge of + and of −: of `inset`
-// px, `clear` (the edge, the padding and half the lens's width) and the
-// stretch of the `span` px between the buttons less both insets.
+// HUD.aperture.padding px short of the inner edge of + and of −, which it
+// drags along its share of the way (HUD.aperture.follow.zoom), so it gains
+// on them only the rest: of `inset` px, `clear` (the edge, the padding and
+// half the lens's width) and that `reach` of the `span` px between the
+// buttons less both insets; then shortened about its middle to
+// HUD.aperture.extent of that length.
 export function apertureTrack([zoomIn, zoomOut], ring, elasticity = 0, hud = HUD) {
-	const { edge, padding, width, stretch } = hud.aperture
+	const { edge, padding, width, stretch, follow } = hud.aperture
 	const clear = edge + padding + width / 2
-	const reach = stretch * elasticity
+	const reach = stretch * elasticity * (1 - follow.zoom)
 	const span = (zoomOut - zoomIn) * ring
 	const inset = (clear + reach * span) / (1 + 2 * reach) / ring
-	return [zoomIn + inset, zoomOut - inset]
+	// The longest such track, taken in to HUD.aperture.extent of it: shorter,
+	// its stretch shrinks with it, so it keeps clear of the buttons.
+	const middle = (zoomIn + zoomOut) / 2
+	const half = (zoomOut - zoomIn - 2 * inset) / 2
+	const { extent } = hud.aperture
+	return [middle - half * extent, middle + half * extent]
 }
 
 // The dashed arc that marks the aperture knob's track, on its circle of
@@ -283,14 +296,16 @@ export function apertureTrackArc(center, ring, [from, to], hud = HUD) {
 	}
 }
 
-// The turn (radians, clockwise) of the dashed arc of the aperture knob's
-// `track` with the knob's marker at `level` (past an end while stretched):
-// none along the track; past an end, HUD.aperture.follow of the marker's
-// turn past it, the same way, so the arc is dragged along and comes back
-// with it.
-export function apertureTrackTurn(level, [from, to], hud = HUD) {
+// The turn (radians, clockwise) of a `layer` the aperture knob drags along
+// (HUD.aperture.follow: 'track', its dashed arc, 'zoom', the zoom slider,
+// 'arcs', the tones' arcs, or 'random', Random eye) with the knob's marker
+// at `level` on its `track`
+// (past an end while stretched): none along the track; past an end, the
+// layer's share of the marker's turn past it, the same way, so it is dragged
+// along and comes back with it.
+export function apertureFollowTurn(level, [from, to], layer = 'track', hud = HUD) {
 	const past = level - Math.min(Math.max(level, 0), 1)
-	return (from - to) * past * hud.aperture.follow
+	return (from - to) * past * hud.aperture.follow[layer]
 }
 
 // The dashes of a dashed circle of `radius` px, [dash, gap]: HUD.dash px
@@ -303,16 +318,18 @@ export function circleDashes(radius, hud = HUD) {
 }
 
 // The arc of the zoom's dashed circle of `radius` px about (cx, cy) between
-// its buttons, from zoom in to zoom out (`track`), drawn over the circle:
-// its SVG path, the circle's dashes (circleDashes()) and the dash offset
-// that lays them on the circle's own (an SVG circle's dashes start at its
-// right and run clockwise).
-export function zoomTrackArc(center, radius, [zoomIn, zoomOut], hud = HUD) {
-	const turn = 2 * Math.PI
+// its buttons, from zoom in to zoom out (`track`), drawn over the circle,
+// both turned `turn` radians clockwise (the zoom slider and its circle
+// dragged along by the aperture knob, apertureFollowTurn()): its SVG path,
+// the circle's dashes (circleDashes()) and the dash offset that lays them on
+// the circle's own (an SVG circle's dashes start at its right and run
+// clockwise; the circle's turn is a dash offset of -turn × radius).
+export function zoomTrackArc(center, radius, [zoomIn, zoomOut], turn = 0, hud = HUD) {
+	const round = 2 * Math.PI
 	return {
-		d: arcPath(center, radius, zoomIn, zoomOut),
+		d: arcPath(center, radius, zoomIn + turn, zoomOut + turn),
 		dashArray: circleDashes(radius, hud),
-		dashOffset: (((zoomIn % turn) + turn) % turn) * radius,
+		dashOffset: (((zoomIn % round) + round) % round) * radius,
 	}
 }
 

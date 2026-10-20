@@ -6,7 +6,7 @@ import {
 	apertureArcScale,
 	apertureLens,
 	apertureTrackArc,
-	apertureTrackTurn,
+	apertureFollowTurn,
 	circleDashes,
 	hudLayout,
 	knobAngle,
@@ -390,9 +390,9 @@ export function createHud({
 	// buttons lie on the zoom's circle (`zoom`).
 	const items = [
 		...toneButtons.map((button, i) => ({ button, angle: (angles, toned) => toned[i] })),
-		{ button: zoomIn, angle: (angles) => angles.zoomIn, zoom: true },
-		{ button: zoomOut, angle: (angles) => angles.zoomOut, zoom: true },
-		{ button: random, angle: (angles) => angles.random },
+		{ button: zoomIn, angle: (angles) => angles.zoomIn, zoom: true, follow: 'zoom' },
+		{ button: zoomOut, angle: (angles) => angles.zoomOut, zoom: true, follow: 'zoom' },
+		{ button: random, angle: (angles) => angles.random, follow: 'random' },
 	]
 	const toneItems = items.slice(0, toneButtons.length)
 
@@ -509,28 +509,57 @@ export function createHud({
 		const degrees = (turn * 180) / Math.PI
 		element.setAttribute('transform', `rotate(${degrees} ${placed.cx} ${placed.cy})`)
 	}
-	// Past an end, the dashed arc of the aperture's track turns about the
-	// center with the knob's marker, half as far (apertureTrackTurn()), and
-	// follows it back as it springs back.
+	// Past an end, the aperture knob drags the layers about it along, each
+	// about the center its share of the marker's turn past the end
+	// (apertureFollowTurn()), and they follow it back as it springs back: the
+	// dashed arc of its track, the zoom slider as a block (its buttons and
+	// their cuts, its knob, its white track and the dashes of the circle it
+	// lies on), the tones' three arcs as a block (a rotation in their
+	// transform, apart from the dash offsets their tone glides ease) and
+	// Random eye.
 	let apertureTrackAngles = null
-	let apertureLineTurn = null
-	const turnApertureLine = () => {
-		const level = apertureKnob.level
-		if (!placed?.aperture || !apertureTrackAngles || level === null) return
-		const turn = apertureTrackTurn(level, apertureTrackAngles)
-		const transform = `rotate(${(turn * 180) / Math.PI} ${placed.cx} ${placed.cy})`
-		if (transform === apertureLineTurn) return
-		apertureLineTurn = transform
-		apertureLine.setAttribute('transform', transform)
+	const dragged = { track: 0, zoom: 0, arcs: 0, random: 0 }
+	const followAperture = (force = false) => {
+		if (!placed) return
+		const level = placed.aperture && apertureTrackAngles ? apertureKnob.level : null
+		const layers = Object.keys(dragged)
+		const turns = layers.map((layer) =>
+			level === null ? 0 : apertureFollowTurn(level, apertureTrackAngles, layer),
+		)
+		if (!force && layers.every((layer, i) => dragged[layer] === turns[i])) return
+		layers.forEach((layer, i) => (dragged[layer] = turns[i]))
+		const degrees = (dragged.track * 180) / Math.PI
+		apertureLine.setAttribute('transform', `rotate(${degrees} ${placed.cx} ${placed.cy})`)
+		const zoomCircle = { ...placed, radius: placed.zoomRadius }
+		for (const item of items) {
+			if (!item.follow) continue
+			const angle = item.angle(placedAngles) + dragged[item.follow]
+			place(item.button, item.cut, angle, item.zoom ? zoomCircle : placed)
+		}
+		knob.setTurn(dragged.zoom)
+		arcs.forEach((_, i) => transformArc(i))
+		const zoomRing = placed.split ? zoomLine : line
+		zoomRing.style.strokeDashoffset = `${-dragged.zoom * placed.zoomRadius}px`
+		placeZoomTrack()
+	}
+	// The zoom's white track, between its buttons, turned with them and the
+	// circle's dashes.
+	const placeZoomTrack = () => {
+		const zoomCircle = { ...placed, radius: placed.zoomRadius }
+		const zoomTrack = zoomTrackArc(zoomCircle, zoomCircle.radius, placed.track, dragged.zoom)
+		zoomTrackLine.setAttribute('d', zoomTrack.d)
+		zoomTrackLine.setAttribute('stroke-dasharray', zoomTrack.dashArray.join(' '))
+		zoomTrackLine.style.strokeDashoffset = `${zoomTrack.dashOffset}px`
 	}
 	// The arcs also grow and shrink with the aperture about the center
 	// (apertureArcScale(); on a HUD without the knob they keep their size),
-	// their line kept 2 px wide (--arc-scale, style.css).
+	// their line kept 2 px wide (--arc-scale, style.css), and turn with the
+	// aperture knob past an end (`dragged.arcs`), on top of their sway.
 	let arcScale = 1
 	const transformArc = (i) => {
 		if (!placed) return
 		const { cx, cy } = placed
-		const degrees = (sway.arcs[i] * 180) / Math.PI
+		const degrees = ((sway.arcs[i] + dragged.arcs) * 180) / Math.PI
 		arcs[i].setAttribute(
 			'transform',
 			`translate(${cx} ${cy}) rotate(${degrees}) scale(${arcScale}) translate(${-cx} ${-cy})`,
@@ -635,10 +664,6 @@ export function createHud({
 		zoomLine.setAttribute('cy', circle.cy)
 		zoomLine.setAttribute('r', zoomCircle.radius)
 		zoomLine.setAttribute('stroke-dasharray', dashes(zoomCircle.radius))
-		const zoomTrack = zoomTrackArc(zoomCircle, zoomCircle.radius, angles.track)
-		zoomTrackLine.setAttribute('d', zoomTrack.d)
-		zoomTrackLine.setAttribute('stroke-dasharray', zoomTrack.dashArray.join(' '))
-		zoomTrackLine.style.strokeDashoffset = `${zoomTrack.dashOffset}px`
 		for (const element of [spin, spinTeeth]) {
 			element.setAttribute('cx', circle.cx)
 			element.setAttribute('cy', circle.cy)
@@ -673,7 +698,7 @@ export function createHud({
 			track: angles.track,
 			aperture: withAperture,
 		}
-		turnApertureLine()
+		followAperture(true)
 		placeSpin()
 		placeArcs()
 		// The sway turns about the center, which moved with the layout.
@@ -734,7 +759,7 @@ export function createHud({
 			// Its track keeps clear of + and − for the drag's elasticity.
 			if (getApertureElasticity() !== laidElasticity) layout()
 			apertureKnob.show(shown)
-			turnApertureLine()
+			followAperture()
 			if (apertureKnob.dragging) activate('aperture')
 			if (aperture !== null && Math.abs(shown - aperture) < 1e-4) return
 			if (aperture !== null) activate('aperture')
@@ -869,8 +894,12 @@ function trackKnob({
 	let circle = null
 	let shown = null
 	const marker = () => knobLevel(shown, getElasticity(), stretch)
+	// A turn of the whole track about the circle's center (radians), as
+	// another knob drags it along (setTurn()).
+	let turn = 0
 	const update = () => {
-		if (circle && shown !== null) place(element, cut, knobAngle(marker(), circle.track), circle)
+		if (!circle || shown === null) return
+		place(element, cut, knobAngle(marker(), circle.track) + turn, circle)
 	}
 	const set = (level) => onLevel(clamp01(level))
 
@@ -978,6 +1007,11 @@ function trackKnob({
 		setTrack(value) {
 			if (drag) release({ pointerId: drag.id }, false)
 			circle = value
+			update()
+		},
+		setTurn(value) {
+			if (value === turn) return
+			turn = value
 			update()
 		},
 		show(level) {
