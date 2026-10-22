@@ -27,9 +27,12 @@ import { splitLines } from './splitLines'
 
 // The intro's timeline, in seconds from its start. Each part starts at its
 // `at` and takes its `duration` with its GSAP `ease`; the rest is relative to
-// them. Left unfrozen, so it can be tried out from the console
-// (window.__EYE__.getIntroConfig()) and replayed (replayIntro()).
+// them. `scale` sets the length of the whole: every time below is multiplied
+// by it (0.8 plays the intro a fifth faster, parts, staggers, the shuffle's
+// reel and the blink alike). Left unfrozen, so it can be tried out from the
+// console (window.__EYE__.getIntroConfig()) and replayed (replayIntro()).
 export const INTRO = {
+	scale: 0.8,
 	// The black mask over the image opens with a straight, sharp cut that
 	// travels along `angle` (degrees counterclockwise from the right: 45 from
 	// the bottom left corner to the top right), square to it.
@@ -393,8 +396,10 @@ export function createIntro({
 	const build = () => {
 		ended = false
 		mask.hidden = false
-		const master = gsap.timeline({ id: 'intro', paused: true, onComplete: () => dev || end() })
-		master
+		// The parts at the times of INTRO, played `scale` times as long in the
+		// timeline main.js and GSDevTools see (whose speed is their own).
+		const parts = gsap.timeline()
+		parts
 			.add(revealPart(), INTRO.reveal.at)
 			.add(cameraPart(), INTRO.camera.at)
 			.add(shufflePart(), INTRO.shuffle.at)
@@ -403,8 +408,9 @@ export function createIntro({
 			.add(textsPart(), INTRO.texts.at)
 		// The eye blinks first as the rest ends.
 		blinks?.hold()
-		master.call(() => blinks?.first(), [], master.duration() + INTRO.blink.delay)
-		return master
+		parts.call(() => blinks?.first(), [], parts.duration() + INTRO.blink.delay)
+		parts.timeScale(1 / INTRO.scale)
+		return gsap.timeline({ id: 'intro', paused: true, onComplete: () => dev || end() }).add(parts)
 	}
 
 	const start = async () => {
@@ -439,8 +445,9 @@ export function createIntro({
 			}
 			start()
 		},
-		// The GSAP timeline of the last build (null before the first): seek,
-		// pause or slow it from the console to look at a moment of it.
+		// The GSAP timeline of the last build (null before the first), its
+		// times those of INTRO times `scale`: seek, pause or slow it from the
+		// console to look at a moment of it.
 		get timeline() {
 			return timeline
 		},
