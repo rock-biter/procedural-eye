@@ -6,9 +6,9 @@
 
 | Module | Responsibility |
 | --- | --- |
-| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`), `RenderSetup`, `EyeApp`, `window.__EYE__`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom knob, Zoom out, the aperture knob on desktops, and Random eye), the title, the tab's title while the page is hidden, the T-800's eye in the console and its report of each shot of the volume cannon, the credit line with the sound toggle and the volume slider, the viewport size and the frame rate, the sound design (the audio engine and the camera foley, fed once a frame by a loop of their own), the intro (held until the app has started, the fonts have loaded and the color tables of its reel of random irises are built, then played; its camera's framings and moves, and the irises it switches through) and, while the URL ends in `#debug`, the collapsed panel with its actions and the sound audition (loaded on demand), and with `?meshtree=1` the mesh tree (also loaded on demand, with or without the HUD). Builds the target params of presets (which keep the viewer's `sound.volume`), random eyes, zooms, the aperture knob's spring back and skin tones, and sets the zoom and aperture levels, including the HUD’s elastic drags and the right-drag over the image (`sideDrag`), and supplies unclamped progress for their return; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
-| [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions, and switches leaves at once without one (`switchParams()`, the intro's shuffle of irises); poses the eye, its blinks held until the intro ends (`holdBlinks()`); drives the accumulation; exposes the API. |
-| [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, adaptive pixel ratio, frame telemetry. |
+| [`main.js`](../main.js) | Bootstrap: URL flags, params (preset, then `?state=`; the presets imported only for `?preset=`), `RenderSetup`, `EyeApp`, and, unless `?gui=0`, the frame around the page, the HUD (the skin tones, Zoom in, the zoom knob, Zoom out, the aperture knob on desktops, and Random eye), the title, the tab's title while the page is hidden, the T-800's eye in the console and its report of each shot of the volume cannon, the credit line with the sound toggle and the volume slider, the viewport size and the frame rate, the sound design (the audio engine and the camera foley, fed once a frame by a loop of their own), the intro (held until the app has started, the fonts have loaded and the color tables of its reel of random irises are built, then played; its camera's framings and moves, and the irises it switches through); on request only, the development tools ([`src/debug/devTools.js`](../src/debug/devTools.js), [`docs/DEVELOPMENT.md`](DEVELOPMENT.md#url-flags)). Builds the target params of presets (which keep the viewer's `sound.volume`), random eyes, zooms, the aperture knob's spring back and skin tones, and sets the zoom and aperture levels, including the HUD’s elastic drags and the right-drag over the image (`sideDrag`), and supplies unclamped progress for their return; on portrait screens the start-up params and presets take `camera.targetZ` 0. |
+| [`src/app.js`](../src/app.js) | `EyeApp`: owns every system and the frame loop; routes parameter changes by schema `kind`; runs transitions, and switches leaves at once without one (`switchParams()`, the intro's shuffle of irises); poses the eye, its blinks held until the intro ends (`holdBlinks()`); drives the accumulation; the calls of the snapshot and the development tools (`getState()`, `setParams()`, `capture()`, `renderInteractive()`). |
+| [`src/renderSetup.js`](../src/renderSetup.js) | Renderer, scene, window size, the phone profile (`mobile`) and the adaptive pixel ratio. |
 | **Parameters** | |
 | [`src/params/paramSchema.js`](../src/params/paramSchema.js) * | `PARAM_SCHEMA`: every tunable value with default, range, unit and `kind`, the defaults taken from `defaults.json`; `BASE_PARAM_SCHEMA`, the same with the fallback defaults; `DEBUG_VIEWS`. |
 | [`src/params/defaults.json`](../src/params/defaults.json) | The default values, as exported by the panel's **Export defaults JSON**. |
@@ -29,7 +29,7 @@
 | [`src/iris/irisAtlas.js`](../src/iris/irisAtlas.js) | GPU bake of the structure and pigment atlases. |
 | [`src/iris/irisColor.js`](../src/iris/irisColor.js) * | Spectral Kubelka–Munk model of the iris layers and its lookup table. |
 | [`src/iris/irisColorLut.js`](../src/iris/irisColorLut.js) | The lookup as a half-float `Data3DTexture`, rebuilt when the layer model changes, crossfaded during transitions; the last 32 tables kept by their model, and tables built ahead in workers (`prepare()`, `has()`). |
-| [`src/iris/irisColorLut.worker.js`](../src/iris/irisColorLut.worker.js) | Builds the tables `prepare()` asks for off the main thread, about 40 ms each. |
+| [`src/iris/irisColorLut.worker.js`](../src/iris/irisColorLut.worker.js) | Builds the tables `prepare()` asks for off the main thread, a few milliseconds each. |
 | **Adnexa and sclera** ([`docs/ADNEXA.md`](ADNEXA.md)) | |
 | [`src/adnexa/fissure.js`](../src/adnexa/fissure.js) * | The palpebral fissure: the margins between the canthi, their closure. |
 | [`src/adnexa/periocular.js`](../src/adnexa/periocular.js) * | The margins' support, the conjunctiva with the lacus, caruncle and plica, the face around the orbit (thin-plate spline). |
@@ -77,6 +77,10 @@
 | [`src/render/drawOrder.js`](../src/render/drawOrder.js) | The scene's draw order (`renderOrder` per mesh), written out rather than left to the renderer's sort. |
 | [`src/render/dustPass.js`](../src/render/dustPass.js) | The dust motes as their images blurred by the lens, added over the depth of field's output before the effects. |
 | [`src/render/pngMetadata.js`](../src/render/pngMetadata.js) * | `tEXt` chunks and CRC for exported PNGs. |
+| [`src/render/precompile.js`](../src/render/precompile.js) | The start-up compile: each job a scene, a camera, a target and the material swaps of its variants, all through `compileAsync()`. |
+| [`src/debug/devTools.js`](../src/debug/devTools.js) | The development tools, a chunk loaded only on request: the console API, the frame telemetry, the presets, the panel, the mesh tree, the sound meter and the `?stats` overlay ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#url-flags)). |
+| [`src/debug/frameStats.js`](../src/debug/frameStats.js) | Frame telemetry (CPU and GPU time, frame intervals, draw calls), from the moment the development tools load. |
+| [`src/debug/panel.js`](../src/debug/panel.js) | The panel of `#debug`: the schema's folders, the actions, the random ancestry, the transition and the sound audition. |
 | [`src/debug/gui.js`](../src/debug/gui.js) | Tweakpane panel generated from the schema. |
 | [`src/debug/meshTree.js`](../src/debug/meshTree.js) | The mesh tree of `?meshtree=1`: the scene graph at the left, with each object's visibility and each mesh's wireframe and vertex count ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#mesh-tree)). |
 | [`src/debug/debugViews.js`](../src/debug/debugViews.js) * | Debug view numbering (`DEBUG_VIEW` define). |
@@ -97,11 +101,19 @@
 | [`src/audio/impulse.js`](../src/audio/impulse.js) * | The reverb's synthetic impulse response. |
 | [`src/meshLayout.js`](../src/meshLayout.js) * | Vertices spaced by the surface's bend (the chord's sagitta under a tolerance), density integrals and even placement under them, rings of different counts zipped by angle: for the lids, the back shell and the eyeball. |
 | [`src/math.js`](../src/math.js) *, [`src/random.js`](../src/random.js) * | Scalar and vector helpers; seeds, PCG hash twin, weighted picks, Gaussian samples. |
-| [`src/frameStats.js`](../src/frameStats.js), [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | Frame telemetry and the adaptive resolution rules (from the terrain project). |
+| [`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) * | The adaptive resolution rules, with the phone profile ([Adaptive Resolution](#adaptive-resolution)). |
 
 ## Frame Loop
 
-`EyeApp.start()` applies the initial rebuild and bake, bakes the skin's relief (outside `#debug`; `main.js` sets the mode from the hash before it, and again on every hash change through `setSkinBaked()`), and renders one frame. It then compiles every program with `renderer.compileAsync()` (recorded as `getCompileMs()`) before the first animation frame. `EyeApp.frame()` then runs on every animation frame:
+`EyeApp.start()` overlaps the compile with the CPU work of the first rebuild, and draws nothing before the first animation frame:
+
+1. It hands every program of the post-processing and the bakes to `compileAsync()` (`precompile()`, [`src/render/precompile.js`](../src/render/precompile.js)): the scene pass, the accumulation, the depth of field's five materials, the dust, the effects and the antialiasing, the iris atlases, the skin's patterns, relief and freckles, and the soft coverages' reduce and blur. Each job draws into the target it will draw into, so the program cache keys match; where `KHR_parallel_shader_compile` exists the driver links them while the main thread goes on.
+2. The initial rebuild; a living eye that blinks posts the blink's frames to the worker at once.
+3. The scene's programs, now that its meshes carry their morph targets, with the lids' and lashes' shadow proxies drawn with the shadow map's material.
+4. The initial bake, the skin's relief (outside `#debug`; `main.js` sets the mode from the hash before it, and again on every hash change through `setSkinBaked()`), and the camera and light rig of the first pose (its pupil weighs their light).
+5. It waits for the programs (`getCompileMs()` records the whole start), and asks for the first frame.
+
+`EyeApp.frame()` then runs on every animation frame:
 
 1. **Transition** ([below](#transitions)): a running transition writes its next values, marks their kinds dirty, crossfades the color lookup and restarts the accumulation. Its time step is capped at 0.1 s, so a long frame does not skip it.
 2. **Pending dirty kinds**
@@ -109,27 +121,27 @@
      - the eye geometry (`createEyeGeometry()`);
      - the entrance-pupil depth the camera aims at;
      - the eyeball mesh;
-     - the lid mesh with the back shell, its skin patterns (baked on the GPU) and the fissure map (baked in JS into the first channel of a half-float texture), only when the lids, `shell.clearance`, `shell.band` or the eye geometry changed: together they take about 0.8 s;
+     - the lid mesh with the back shell (the lid ring about 0.35 s in Node on an M1), its skin patterns (baked on the GPU) and the fissure map (baked in JS into the first channel of a half-float texture, 0.1 s), only when the lids, `shell.clearance`, `shell.band` or the eye geometry changed;
      - the lashes and the tear film;
      - the blink's frames no longer fit: `LidBlink.invalidate()` keeps the lids open until a living eye asks for new ones (step 4).
 
      A rebuild always bakes too.
    - `bake`:
      - the iris rest space;
-     - the structure and pigment atlases (GPU, under a millisecond);
-     - the color lookup (spectral model in JS, about 35 ms), only when the layer model changed, and not while it crossfades; a table kept or built ahead (`IrisColorLut.prepare()`) is only uploaded;
+     - the structure atlas (GPU, under a millisecond), only when a structure leaf or the rest space (the iris's radius, the pupil and the collarette at rest) changed, and the pigment atlas, which reads the structure, when it or a color leaf changed;
+     - the color lookup (spectral model in JS, a few milliseconds), only when the layer model changed, and not while it crossfades; a table kept or built ahead (`IrisColorLut.prepare()`) is only uploaded;
      - the scleral vessel map, only when its parameters or the globe changed.
    - `define`: the debug view define of the eyeball, lid, back shell and lash materials. The tone-mapping mode is set by the post-processing every frame; `postprocessing` recompiles it.
    - **Skin relief** (`bakeSkin()`): outside `#debug`, when no transition runs, the skin's relief and freckles bake again if the lid mesh, `lids.seed`, `skin.pores`, `skin.wrinkles` or `skin.freckles` changed (about 30 ms). These leaves stay of kind `uniform`: in `#debug` the skin reads them every frame.
 3. **Controls**: `CameraControls.update()` steps a coasting orbit (which restarts the accumulation as a drag does) and the mouse parallax, which restarts it while it moves ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
 4. **Pose** (`pose()`, [`docs/ANIMATION.md`](ANIMATION.md))
    - A living eye steps the animator and restarts the accumulation.
-   - A living eye that blinks (`animation.blinkRate` above 0) asks for the blink's frames when they are stale: `LidBlink.prepare()` posts the params to the worker, which builds them in about 1.3 s (in Node on an M1; a quarter of a second when only the lashes or the meniscus changed) while the frame loop runs on. The pose's blink sets the meshes' morph weights and `uLidBlink` (`LidBlink.set()`), 0 until the frames arrive ([`docs/ANIMATION.md`](ANIMATION.md#blink)).
+   - A living eye that blinks (`animation.blinkRate` above 0) asks for the blink's frames when they are stale: `LidBlink.prepare()` posts the params and the layout of the lids at rest to the worker, which builds them in about 0.6 s (in Node on an M1; a quarter of a second when only the lashes or the meniscus changed) while the frame loop runs on. The pose's blink sets the meshes' morph weights and `uLidBlink` (`LidBlink.set()`), 0 until the frames arrive ([`docs/ANIMATION.md`](ANIMATION.md#blink)).
    - In photo mode it keeps its instant, with the lids open.
    - A still eye (`animation.enabled` off) is posed by its parameters whenever the image restarts.
    - The pose also gives the line of sight the camera frames.
 5. **Convergence**: once the accumulation holds `quality.photoSamples` samples, the frame returns. The canvas keeps the converged image. Out of photo mode the dust still drifts over it (`dustDrifts`): `renderDisplay()` shows the mean again with this instant's dust, at most 30 times a second, without the scene pass or a sample (the composite, the dust and the effects). The dust's clock (`dustTime`) runs with the frame time unless the eye is frozen.
-6. **Adaptive resolution**: before a fresh frame is drawn, the interval since the last frame feeds the adaptive pixel ratio. Accumulating frames do not, because a resize restarts the accumulation. The resize comes before drawing: a canvas resized after it is cleared, and the browser would show a black frame.
+6. **Adaptive resolution** ([below](#adaptive-resolution)): before a fresh frame is drawn, the interval since the last frame feeds the adaptive pixel ratio, when the frame before it was fresh too. Accumulating frames do not, because a resize restarts the accumulation, and neither does the first fresh frame after them, whose interval spans the pause. The resize comes before drawing: a canvas resized after it is cleared, and the browser would show a black frame.
 7. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field. When the next frame restarts the image anyway (a living eye, a running transition), it is shown without being kept in the accumulation ([`docs/RENDERING.md`](RENDERING.md#pipeline)); `capture()` then renders and keeps one first.
    - Later frames take `accumulationSample(n)`: a subpixel jitter, a point on the lens and a point on the key light.
@@ -141,6 +153,16 @@
      5. `ShaftLight` sets the light shafts' source, blades (swaying and flickering on the dust's clock), cookie (baked again when their layout changed or they moved) and light; on fresh frames it redraws their shadow and coverage when its inputs changed. Moving shafts restart the image every frame (`shaftsMove`), as a living eye does. `Backdrop` takes the clear color and the shadow plane.
      6. The eyeball, lid and lash uniforms are refreshed from the params; the lashes' widening from the camera's distance between the screen's zoom distances (`lashWidening()`, [`docs/ADNEXA.md`](ADNEXA.md#lashes)).
      7. The post-processing updates the lens of the depth of field and its fade, then the haze, the shafts' origin and the dust (`updateAtmosphere()`: the pinhole camera, the rig and the dust's clock), then the composer renders.
+
+## Adaptive Resolution
+
+[`src/adaptivePixelRatio.js`](../src/adaptivePixelRatio.js) (pure, applied by `RenderSetup`) sets the pixel ratio between `quality.minPixelRatio` and the display's, capped at 2, from the intervals of consecutive fresh frames (`quality.adaptiveResolution`; `?dpr=` pins it):
+
+- **Windows**: the intervals are gathered over windows of half a second, the slowest fifth of each left out (the hitches a lower resolution would not fix) and longer ones (250 ms: a compile, a hidden tab) skipped. A window is slow when its mean exceeds the budget, `maxFrameMs`.
+- **Down**: four slow windows in a row (two seconds) lower the ratio by as many steps as the measured time asks for (the cost goes with the pixel count, the square of the ratio), at most `maxDropSteps`.
+- **Up**: four windows within budget try a step higher. Two slow windows during a try undo it and double the wait before the next (up to 20 s); twenty windows (10 s) confirm it. `EyeApp.endTransition()` resets the wait: a new scene may hold a ratio that failed before.
+- **Desktops** keep the budget at 36 ms (the iris targets 30 fps; a frame rate locked at 30 by vsync keeps its resolution), with steps of 0.2.
+- **Phones and tablets** (`RenderSetup.mobile`: a coarse pointer, or `?mobile=1`) target 60 fps (`MOBILE_PIXEL_RATIO`: 20 ms, steps of 0.1, one step per drop). Under vsync a phone just slower than 16.7 ms a frame shows 30 fps, and a budget of 30 fps would hold it there for good, as a warming GPU does after a few minutes; at 60 fps it lowers the resolution a step at a time until 60 fps hold again, and tries the higher one later. `?stats` shows the ratio and its windows on the phone ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#url-flags)).
 
 ## Parameter Routing
 
@@ -156,10 +178,10 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 | Leaf | Change |
 | --- | --- |
 | Numbers and colors | Glide along a minimum-jerk curve; colors in linear sRGB. In-between values are not snapped to the slider step. |
-| Toggles, choices, `discrete` numbers (seeds, counts), kinds `rebuild` and `define` | Switch at the start. Geometry cannot glide: a lid rebuild bakes the fissure map, which takes about 0.3 s. |
+| Toggles, choices, `discrete` numbers (seeds, counts), kinds `rebuild` and `define` | Switch at the start. Geometry cannot glide: a lid rebuild (the lid ring and the fissure map) takes about half a second. |
 | A toggle that `fades` a sibling (a light's `enabled`) | Turns on at the start with its `intensity` gliding up from zero, or fades the intensity to zero and turns off at the end. |
 
-- **Color lookup**: building it takes about 35 ms, too much for every frame. At the start, `IrisColorLut.beginBlend()` builds the target table once (or takes it kept); every frame then mixes the old and the new table with the transition's progress (`setBlend()`). The pigment atlas re-bakes every frame (under a millisecond).
+- **Color lookup**: building it takes a few milliseconds of the main thread, too much for every frame of a glide. At the start, `IrisColorLut.beginBlend()` builds the target table once (or takes it kept); every frame then mixes the old and the new table with the transition's progress (`setBlend()`). The pigment atlas re-bakes every frame its leaves glide (under a millisecond), the structure atlas only while a structure leaf glides.
 - **Pose**: when the transition changes where the pose comes from, the pose blends too ([`docs/ANIMATION.md`](ANIMATION.md#modes)).
 - **Duration**: the panel's **transition (s)** (1 s by default; 0 switches at once); a zoom takes `zoom.duration`. Captures and `?preset=` at start-up do not glide.
 - **Interruptions**:
@@ -188,6 +210,7 @@ The panel, the camera controls and `window.__EYE__.setParams()` all edit the one
 - **Seeds**: they are separate per subsystem (`irisStructure.seed`, `lashes.seed`, `lids.seed` for the lid shape, folds and skin patterns, `sclera.vessels.seed`), so a new crypt pattern keeps the same lashes.
 - **Presets** ([`src/params/presets.js`](../src/params/presets.js)): deep partial overrides of the defaults.
   - Choosing one in the panel glides to its overrides on the defaults ([Transitions](#transitions)).
+  - They load only with the development tools or `?preset=` (a chunk of their own): the page needs none, its default being the defaults themselves.
   - Each reference preset names its photographs (`references`, shown by the capture contact sheet).
   - Reference presets keep the living eye off, so their pupil and gaze are the tuned ones, and the air clear (no dust, no haze, no light shafts), as in their photographs.
   - They also pin the frontal 100 mm framing they were tuned with (`frontal`). The default camera looks from 26° to the side and 7.8° below, with a 110 mm lens.

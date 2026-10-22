@@ -1,7 +1,7 @@
-// Frame telemetry read by window.__INFINITE_WORLD__.getRenderStats(): the
-// interval between frames, the main-thread time of the frame loop and of each
-// of its stages, the draw calls and triangles of every render pass of the
-// last frame, and the GPU time per frame where the browser exposes
+// Frame telemetry of the development tools (src/debug/devTools.js), read by
+// window.__EYE__.getRenderStats(): the interval between rendered frames, the
+// main-thread time of each, the draw calls and triangles of every render pass
+// of the last frame, and the GPU time per frame where the browser exposes
 // EXT_disjoint_timer_query_webgl2. Each frame only writes numbers into fixed
 // ring buffers; percentiles are computed when the stats are read.
 
@@ -92,30 +92,26 @@ export class GpuTimer {
 	}
 }
 
-// Call beginFrame() first in the frame loop, mark(stage) after each stage,
-// and endFrame() after the last render. Draw counters cover every render of
-// the frame (shadow maps, scene, post-processing), so it turns off the
-// renderer's per-render reset. GPU timing starts on the first getStats()
-// call, so a page nobody profiles never issues a query.
+// Call beginFrame() before a frame's renders and endFrame() after the last.
+// Draw counters cover every render of the frame (shadow maps, scene,
+// post-processing), so it turns off the renderer's per-render reset. GPU
+// timing starts on the first getStats() call, so a page nobody profiles never
+// issues a query.
 export default class FrameStats {
 	constructor(renderer, { capacity = FRAME_STATS_CAPACITY } = {}) {
 		this.renderer = renderer
-		this.capacity = capacity
 		renderer.info.autoReset = false
 		this.interval = new SampleWindow(capacity)
 		this.cpu = new SampleWindow(capacity)
 		this.gpu = new SampleWindow(capacity)
-		this.stages = new Map()
 		this.gpuTimer = null
 		this.lastTimestamp = null
 		this.frameStart = 0
-		this.markTime = 0
 		this.drawCalls = 0
 		this.triangles = 0
 	}
 
-	// `timestamp` is the requestAnimationFrame time.
-	beginFrame(timestamp) {
+	beginFrame(timestamp = performance.now()) {
 		if (this.lastTimestamp !== null) {
 			const interval = timestamp - this.lastTimestamp
 			if (interval <= MAX_FRAME_INTERVAL) this.interval.push(interval)
@@ -123,20 +119,7 @@ export default class FrameStats {
 		this.lastTimestamp = timestamp
 		this.renderer.info.reset()
 		this.gpuTimer?.begin()
-		this.frameStart = this.markTime = performance.now()
-	}
-
-	// Attributes the main-thread time since the previous mark (or beginFrame)
-	// to `stage`.
-	mark(stage) {
-		const now = performance.now()
-		let samples = this.stages.get(stage)
-		if (!samples) {
-			samples = new SampleWindow(this.capacity)
-			this.stages.set(stage, samples)
-		}
-		samples.push(now - this.markTime)
-		this.markTime = now
+		this.frameStart = performance.now()
 	}
 
 	endFrame() {
@@ -161,9 +144,6 @@ export default class FrameStats {
 			cpu: this.cpu.summarize(),
 			gpu: this.gpu.summarize(),
 			gpuSupported: this.gpuTimer.supported,
-			stages: Object.fromEntries(
-				[...this.stages].map(([stage, samples]) => [stage, samples.summarize()]),
-			),
 			drawCalls: this.drawCalls,
 			triangles: this.triangles,
 			programs: info.programs?.length ?? 0,

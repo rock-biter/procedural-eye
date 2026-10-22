@@ -2,7 +2,6 @@
 // binding per leaf. Bindings edit the params object in place and report the
 // changed path; app listeners refresh the panel when something else (the
 // camera controls, a preset) changes the values.
-import * as EssentialsPlugin from '@tweakpane/plugin-essentials'
 import { Pane } from 'tweakpane'
 import { isLeaf, leafType } from '../params/params'
 
@@ -44,8 +43,6 @@ function buildFolder(container, schema, values, prefix, onChange) {
 // `actions`: [{ title, run }] buttons above the folders; `presets`: { name: { label } }.
 export function createGui({ schema, params, onChange, actions = [], presets = null, onPreset }) {
 	const pane = new Pane({ title: 'Procedural eye', expanded: false })
-	pane.registerPlugin(EssentialsPlugin)
-	const fps = pane.addBlade({ view: 'fpsgraph', label: 'fps', rows: 2 })
 	if (presets) {
 		const state = { preset: Object.keys(presets)[0] }
 		pane
@@ -66,5 +63,5 @@ export function createGui({ schema, params, onChange, actions = [], presets = nu
 			refreshing = false
 		}
 	}
-	return { pane, fps, refresh }
+	return { pane, refresh }
 }

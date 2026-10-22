@@ -1,5 +1,5 @@
-// The renderer and its window: canvas, scene, drawing-buffer size, frame
-// telemetry and the adaptive pixel ratio. Everything renders through the
+// The renderer and its window: canvas, scene, drawing-buffer size and the
+// adaptive pixel ratio. Everything renders through the
 // offscreen post-processing chain (src/render/postProcessing.js), so the
 // canvas needs neither depth nor alpha nor MSAA.
 import { NoToneMapping, Scene, SRGBColorSpace, Vector2, WebGLRenderer } from 'three'
@@ -7,9 +7,9 @@ import {
 	AdaptivePixelRatio,
 	createAdaptivePixelRatioSettings,
 	getMaxPixelRatio,
+	MOBILE_PIXEL_RATIO,
 	parsePixelRatio,
 } from './adaptivePixelRatio'
-import FrameStats from './frameStats'
 
 // The focus distance (mm) of background pixels: far enough to count as
 // infinity, and finite in the half-float scene buffer (at most 65504), where
@@ -36,9 +36,15 @@ export default class RenderSetup {
 
 		this.scene = new Scene()
 		this.sizes = { width: window.innerWidth, height: window.innerHeight }
-		this.frameStats = new FrameStats(this.renderer)
 		this.pinnedPixelRatio = parsePixelRatio(urlParams)
+		// Phones and tablets (a coarse pointer) target 60 fps, a step at a time
+		// (src/adaptivePixelRatio.js). ?mobile=1 or ?mobile=0 forces the
+		// profile, to try one on the other.
+		this.mobile = urlParams.has('mobile')
+			? urlParams.get('mobile') !== '0'
+			: window.matchMedia('(pointer: coarse)').matches
 		this.pixelRatioSettings = createAdaptivePixelRatioSettings({
+			...(this.mobile ? MOBILE_PIXEL_RATIO : {}),
 			enabled: params.quality.adaptiveResolution && this.pinnedPixelRatio === null,
 			min: params.quality.minPixelRatio,
 		})
@@ -85,9 +91,5 @@ export default class RenderSetup {
 	getDrawingBufferSize() {
 		const size = this.renderer.getDrawingBufferSize(this.drawingBufferSize)
 		return { width: size.x, height: size.y }
-	}
-
-	getStats() {
-		return { ...this.frameStats.getStats(), adaptivePixelRatio: this.adaptivePixelRatio.getStats() }
 	}
 }

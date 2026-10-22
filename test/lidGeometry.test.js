@@ -714,3 +714,27 @@ test('the fissure distance is positive in the opening and negative under the lid
 	assert.ok(signedFissureDistance(polygon, 0, params.lids.mrd1 + 2) < -1.9)
 	close(signedFissureDistance(polygon, 0, -params.lids.mrd2), 0, 0.05, 'on the lower margin')
 })
+
+test('the fissure map is signedFissureDistance() at every texel, to the bit', async () => {
+	const { bakeFissureMap, FISSURE_MAP, fissurePolygon, signedFissureDistance } =
+		await import('../src/adnexa/fissureMap')
+	const cases = [
+		[params.lids, 1],
+		[params.lids, -1],
+		[{ ...params.lids, closure: 1 }, 1],
+		[{ ...params.lids, fissureWidth: 25, mrd1: 1.5, canthalTilt: -3 }, -1],
+	]
+	for (const [lids, side] of cases) {
+		const polygon = fissurePolygon(lids, side)
+		const naive = new Float32Array(FISSURE_MAP.size * FISSURE_MAP.size)
+		for (let j = 0; j < FISSURE_MAP.size; j++) {
+			const y = ((j + 0.5) / FISSURE_MAP.size - 0.5) * 2 * FISSURE_MAP.halfHeight
+			for (let i = 0; i < FISSURE_MAP.size; i++) {
+				const x = ((i + 0.5) / FISSURE_MAP.size - 0.5) * 2 * FISSURE_MAP.halfWidth
+				naive[j * FISSURE_MAP.size + i] = signedFissureDistance(polygon, x, y)
+			}
+		}
+		const baked = bakeFissureMap(lids, side)
+		assert.deepEqual(new Uint32Array(baked.buffer), new Uint32Array(naive.buffer))
+	}
+})

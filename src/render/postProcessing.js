@@ -26,6 +26,7 @@ import filmGrainFragmentShader from '../shaders/film-grain-fragment.glsl'
 import AccumulationPass from './accumulationPass'
 import DofPass from './dofPass'
 import DustPass from './dustPass'
+import { withMaterial } from './precompile'
 import ScenePass from './scenePass'
 
 const TONE_MAPPING_MODES = {
@@ -154,12 +155,6 @@ export default class PostProcessing {
 		this.composer.addPass(this.antialiasPass)
 	}
 
-	setCamera(camera) {
-		this.renderPass.mainCamera = camera
-		this.effectPass.mainCamera = camera
-		this.antialiasPass.mainCamera = camera
-	}
-
 	// `camera`: { focalLength, fNumber, focusDistance, sensorHeight }; the
 	// interactive depth of field fades out over the first 16 accumulated samples.
 	update(params, size, camera) {
@@ -167,7 +162,7 @@ export default class PostProcessing {
 		this.dof.setLens({ ...camera, heightPx: size.height })
 		const samples = this.accumulation.samples
 		this.dof.weight = 1 - Math.min(1, Math.max(0, (samples - 1) / 15))
-		this.toneMapping.mode = TONE_MAPPING_MODES[post.toneMapping] ?? ToneMappingMode.AGX
+		this.setToneMapping(params)
 		this.renderer.toneMappingExposure = 2 ** params.camera.exposure
 		this.colorGrade.setGrade(post, params.camera.whiteBalance)
 		// Lateral aberration in pixels, as a fraction of the buffer size.
@@ -179,6 +174,32 @@ export default class PostProcessing {
 		this.grain.intensity = post.grain
 		// Faded out with the interactive depth of field, as samples accumulate.
 		this.fxaa.blendMode.opacity.value = this.antialias ? this.dof.weight : 0
+	}
+
+	// The tone mapping operator, a define of the effect pass's program: set
+	// before it is compiled (src/app.js) and every frame (a change recompiles).
+	setToneMapping(params) {
+		this.toneMapping.mode = TONE_MAPPING_MODES[params.post.toneMapping] ?? ToneMappingMode.AGX
+	}
+
+	// The programs of the passes as start-up compile jobs (src/render/precompile.js).
+	programs() {
+		const target = this.composer.inputBuffer
+		const fullscreen = (pass, materials) => ({
+			scene: pass.scene,
+			camera: pass.camera,
+			target,
+			variants: materials.map((material) => withMaterial(pass, material, 'fullscreenMaterial')),
+		})
+		const { dof } = this
+		return [
+			fullscreen(this.renderPass, [this.renderPass.spreadMaterial]),
+			fullscreen(this.accumulation, [this.accumulation.blendMaterial]),
+			fullscreen(dof, [dof.prepare, dof.tileReduce, dof.dilate, dof.gather, dof.composite]),
+			{ scene: this.dust.dustScene, camera: this.dust.camera, target },
+			{ scene: this.effectPass.scene, camera: this.effectPass.camera, target },
+			{ scene: this.antialiasPass.scene, camera: this.antialiasPass.camera, target: null },
+		]
 	}
 
 	// The dust, the haze and the light shafts' origin of this frame. `pinhole`:

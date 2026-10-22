@@ -4,6 +4,6 @@
 import { createBlinkFrames, frameBuffers } from './blinkFrames'
 
 self.onmessage = ({ data }) => {
-	const frames = createBlinkFrames(data.params, { lids: data.lids })
+	const frames = createBlinkFrames(data.params, { lids: data.lids, layout: data.layout })
 	self.postMessage({ id: data.id, ...frames }, frameBuffers(frames))
 }

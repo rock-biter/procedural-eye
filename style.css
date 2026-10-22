@@ -959,7 +959,7 @@ canvas {
 	content: '';
 	position: absolute;
 	right: 0;
-	bottom: var(--underline-bottom, 1px);
+	bottom: 1px;
 	left: 0;
 	height: 1px;
 	background: currentColor;

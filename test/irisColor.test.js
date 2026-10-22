@@ -77,3 +77,45 @@ test('the lookup table has the documented layout', () => {
 	for (let c = 0; c < 3; c++) assert.ok(Math.abs(data[index + c] - expected[c]) < 1e-6)
 	assert.equal(IRIS_COLOR_LUT.melanin, 32)
 })
+
+test('the lookup table is irisColorRgb() at every entry, to the bit', () => {
+	const models = [
+		model,
+		irisLayerModel({
+			ablThickness: 0.08,
+			ablScattering: 5,
+			melanosomeScattering: 12,
+			stromaMelanin: 0.3,
+			ablMelanin: 0.9,
+			stromaScattering: 1.2,
+			rayleighShare: 0,
+			blood: 0.01,
+		}),
+		irisLayerModel({
+			ablThickness: 0,
+			ablScattering: 0,
+			melanosomeScattering: 0,
+			stromaMelanin: 0,
+			stromaScattering: 0,
+			rayleighShare: 1,
+			blood: 0,
+		}),
+	]
+	for (const layers of models) {
+		const data = buildIrisColorLut(layers)
+		const naive = new Float32Array(data.length)
+		const size = IRIS_COLOR_LUT
+		let offset = 0
+		for (let k = 0; k < size.stroma; k++) {
+			const stroma = (k / (size.stroma - 1)) * size.maxStroma
+			for (let j = 0; j < size.eumelanin; j++) {
+				for (let i = 0; i < size.melanin; i++) {
+					const rgb = irisColorRgb(i / (size.melanin - 1), j / (size.eumelanin - 1), stroma, layers)
+					naive.set([rgb[0], rgb[1], rgb[2], 1], offset)
+					offset += 4
+				}
+			}
+		}
+		assert.deepEqual(new Uint32Array(data.buffer), new Uint32Array(naive.buffer))
+	}
+})

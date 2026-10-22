@@ -2,11 +2,11 @@
 // the frame's sides drawn clockwise, the clip that makes a sliding line read
 // as rising out of a mask, the camera's glide between two framings and the
 // order the HUD's layers and buttons come in.
+import { clamp01 } from '../math'
 
 const DEGREE = Math.PI / 180
 // A share as a CSS percentage, to a hundredth.
 const percent = (share) => `${Math.round(share * 10000) / 100}%`
-const clamp01 = (value) => Math.min(Math.max(value, 0), 1)
 
 // The polygon (points in px) the black mask still covers on a `width` ×
 // `height` page once its cut has travelled `progress` (0 to 1) across it: the

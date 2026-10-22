@@ -150,7 +150,7 @@ Fresh interactive frames use `quality.interactiveShadowSteps` and `quality.inter
 
 Little melanin over the dark epithelium gives blue (Rayleigh scattering); pheomelanin gives green and amber; eumelanin gives brown.
 
-`IRIS_COLOR_LUT` holds 32 (ABL melanin, 0–1) × 8 (eumelanin share, 0–1) × 16 (stroma thickness, 0–0.8 mm) entries. [`src/iris/irisColorLut.js`](../src/iris/irisColorLut.js) uploads it as a half-float `Data3DTexture` whenever a `bake` color parameter changes. Building a table takes about 40 ms in JS (on an M1), so it keeps the last 32 by their layer model, and `prepare()` builds those of irises known ahead (the intro's shuffle) in up to four workers ([`src/iris/irisColorLut.worker.js`](../src/iris/irisColorLut.worker.js)): switching to them then only uploads a table.
+`IRIS_COLOR_LUT` holds 32 (ABL melanin, 0–1) × 8 (eumelanin share, 0–1) × 16 (stroma thickness, 0–0.8 mm) entries. [`src/iris/irisColorLut.js`](../src/iris/irisColorLut.js) uploads it as a half-float `Data3DTexture` whenever a `bake` color parameter changes. Building a table takes a few milliseconds in JS (3 ms warm on an M1, in Node: `buildIrisColorLut()` evaluates each term once at the level of the loops it depends on, the wavelength's alone, the epithelium's layers per melanin and eumelanin share, the stroma's per thickness and eumelanin share). It keeps the last 32 by their layer model, and `prepare()` builds those of irises known ahead (the intro's shuffle) in up to four workers ([`src/iris/irisColorLut.worker.js`](../src/iris/irisColorLut.worker.js)): switching to them then only uploads a table.
 
 ## Parameters by Effect
 

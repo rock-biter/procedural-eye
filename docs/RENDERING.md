@@ -114,7 +114,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 - **Common to both**: the march limit `quality.irisSteps`, plus the ray-footprint LOD of the atlases and the micro detail.
 - **Key-light shadow**: fresh frames filter a 1024² map, accumulated samples compare a 2048² one.
 - **Split frames**: frames that are not kept shade the blurred share at half resolution ([Split Frames](#split-frames)); kept ones are whole.
-- **Adaptive resolution**: the pixel ratio adapts on fresh frames only (`quality.adaptiveResolution`, `quality.minPixelRatio`).
+- **Adaptive resolution**: the pixel ratio adapts on fresh frames only (`quality.adaptiveResolution`, `quality.minPixelRatio`), to 30 fps on desktops and 60 fps on phones ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#adaptive-resolution)).
 - **Antialiasing**: fresh frames get FXAA (`quality.antialias`), accumulated samples their pixel jitter ([Pipeline](#pipeline)).
 
 ## Materials and Uniforms
@@ -181,10 +181,10 @@ Defines:
 
 The lids, the lashes and the tear meniscus blink by three.js morph targets ([`src/adnexa/lidBlink.js`](../src/adnexa/lidBlink.js)); the frames themselves are in [`docs/ADNEXA.md`](ADNEXA.md#blink-frames).
 
-- **Targets**: `BLINK_FRAMES` (4) absolute frames per geometry (`morphTargetsRelative` false, so the open mesh weighs 1 − the frames' weights). Positions and normals, and in the colors' slot the lids' occlusion (x) and the lashes' tangents. three packs them into a float `DataArrayTexture` per geometry and sets `morphTargetsTexture`, `morphTargetsTextureSize`, `morphTargetInfluences` and `morphTargetBaseInfluence` per object, with the defines `USE_MORPHTARGETS`, `MORPHTARGETS_COUNT` and `MORPHTARGETS_TEXTURE_STRIDE`: about 19 MB for the lids, 4 MB for the lashes.
+- **Targets**: `BLINK_FRAMES` (4) absolute frames per geometry (`morphTargetsRelative` false, so the open mesh weighs 1 − the frames' weights). Positions and normals, and in the colors' slot the lids' occlusion (x) and the lashes' tangents. three packs them into a float `DataArrayTexture` per geometry and sets `morphTargetsTexture`, `morphTargetsTextureSize`, `morphTargetInfluences` and `morphTargetBaseInfluence` per object, with the defines `USE_MORPHTARGETS`, `MORPHTARGETS_COUNT` and `MORPHTARGETS_TEXTURE_STRIDE`: about 2 MB for the lids (9,588 vertices), 5 MB for the lashes (24,300).
 - **Blend**: `lidMorph()` (`lid-morph.glsl`, a `ZERO` loop) adds the frames whose weight is not 0, before the lid follow and in its rest frame. The weights are a Catmull–Rom spline's (`blinkWeights()`): four at most, some negative; all 0 when the lids are open, so an open eye fetches nothing.
 - **Consumers**: `skin-vertex.glsl` (the skin patterns keep the open position, so they stay on the skin as it stretches), `lash-vertex.glsl`, `tear-vertex.glsl` and `shadow-depth-vertex.glsl`. The shadow pass draws every caster with one material: the renderer sets the morph uniforms per object, so it morphs them too. The back shell has no targets.
-- **Placeholders**: each new geometry carries its own attributes as frames, so its programs are compiled with the morph targets from the start (`compileAsync()`) and keep their variant when the real frames arrive. Swapping them in disposes the geometry (three caches a geometry's morph texture), which uploads it anew on the next frame. The relief bake's lid ring has its own attributes for that reason.
+- **Placeholders**: each new geometry carries its own attributes as frames, so its programs are compiled with the morph targets from the start (`EyeApp.start()` compiles the scene after the first rebuild, [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)) and keep their variant when the real frames arrive. Swapping them in disposes the geometry (three caches a geometry's morph texture), which uploads it anew on the next frame. The relief bake's lid ring has its own attributes for that reason.
 
 ## Shader Files
 

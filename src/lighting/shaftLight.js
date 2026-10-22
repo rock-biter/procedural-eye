@@ -187,7 +187,6 @@ export default class ShaftLight {
 		renderer.setRenderTarget(previousTarget)
 	}
 
-	// The beams and their cookie, again only when the layout changes.
 	// The beams of the layout, again only when it changes, then swaying and
 	// flickering at `time` (animateShafts()); the cookie bakes again when they
 	// move, clearing and converting only the texels the beams cover (a few
@@ -195,11 +194,13 @@ export default class ShaftLight {
 	bake(shafts, time) {
 		const { count, seed, width, widthVariation, spread, offsetX, offsetY, angle, alignment } =
 			shafts
-		const options = { count, width, widthVariation, spread, offsetX, offsetY, angle, alignment }
-		const layout = JSON.stringify([seed, shafts.elongation, shafts.sway, options])
+		// Compared every frame as they are, without building a key.
+		const layout = [seed, shafts.elongation, shafts.sway, count, width, widthVariation]
+		layout.push(spread, offsetX, offsetY, angle, alignment)
 		const moving = (shafts.sway > 0 || shafts.flicker > 0) && shafts.speed > 0
-		if (layout !== this.layout) {
+		if (!this.layout?.every((value, i) => value === layout[i])) {
 			this.layout = layout
+			const options = { count, width, widthVariation, spread, offsetX, offsetY, angle, alignment }
 			this.shafts = createShafts(seed, options)
 			this.beams = this.shafts.slice()
 			// Room for the sway, so the cookie's texels stay put as the beams move.
@@ -221,11 +222,27 @@ export default class ShaftLight {
 		}
 		this.boxes = []
 		bakeShaftCookie(this.beams, shafts.elongation, size, this.extent, values, this.boxes)
+		// The texels cleared or baked, each converted once: per row, the union
+		// of the old and the new boxes' spans.
 		const data = this.cookie.image.data
-		for (const [i0, i1, j0, j1] of [...boxes, ...this.boxes]) {
-			for (let j = j0; j <= j1; j++) {
-				for (let i = j * size + i0; i <= j * size + i1; i++)
-					data[i] = DataUtils.toHalfFloat(values[i])
+		const spans = [...boxes, ...this.boxes]
+		let first = size
+		let last = -1
+		for (const [, , j0, j1] of spans) {
+			first = Math.min(first, j0)
+			last = Math.max(last, j1)
+		}
+		for (let j = first; j <= last; j++) {
+			const row = []
+			for (const [i0, i1, j0, j1] of spans) if (j >= j0 && j <= j1) row.push([i0, i1])
+			row.sort((a, b) => a[0] - b[0])
+			let next = 0
+			for (const [i0, i1] of row) {
+				for (let i = Math.max(i0, next); i <= i1; i++) {
+					const index = j * size + i
+					data[index] = DataUtils.toHalfFloat(values[index])
+				}
+				next = Math.max(next, i1 + 1)
 			}
 		}
 		this.cookie.needsUpdate = true

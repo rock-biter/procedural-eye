@@ -149,19 +149,83 @@ export const IRIS_COLOR_LUT = Object.freeze({
 	maxStroma: 0.8,
 })
 
+const CMF = WAVELENGTHS.map(colorMatching)
+
 // RGBA float data (A = 1) of the lookup, melanin fastest, then eumelanin,
-// then stroma thickness: the layout of a three Data3DTexture.
+// then stroma thickness: the layout of a three Data3DTexture. The same values
+// as irisColorRgb() at each entry, to the bit: each term of irisReflectance()
+// is computed once at the loop level where its inputs are fixed (the
+// wavelength's, then per eumelanin share, per melanin, per stroma thickness)
+// with the same operations in the same order, so the stroma's and the ABL's
+// Kubelka–Munk layers are a few thousand instead of a hundred thousand.
 export function buildIrisColorLut(model, size = IRIS_COLOR_LUT) {
+	const count = WAVELENGTHS.length
+	const base = []
+	const bloodTerm = []
+	const stromaS = []
+	const ablSpread = []
+	for (const lambda of WAVELENGTHS) {
+		const relative = lambda / 500
+		base.push(baselineAbsorption(lambda))
+		bloodTerm.push(model.blood * bloodAbsorption(lambda))
+		stromaS.push(
+			0.75 *
+				model.stromaScattering *
+				(model.rayleighShare * relative ** -4 + (1 - model.rayleighShare) * relative ** -1),
+		)
+		ablSpread.push(relative ** -0.5)
+	}
+	const melanins = Array.from({ length: size.melanin }, (_, i) => i / (size.melanin - 1))
+	// Per eumelanin share and wavelength: the pigment's absorption and the
+	// stroma's.
+	const pigments = []
+	const stromaK = []
+	for (let j = 0; j < size.eumelanin; j++) {
+		const eumelanin = j / (size.eumelanin - 1)
+		const pigment = WAVELENGTHS.map(
+			(lambda) =>
+				eumelanin * eumelaninAbsorption(lambda) + (1 - eumelanin) * pheomelaninAbsorption(lambda),
+		)
+		pigments.push(pigment)
+		stromaK.push(pigment.map((p, l) => 2 * (model.stromaMelanin * p + bloodTerm[l] + base[l])))
+	}
+	// The ABL per melanin, eumelanin share and wavelength: { R, T }.
+	const abl = melanins.map((melanin) => {
+		const scattering = 0.75 * (model.ablScattering + model.melanosomeScattering * melanin)
+		const pigmented = melanin * model.ablMelaninMax
+		return pigments.map((pigment) =>
+			pigment.map((p, l) =>
+				kubelkaMunkLayer(
+					2 * (pigmented * p + base[l]),
+					scattering * ablSpread[l],
+					model.ablThickness,
+					0,
+				),
+			),
+		)
+	})
 	const data = new Float32Array(size.melanin * size.eumelanin * size.stroma * 4)
 	let offset = 0
 	for (let k = 0; k < size.stroma; k++) {
 		const stroma = (k / (size.stroma - 1)) * size.maxStroma
+		const thickness = Math.max(stroma, 0)
 		for (let j = 0; j < size.eumelanin; j++) {
-			const eumelanin = j / (size.eumelanin - 1)
+			const stromaR = stromaK[j].map(
+				(K, l) => kubelkaMunkLayer(K, stromaS[l], thickness, model.epithelium).R,
+			)
 			for (let i = 0; i < size.melanin; i++) {
-				const melanin = i / (size.melanin - 1)
-				const rgb = irisColorRgb(melanin, eumelanin, stroma, model)
-				data.set([rgb[0], rgb[1], rgb[2], 1], offset)
+				const layers = abl[i][j]
+				const xyz = [0, 0, 0]
+				for (let l = 0; l < count; l++) {
+					const { R, T } = layers[l]
+					const r = stromaR[l]
+					const reflectance = R + (T * T * r) / (1 - R * r)
+					const cmf = CMF[l]
+					for (let c = 0; c < 3; c++) xyz[c] += reflectance * cmf[c]
+				}
+				const rgb = xyzToLinearSrgb(xyz)
+				for (let c = 0; c < 3; c++) data[offset + c] = Math.max(rgb[c] / WHITE[c], 0)
+				data[offset + 3] = 1
 				offset += 4
 			}
 		}

@@ -4,10 +4,8 @@ import EyeApp from './src/app'
 import Ambience from './src/audio/ambience'
 import AudioEngine from './src/audio/audioEngine'
 import CameraFoley from './src/audio/cameraFoley'
-import { SOUNDS } from './src/audio/soundBank'
 import { PARAM_SCHEMA } from './src/params/paramSchema'
 import {
-	allValues,
 	applyOverrides,
 	cloneParams,
 	createDefaults,
@@ -16,8 +14,7 @@ import {
 	setValue,
 } from './src/params/params'
 import { TRANSITION } from './src/params/paramTransition'
-import { ANCESTRIES, randomEye, randomIrises } from './src/params/populationPriors'
-import { PRESETS } from './src/params/presets'
+import { randomEye, randomIrises } from './src/params/populationPriors'
 import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { magnification } from './src/camera/cameraOptics'
@@ -36,11 +33,15 @@ import {
 } from './src/ui/hudLayout'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
-// ?meshtree=1, ?intro=, #debug), creates the params, the renderer and the app,
-// the HUD and its intro unless ?gui=0, the panel while the URL ends in #debug,
-// and the mesh tree with ?meshtree=1.
+// ?meshtree=1, ?intro=, ?debug, ?dev, #debug), creates the params, the
+// renderer and the app, the HUD and its intro unless ?gui=0, and, on request
+// only, the development tools (src/debug/devTools.js: the console API, the
+// panel while the URL ends in #debug, the mesh tree with ?meshtree=1).
 const urlParams = new URLSearchParams(window.location.search)
-const presetName = PRESETS[urlParams.get('preset')] ? urlParams.get('preset') : 'default'
+// The presets (src/params/presets.js) load only for ?preset= (the default
+// preset is the defaults themselves).
+const PRESETS = urlParams.has('preset') ? (await import('./src/params/presets')).PRESETS : null
+const preset = PRESETS?.[urlParams.get('preset')] ?? { params: {} }
 const state = urlParams.get('state') ? decodeState(urlParams.get('state')) : null
 // Portrait screens (phones held upright) keep the camera target at the
 // entrance pupil's depth: camera.targetZ 0.
@@ -50,7 +51,7 @@ function fitScreen(target) {
 	return target
 }
 
-const params = fitScreen(createParams(PARAM_SCHEMA, PRESETS[presetName].params, state))
+const params = fitScreen(createParams(PARAM_SCHEMA, preset.params, state))
 if (urlParams.has('photo'))
 	setValue(PARAM_SCHEMA, params, 'quality.photoSamples', urlParams.get('photo'))
 if (urlParams.has('view')) setValue(PARAM_SCHEMA, params, 'debug.view', urlParams.get('view'))
@@ -82,8 +83,6 @@ if (!urlParams.has('state') && !urlParams.has('preset')) {
 const setup = new RenderSetup({ params, urlParams })
 // Captures (?photo=) start frozen: a deterministic instant.
 const app = new EyeApp({ setup, params, frozen: urlParams.has('photo') })
-// The app object itself, for console debugging.
-if (urlParams.has('debug')) window.__EYE_APP__ = app
 app.controls.distanceLimits = () => zoomDistances(app.targetParams.zoom)
 app.controls.zoomSensor = (distance) => {
 	const settings = app.targetParams.zoom
@@ -98,18 +97,9 @@ app.controls.zoomSensor = (distance) => {
 const apertureLimits = () => [app.targetParams.aperture.open, app.targetParams.aperture.closed]
 app.controls.fNumberLimits = apertureLimits
 
-// ?meshtree=1: the scene graph at the left, each object's visible and each
-// mesh's wireframe, with the frame's draw calls and the scene's vertices
-// (src/debug/meshTree.js), loaded on demand, with or without the HUD.
-if (urlParams.get('meshtree') === '1') {
-	import('./src/debug/meshTree').then(({ createMeshTree }) =>
-		createMeshTree({
-			scene: setup.scene,
-			onChange: () => app.refreshScene(),
-			drawCalls: () => setup.frameStats.drawCalls,
-		}),
-	)
-}
+// The calls into the development tools, once they are loaded
+// (src/debug/devTools.js sets them).
+const hooks = { refreshPanel: () => {}, onRandomEye: null }
 
 // The panel's random-eye ancestry and the length of preset and random-eye
 // transitions (seconds; 0 switches at once).
@@ -118,16 +108,6 @@ const panelState = { ancestry: 'european', transition: TRANSITION.duration }
 // The groups a random eye resets to their defaults before applying its sample.
 // The lashes and the skin are not among them: a random eye keeps them.
 const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera']
-
-// Glides to the preset `name`: its overrides on the defaults, the viewer's
-// volume kept (sound.volume, the slider by the sound toggle).
-function loadPreset(name, duration = panelState.transition) {
-	if (!PRESETS[name]) return false
-	const target = fitScreen(createParams(PARAM_SCHEMA, PRESETS[name].params))
-	setValue(PARAM_SCHEMA, target, 'sound.volume', app.targetParams.sound.volume)
-	app.transitionTo(target, duration)
-	return true
-}
 
 // Glides to a random eye of `ancestry`. The other groups keep the values a
 // running transition is heading for.
@@ -249,31 +229,12 @@ function skinTone(name, duration = panelState.transition) {
 	return true
 }
 
-window.__EYE__ = {
-	...app.createApi(),
-	getPresetNames: () => Object.keys(PRESETS),
-	getPresetInfo: (name) => {
-		const preset = PRESETS[name]
-		return preset ? { label: preset.label, references: preset.references ?? [] } : null
-	},
-	loadPreset,
-	randomEye: loadRandomEye,
-	zoom,
-	getZoomLevel,
-	setZoomLevel,
-	getApertureLevel,
-	setApertureLevel,
-	skinTone,
-}
-
 // The sound design's cues (src/audio/cameraFoley.js), once the HUD has set
 // them up: nothing without it (?gui=0).
 let cue = () => {}
-// Plays a sound of src/audio/soundBank.js by its name, for the panel.
-let audition = null
-// Reads the params back into the panel, once it is built (the volume slider
-// sets sound.volume without a change that would restart the image).
-let refreshPanel = () => {}
+// What the development tools take of the interface: { audio, ambience,
+// intro, INTRO }, none without it.
+let ui = null
 // The intro (src/ui/intro.js), with the interface, and whether it plays at
 // start-up: not with ?intro=0, not for a capture (?photo=), not with reduced
 // motion. ?intro=dev keeps its timeline and loads GSDevTools to scrub it.
@@ -297,8 +258,8 @@ async function savePng(element) {
 // main thread, so the page goes on meanwhile.
 async function takePhoto() {
 	const { insertPngText } = await import('./src/render/pngMetadata')
-	const state = window.__EYE__.getState()
-	const blob = await window.__EYE__.captureBlob()
+	const state = app.getState()
+	const blob = await app.captureBlob()
 	const bytes = new Uint8Array(await blob.arrayBuffer())
 	const tagged = insertPngText(bytes, 'eye-state', state)
 	download(new Blob([tagged], { type: 'image/png' }), `eye-${Date.now()}.png`)
@@ -321,16 +282,6 @@ function writeStored(key, value) {
 	} catch {
 		// The choice holds for this page only.
 	}
-}
-
-// Downloads the values the panel is heading for (not a transition's in-between
-// ones) as defaults.json, the file that replaces src/params/defaults.json. The
-// debug view is left out, so the app never starts in one.
-function exportDefaults() {
-	const values = allValues(PARAM_SCHEMA, app.targetParams)
-	delete values.debug
-	const json = `${JSON.stringify(values, null, 2)}\n`
-	download(new Blob([json], { type: 'application/json' }), 'defaults.json')
 }
 
 function download(blob, filename) {
@@ -391,11 +342,6 @@ if (urlParams.get('gui') !== '0') {
 	const foley = new CameraFoley(audio)
 	const ambience = new Ambience(audio)
 	cue = (name, detail) => foley.cue(name, detail)
-	window.__EYE__.getSoundStats = () => ({ ...audio.stats(), musicSpeed: ambience.rate })
-	audition = (name) => {
-		audio.unlock()
-		return audio.play(name) !== null
-	}
 	// A mouse entering a control of the page and, unless `press` is false, a
 	// press on it, also from the keyboard.
 	const sounding = (element, control, press = true) => {
@@ -453,7 +399,10 @@ if (urlParams.get('gui') !== '0') {
 		// The wheel over the aperture knob eases the f-number as the zoom's.
 		onApertureWheel: (deltaY) => app.controls.apertureWheel(deltaY),
 		getApertureElasticity: () => app.params.aperture.elasticity,
-		onRandom: () => console.log('Random eye', panelState.ancestry, loadRandomEye()),
+		onRandom: () => {
+			const features = loadRandomEye()
+			hooks.onRandomEye?.(panelState.ancestry, features)
+		},
 		onCue: (name, detail) => cue(name, detail),
 	})
 	document.body.appendChild(hud.element)
@@ -660,7 +609,7 @@ if (urlParams.get('gui') !== '0') {
 		for (const values of new Set([app.params, app.targetParams]))
 			setValue(PARAM_SCHEMA, values, 'sound.volume', rounded)
 		showVolume()
-		refreshPanel()
+		hooks.refreshPanel()
 	}
 	// The level the toggle brings back.
 	const stored = Number.parseFloat(readStored(VOLUME_KEY))
@@ -1197,85 +1146,55 @@ if (urlParams.get('gui') !== '0') {
 		dev: urlParams.get('intro') === 'dev',
 	})
 	if (introPlays) intro.hold()
-	window.__EYE__.replayIntro = () => intro.replay()
-	window.__EYE__.getIntro = () => intro.timeline
-	window.__EYE__.getIntroConfig = () => INTRO
+	ui = { audio, ambience, intro, INTRO }
 
 	// For whoever opens the console: the T-800's eye, with its warnings about
 	// the volume (src/ui/consoleArt.js); each shot that hits Snapshot adds a
 	// line (shoot()).
 	console.log(...terminatorLog())
-
-	// The panel shows while the URL ends in #debug: built the first time, then
-	// hidden and shown again as the hash changes.
-	let panel = null
-	const updatePanel = async () => {
-		const shown = window.location.hash === '#debug'
-		if (shown) panel ??= createPanel()
-		if (panel) (await panel).pane.hidden = !shown
-	}
-	window.addEventListener('hashchange', updatePanel)
-	updatePanel()
 }
 
-// The collapsed panel: the presets, the actions, every parameter, the random
-// ancestry and the transition length.
-async function createPanel() {
-	const { createGui } = await import('./src/debug/gui')
-	const gui = createGui({
-		schema: PARAM_SCHEMA,
-		params,
-		presets: PRESETS,
-		onChange: (path) => app.onParamChange(path),
-		onPreset: (name) => loadPreset(name),
-		actions: [
-			{ title: 'Photo (freeze / live) — Space', run: () => window.__EYE__.toggleFrozen() },
-			{ title: 'Save PNG', run: () => savePng() },
-			{ title: 'Export defaults JSON', run: () => exportDefaults() },
-			{
-				title: 'Copy state URL',
-				run: () => {
-					const url = new URL(window.location.href)
-					url.searchParams.set('state', window.__EYE__.getState())
-					navigator.clipboard?.writeText(url.toString())
-					console.log(url.toString())
+// The development tools load only on request: with a flag of the scripts or
+// the console (?debug, ?dev, ?stats, ?gui=0, ?photo=, ?preset=, ?view=,
+// ?meshtree=1, ?intro=dev), or once the URL ends in #debug (the panel). A
+// plain page never downloads them.
+const DEV_FLAGS = ['debug', 'dev', 'stats', 'photo', 'preset', 'view']
+const devRequested =
+	urlParams.get('gui') === '0' ||
+	urlParams.get('meshtree') === '1' ||
+	urlParams.get('intro') === 'dev' ||
+	DEV_FLAGS.some((flag) => urlParams.has(flag))
+let devTools = null
+const loadDevTools = () => {
+	devTools ??= import('./src/debug/devTools').then(({ installDevTools }) =>
+		installDevTools({
+			app,
+			urlParams,
+			panelState,
+			fitScreen,
+			ui,
+			hooks,
+			actions: {
+				savePng,
+				download,
+				api: {
+					randomEye: loadRandomEye,
+					zoom,
+					getZoomLevel,
+					setZoomLevel,
+					getApertureLevel,
+					setApertureLevel,
+					skinTone,
 				},
 			},
-		],
-	})
-	gui.pane.addBinding(panelState, 'ancestry', {
-		label: 'random ancestry',
-		options: Object.fromEntries(ANCESTRIES.map((name) => [name, name])),
-		index: 1,
-	})
-	gui.pane.addBinding(panelState, 'transition', {
-		label: 'transition (s)',
-		min: 0,
-		max: 6,
-		step: 0.1,
-		index: 3,
-	})
-	// Any sound of the foley on demand, to tune the volumes by ear: in the
-	// `sound` folder, after the master volume and the volumes.
-	const soundFolder = gui.pane.children.find((child) => child.title === 'sound')
-	if (audition && soundFolder) {
-		const sounds = Object.keys(SOUNDS)
-		const heard = { sound: sounds[0] }
-		soundFolder.addBinding(heard, 'sound', {
-			label: 'listen to',
-			options: Object.fromEntries(sounds.map((name) => [name, name])),
-			index: 2,
-		})
-		soundFolder
-			.addButton({ title: 'Play sound', index: 3 })
-			.on('click', () => audition(heard.sound))
-	}
-	app.listeners.add((path) => {
-		if (path === 'camera' || path === '*') gui.refresh()
-	})
-	refreshPanel = () => gui.refresh()
-	return gui
+		}),
+	)
+	return devTools
 }
+if (devRequested || window.location.hash === '#debug') loadDevTools()
+window.addEventListener('hashchange', () => {
+	if (window.location.hash === '#debug') loadDevTools()
+})
 
 // Outside #debug the skin reads its relief and freckles baked (once, before
 // the first frame); in #debug it evaluates them per pixel, live with the

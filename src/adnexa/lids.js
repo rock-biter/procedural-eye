@@ -108,6 +108,8 @@ export default class Lids {
 	// `renderer` bakes the skin patterns over the new mesh.
 	rebuild(params, eye, renderer) {
 		const data = createLidMesh(params.lids, eye, eye.nasalSign)
+		// The layout at rest, which the blink's frames keep (src/adnexa/lidBlink.js).
+		this.restLayout = data.layout
 		// The back shell closes the patch behind the lids.
 		const back = backShellSurface(data, eye, params.shell)
 		// The conjunctiva fills the canthi beyond the globe's outline, and the
@@ -282,7 +284,12 @@ export default class Lids {
 	bakeRelief(renderer, params) {
 		if (!this.baked) return false
 		const { pores, wrinkles, freckles } = params.skin
-		const key = JSON.stringify([this.version, params.lids.seed, pores, wrinkles, freckles])
+		// Asked every frame: the inputs compared as they are, the key built
+		// only when one changed.
+		const inputs = [this.version, params.lids.seed, pores, wrinkles, freckles]
+		if (this.reliefInputs?.every((value, i) => value === inputs[i])) return false
+		this.reliefInputs = inputs
+		const key = JSON.stringify(inputs)
 		if (key === this.relief.key) return false
 		this.update(params, this.uniforms.uPixelAngle.value)
 		this.relief.bake(renderer, this.pattern.box, this.ring, key)

@@ -210,6 +210,9 @@ test('the blink frames keep the layout, end closed, and the spline follows the c
 		assert.ok(Math.min(...frame.ao) < 0.7)
 	}
 	assert.deepEqual(frames.lids.at(-1).positions, closed.positions)
+	// Given the layout at rest (posted to the worker, so cloned), the same frames.
+	const given = createBlinkFrames(params, { layout: structuredClone(open.layout) })
+	assert.deepEqual(given.lids, frames.lids)
 	// The normals are unit length, and three.js's.
 	const normals = frames.lids[0].normals
 	for (let v = 0; v < normals.length; v += 3 * 97) {

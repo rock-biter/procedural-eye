@@ -47,6 +47,7 @@ import { ParamTransition, TRANSITION } from './params/paramTransition'
 import Backdrop from './render/backdrop'
 import { encodePng } from './render/pngEncoder'
 import PostProcessing from './render/postProcessing'
+import { precompile, withMaterial } from './render/precompile'
 import { FOCUS_AT_INFINITY } from './renderSetup'
 import ScleraMaps from './sclera/scleraMaps'
 import { SCLERA_PSI } from './sclera/vesselGenerator'
@@ -178,76 +179,105 @@ export default class EyeApp {
 		this.physicalCamera.orbitOffset = this.controls.parallax
 		this.cameraEye = new Vector3()
 		this.backdropColor = new Color()
-		// Continuous interactive frames for measure(): { remaining, resolve }.
-		this.benchmark = null
 		this.compileMs = null
+		// Whether the last frame drew an interactive (fresh) frame.
+		this.lastFresh = false
 		// How long the last bake of the skin's relief took (ms, CPU side).
 		this.skinBakeMs = null
-		this.rebuild()
+		// Set once start() has built the eye (the skin's relief bakes then).
+		this.started = false
 		setup.onResize = () => this.resize()
 		this.resize()
 		this.frame = this.frame.bind(this)
 	}
 
-	// Compiles every program before the first frame (KHR_parallel_shader_compile
-	// where available) and records how long it took.
+	// Builds the eye and compiles every program before the first frame, all at
+	// once (src/render/precompile.js: KHR_parallel_shader_compile where
+	// available), the driver linking them while the main thread builds the eye;
+	// records how long it all took (compileMs). The passes' and the bakes'
+	// programs go first; the scene's depend on its meshes (their morph
+	// targets), so they follow the rebuild. A living eye that blinks starts
+	// building the blink's frames in the worker right away.
 	async start() {
-		if (this.dirty.has('rebuild')) this.rebuild()
-		if (this.dirty.has('rebuild') || this.dirty.has('bake')) this.bake()
+		const startedAt = performance.now()
+		const renderer = this.setup.renderer
+		this.post.setToneMapping(this.params)
+		const passes = precompile(renderer, [...this.post.programs(), ...this.bakePrograms()])
+		this.rebuild()
+		const { enabled, blinkRate } = this.params.animation
+		if (enabled && blinkRate > 0 && !this.frozen) this.lidBlink.prepare(this.params)
+		const scene = precompile(renderer, this.scenePrograms())
+		this.bake()
 		this.dirty.delete('rebuild')
 		this.dirty.delete('bake')
+		this.started = true
 		this.bakeSkin()
-		const started = performance.now()
-		this.renderSample(null)
-		await this.setup.renderer.compileAsync(this.setup.scene, this.physicalCamera.camera)
-		this.compileMs = performance.now() - started
+		// The light rig the first pose's pupil weighs (no sample is drawn before
+		// it).
+		this.placeSample(null)
+		await Promise.all([passes, scene])
+		this.compileMs = performance.now() - startedAt
 		this.invalidate()
 		requestAnimationFrame(this.frame)
 	}
 
-	// Wall-clock time of `frames` interactive frames, each finished with a
-	// synchronous one-pixel read: on ANGLE-Metal the timer queries are not
-	// reliable, a forced completion is. Returns { meanMs, minMs, maxMs, samples }.
-	measureSync(frames = 30) {
-		const renderer = this.setup.renderer
-		const times = []
-		// Reading the canvas would wait for the display; the scene buffer is
-		// offscreen and written every frame, kept or not.
-		const pixel = new Uint16Array(4)
-		const finish = () => {
-			renderer.readRenderTargetPixels(this.post.composer.inputBuffer, 0, 0, 1, 1, pixel)
-		}
-		const render = () => {
-			this.invalidate()
-			this.post.accumulation.passthrough = this.restartsEveryFrame
-			this.renderSample(null)
-			this.post.accumulation.passthrough = false
-			finish()
-		}
-		render()
-		for (let i = 0; i < frames; i++) {
-			const start = performance.now()
-			render()
-			times.push(performance.now() - start)
-		}
-		times.sort((a, b) => a - b)
-		const round = (value) => Math.round(value * 100) / 100
-		return {
-			meanMs: round(times.reduce((sum, value) => sum + value, 0) / frames),
-			medianMs: round(times[Math.floor(frames / 2)]),
-			minMs: round(times[0]),
-			maxMs: round(times[frames - 1]),
-			samples: frames,
-		}
+	// The start-up compile jobs of the bakes: the iris atlases, the skin's
+	// patterns and relief, the soft coverages.
+	bakePrograms() {
+		const target = this.post.composer.inputBuffer
+		const quad = (mesh, materials) => materials.map((material) => withMaterial(mesh, material))
+		const atlas = this.irisAtlas
+		const { pattern, relief } = this.lids
+		const coverages = [this.keyShadow.coverage, this.shaftLight.coverage]
+		return [
+			{
+				scene: atlas.scene,
+				camera: atlas.camera,
+				target,
+				variants: quad(atlas.quad, [atlas.material, atlas.pigmentMaterial]),
+			},
+			{ scene: pattern.scene, camera: pattern.camera, target },
+			{
+				scene: relief.scene,
+				camera: relief.camera,
+				target,
+				variants: quad(relief.quad, [relief.underlayMaterial, relief.frecklesMaterial]),
+			},
+			...coverages.map((coverage) => ({
+				scene: coverage.scene,
+				camera: coverage.quadCamera,
+				target,
+				variants: quad(coverage.mesh, [coverage.reduce, coverage.blur]),
+			})),
+		]
 	}
 
-	// Renders `frames` interactive frames back to back (no accumulation) and
-	// resolves with the frame statistics, GPU time included where available.
-	measure(frames = 120) {
-		this.setup.frameStats.getStats()
-		return new Promise((resolve) => {
-			this.benchmark = { remaining: frames, resolve }
-		})
+	// The start-up compile job of the scene, its shadow casters drawn with the
+	// shadow pass's material (the scene's override there), not their own.
+	scenePrograms() {
+		const casters = [this.lids.shadow.mesh, this.lashes.shadow.mesh]
+		const shadowed = () => {
+			const undo = casters.map((mesh) => withMaterial(mesh, this.keyShadow.material)())
+			return () => undo.forEach((restore) => restore())
+		}
+		return [
+			{
+				scene: this.setup.scene,
+				camera: this.physicalCamera.camera,
+				target: this.post.composer.inputBuffer,
+				variants: [shadowed],
+			},
+		]
+	}
+
+	// An interactive frame drawn now, outside the loop (the measurements of
+	// src/debug/devTools.js): kept only if the next frame would not restart
+	// the image anyway.
+	renderInteractive() {
+		this.invalidate()
+		this.post.accumulation.passthrough = this.restartsEveryFrame
+		this.renderSample(null)
+		this.post.accumulation.passthrough = false
 	}
 
 	rebuild() {
@@ -302,10 +332,11 @@ export default class EyeApp {
 	}
 
 	// Outside #debug the skin reads its relief and freckles baked; in #debug
-	// it evaluates them per pixel, so the panel's edits show at once.
+	// it evaluates them per pixel, so the panel's edits show at once. Before
+	// start() it only sets the mode (start() bakes once the eye is built).
 	setSkinBaked(baked) {
 		this.lids.setBaked(baked)
-		this.bakeSkin()
+		if (this.started) this.bakeSkin()
 		this.invalidate()
 	}
 
@@ -390,6 +421,8 @@ export default class EyeApp {
 	endTransition() {
 		this.transition = null
 		this.poseFrom = null
+		// A new scene: a higher resolution that failed before may hold now.
+		this.setup.adaptivePixelRatio.resetHold()
 		this.notifyChange('*')
 	}
 
@@ -531,10 +564,6 @@ export default class EyeApp {
 		// The skin's relief bakes again once its inputs settle: not every
 		// frame of a transition (outside #debug nothing changes them anyway).
 		if (!this.transition && this.bakeSkin()) this.invalidate()
-		if (this.benchmark) {
-			this.measureFrame(time)
-			return
-		}
 		// A coasting orbit restarts the image as a drag does; the parallax too.
 		const living = this.params.animation.enabled && !this.frozen
 		if (this.controls.update(Math.min(delta / 1000, 0.1), living)) this.invalidate()
@@ -545,6 +574,7 @@ export default class EyeApp {
 		const glitchDelta = Math.min(delta / 1000, 0.1)
 		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
 		if (this.converged) {
+			this.lastFresh = false
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
 			if (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30) {
@@ -555,18 +585,18 @@ export default class EyeApp {
 		}
 
 		// Only interactive frames adapt the resolution: a resize restarts the
-		// accumulation. It comes before the frame is drawn: a canvas resized
-		// after drawing is cleared, and the browser would show it black.
-		if (this.samples === 0 && delta > 0) this.setup.adaptPixelRatio(delta)
-		const stats = this.setup.frameStats
-		stats.beginFrame(time)
+		// accumulation. The interval measures the previous frame, so it counts
+		// only when that one was interactive too, not a full-quality sample or
+		// a converged image. It comes before the frame is drawn: a canvas
+		// resized after drawing is cleared, and the browser would show it black.
 		const fresh = this.samples === 0
+		if (fresh && this.lastFresh && delta > 0) this.setup.adaptPixelRatio(delta)
+		this.lastFresh = fresh
 		// A living eye or a transition restarts the image on the next frame:
 		// this one is shown without being kept.
 		this.post.accumulation.passthrough = fresh && this.restartsEveryFrame
 		this.renderSample(fresh ? null : accumulationSample(this.samples))
 		this.post.accumulation.passthrough = false
-		stats.endFrame()
 	}
 
 	// Whether the dust moves over a converged image (not in photo mode).
@@ -628,23 +658,9 @@ export default class EyeApp {
 		)
 	}
 
-	measureFrame(time) {
-		const stats = this.setup.frameStats
-		stats.beginFrame(time)
-		this.invalidate()
-		this.post.accumulation.passthrough = this.restartsEveryFrame
-		this.renderSample(null)
-		this.post.accumulation.passthrough = false
-		stats.endFrame()
-		if (--this.benchmark.remaining <= 0) {
-			const { resolve } = this.benchmark
-			this.benchmark = null
-			// The last GPU queries resolve a few frames later.
-			setTimeout(() => resolve({ ...this.setup.getStats(), compileMs: this.compileMs }), 300)
-		}
-	}
-
-	renderSample(sample) {
+	// Places the camera for `sample` and builds the light rig from it; returns
+	// the drawing-buffer size.
+	placeSample(sample) {
 		const size = this.setup.getDrawingBufferSize()
 		this.physicalCamera.update(this.params, this.eye, this.focusDepth, size, sample, this.framing)
 		this.eyeRig.updateMatrices()
@@ -654,6 +670,11 @@ export default class EyeApp {
 			this.eyeRig.worldToEye,
 			this.redFlash(),
 		)
+		return size
+	}
+
+	renderSample(sample) {
+		const size = this.placeSample(sample)
 		this.setup.renderer.setClearColor(
 			this.backdropColor.setRGB(...this.backdropRadiance()),
 			FOCUS_AT_INFINITY,
@@ -777,50 +798,20 @@ export default class EyeApp {
 		return result
 	}
 
-	// window.__EYE__: the hooks of the capture script and the console.
-	createApi() {
-		return {
-			params: this.params,
-			getAccumulation: () => ({
-				samples: this.samples,
-				target: this.params.quality.photoSamples,
-				converged: this.converged,
-			}),
-			getRenderStats: () => this.setup.getStats(),
-			getState: () => encodeState(PARAM_SCHEMA, this.params),
-			getParams: () => cloneParams(this.params),
-			// A full params object to glide to (see main.js for presets).
-			transitionTo: (target, duration) => this.transitionTo(cloneParams(target), duration),
-			getTargetParams: () => cloneParams(this.targetParams),
-			isTransitioning: () => this.transition !== null,
-			setParams: (overrides) => {
-				this.finishTransition()
-				this.controls.stop()
-				const unknown = applyOverrides(PARAM_SCHEMA, this.params, overrides)
-				this.dirty.add('rebuild').add('define')
-				this.notifyChange('*')
-				return unknown
-			},
-			capture: () => this.capture(),
-			captureBlob: () => this.captureBlob(),
-			toggleFrozen: () => this.toggleFrozen(),
-			isFrozen: () => this.frozen,
-			// Blinks now; false while the blink's frames are not built yet.
-			blink: () => this.blink(),
-			isBlinkReady: () => this.lidBlink.ready,
-			// The volume cannon's glitch, now; resolves at its peak.
-			glitch: () => this.terminator.trigger(),
-			isGlitching: () => this.terminator.active,
-			measure: (frames) => this.measure(frames),
-			measureSync: (frames) => this.measureSync(frames),
-			getCompileMs: () => this.compileMs,
-			// The skin's relief: baked (outside #debug) or per pixel; the last
-			// bake's time.
-			setSkinBaked: (baked) => this.setSkinBaked(Boolean(baked)),
-			isSkinBaked: () => this.lids.baked,
-			getSkinBakeMs: () => this.skinBakeMs,
-			getEyeGeometry: () => ({ apexZ: this.eye.apexZ, focusDepth: this.focusDepth }),
-		}
+	// The params as a ?state= string: the values that differ from the defaults.
+	getState() {
+		return encodeState(PARAM_SCHEMA, this.params)
+	}
+
+	// Applies a deep partial override at once (ending a running transition)
+	// and rebuilds; returns the unknown paths.
+	setParams(overrides) {
+		this.finishTransition()
+		this.controls.stop()
+		const unknown = applyOverrides(PARAM_SCHEMA, this.params, overrides)
+		this.dirty.add('rebuild').add('define')
+		this.notifyChange('*')
+		return unknown
 	}
 }
 

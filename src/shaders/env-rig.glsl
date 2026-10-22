@@ -219,16 +219,9 @@ vec3 backgroundIrradiance(vec3 n) {
 	return PI * uRoom.rgb * mix(uRoom.w, 1.12, 0.5 + 0.5 * y);
 }
 
-// Total irradiance from the rig and the background.
-vec3 envIrradiance(vec3 p, vec3 n) {
-	vec3 irradiance = backgroundIrradiance(n);
-	for (int i = ZERO; i < uEmitterCount; i++) irradiance += emitterIrradiance(i, p, n);
-	return irradiance;
-}
-
-// The same with the key light (emitter 0) scaled by `shadow0` (its shadow,
-// per channel the light shafts it crosses) and the background by `ambient`
-// (occlusion by the lids).
+// Total irradiance from the rig and the background, the key light (emitter 0)
+// scaled by `shadow0` (its shadow, per channel the light shafts it crosses)
+// and the background by `ambient` (occlusion by the lids).
 vec3 envIrradianceShadowed(vec3 p, vec3 n, vec3 shadow0, float ambient) {
 	vec3 irradiance = backgroundIrradiance(n) * ambient;
 	for (int i = ZERO; i < uEmitterCount; i++) {

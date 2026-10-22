@@ -89,8 +89,12 @@ export default class SkinRelief {
 		this.quad = new Mesh(new PlaneGeometry(2, 2), this.underlayMaterial)
 		this.quad.frustumCulled = false
 		// The lid ring's geometry, the lids' (src/adnexa/lids.js), set by bake().
+		// The ring draws before the underlay (renderOrder), in one render, so
+		// the mipmaps are made once.
 		this.lidMesh = new Mesh(undefined, this.lidMaterial)
 		this.lidMesh.frustumCulled = false
+		this.lidMesh.renderOrder = 0
+		this.quad.renderOrder = 1
 		this.scene = new Scene()
 		this.scene.add(this.quad, this.lidMesh)
 		this.camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1)
@@ -123,24 +127,18 @@ export default class SkinRelief {
 		const previous = renderer.getRenderTarget()
 		const autoClear = renderer.autoClear
 		renderer.autoClear = false
-		// One mesh per render: the lid ring first, then the underlay, at the
-		// far plane, only where the ring left the cleared depth. Drawn
-		// together, the renderer's sort would pick their order.
-		const render = (mesh) => {
-			this.quad.visible = mesh === this.quad
-			this.lidMesh.visible = mesh === this.lidMesh
-			renderer.render(this.scene, this.camera)
-		}
+		// The lid ring first, then the underlay, at the far plane, only where
+		// the ring left the cleared depth (their renderOrder).
 		const draw = (name, { quad, lids = false }) => {
 			const size = SKIN_RELIEF_SIZE[name]
 			this.texel[name] = Math.max(width, height) / size
 			this.uniforms.uFootprint.value = this.texel[name]
 			this.quad.material = quad
+			this.lidMesh.visible = lids
 			// The quad covers every texel; the clear resets the depth.
 			renderer.setRenderTarget(this.targets[name])
 			renderer.clear()
-			if (lids) render(this.lidMesh)
-			render(this.quad)
+			renderer.render(this.scene, this.camera)
 		}
 		this.lidMesh.geometry = geometry
 		draw('lids', { quad: this.underlayMaterial, lids: true })
