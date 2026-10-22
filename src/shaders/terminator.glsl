@@ -1,39 +1,71 @@
 // The Terminator easter egg on the eyeball (src/eye/terminator.js,
-// docs/RENDERING.md): the glitch's mask, the T-800's red lens, and the chrome
-// of its socket, turned on a lathe around the eye's axis, with a raised bezel
-// round the lens and eight rivets beyond it. Both eyeball programs shade
-// either the eye or the T-800, pixel by pixel: the mask is 0 or 1, in
-// blocks, so a block takes one branch.
+// docs/RENDERING.md): the glitch's shockwave, the T-800's red lens, and the
+// chrome of its socket, turned on a lathe around the eye's axis, with a
+// raised bezel round the lens and eight rivets beyond it.
 #ifndef TERMINATOR_GLSL
 #define TERMINATOR_GLSL
 
 #include ./sclera.glsl
 
-uniform vec4 uGlitch; // coverage (0–1), block height (mm), pattern, unused
-uniform vec2 uGlitchShape; // full-width slices' share, the rows' shift (cells)
+uniform vec4 uGlitch; // the front's reach (0 the eye's axis, 1 the globe's edge), half-width of its band (mm), row height (mm), pattern
+uniform vec4 uGlitchShape; // tears (mm), color split (mm), ripple (mm), blockiness (0–1)
 uniform vec3 uTerminatorLens; // the lens' red radiance
 uniform vec3 uTerminatorCore; // its core's
 uniform vec4 uTerminatorChrome; // the chrome's tint (linear), roughness
 
-// Whether a world point shows the T-800. The front plane is cut into rows
-// a block high; a row is either one full-width slice or, shifted sideways,
-// blocks 2 to 8 cells wide, each on with the probability of the coverage.
-// The pattern changes with uGlitch.z. In the world, not on the screen: the
-// blocks stay put as the camera moves, and the eye turns under them.
-bool glitched(vec3 world) {
-	float coverage = uGlitch.x;
-	if (coverage <= 0.0) return false;
-	if (coverage >= 1.0) return true;
-	vec2 c = world.xy;
-	float cell = uGlitch.y;
-	uint pattern = uint(uGlitch.z);
-	uint row = uint(int(floor(c.y / cell)) + 65536);
+// The glitch at an eye-space point of the surface.
+struct Glitch {
+	vec3 weight; // the T-800's share, per channel
+	vec2 shift; // where to shade instead: this far along the surface (mm, eye space)
+	vec3 gain; // the row's brightness and tint
+	bool band; // on the front: both shaded, and blended
+};
+
+// A shockwave from the eye's axis: behind its front the T-800, ahead of it
+// the eye, and on it a band uGlitch.y mm either side where the two glitch
+// into each other. Torn into rows across the eye, each shifted sideways (a
+// few much further), lit a little differently, some tinted magenta or cyan,
+// and pulled toward the front as by a lens; in each row, blocks of either,
+// more of the T-800's further in. Red, green and blue see the front
+// uGlitchShape.y mm apart, and split the blocks as much. The pattern changes
+// with uGlitch.w. While the glitch is on (a reach above 0), its band shows.
+Glitch glitchAt(vec3 p) {
+	Glitch g;
+	g.weight = vec3(0.0);
+	g.shift = vec2(0.0);
+	g.gain = vec3(1.0);
+	g.band = false;
+	if (uGlitch.x <= 0.0) return g;
+	float halfWidth = uGlitch.y;
+	float front = uGlitch.x * uGlobe.x;
+	float r = length(p.xy);
+	float x = (r - front) / halfWidth;
+	if (x <= -1.5) {
+		g.weight = vec3(1.0);
+		return g;
+	}
+	if (x >= 1.5) return g;
+	g.band = true;
+	float window = sq(1.0 - sq(min(abs(x), 1.0)));
+	float cell = uGlitch.z;
+	uint pattern = uint(uGlitch.w);
+	uint row = uint(int(floor(p.y / cell)) + 65536);
 	vec4 h = hashBytes(pcgHash(row * 977u + pattern * 7919u + 13u));
-	if (h.x < uGlitchShape.x) return h.y < coverage;
-	float width = cell * (2.0 + floor(h.z * 7.0));
-	float x = c.x + (h.w - 0.5) * 8.0 * uGlitchShape.y * cell;
-	uint column = uint(int(floor(x / width)) + 65536);
-	return hash01(row, column, pattern) < coverage;
+	vec4 k = hashBytes(pcgHash(row * 31u + pattern * 131u + 7u));
+	vec2 radial = p.xy / max(r, 1e-6);
+	float tear = (h.x - 0.5) * 2.0 * uGlitchShape.x * (k.x < 0.2 ? 2.5 : 1.0);
+	g.shift = window * (vec2(tear, 0.0) - uGlitchShape.z * x * radial);
+	vec2 q = p.xy + g.shift;
+	float width = cell * (2.0 + floor(h.z * 6.0));
+	uint column = uint(int(floor(q.x / width)) + 65536);
+	float block = hash01(row, column, pattern);
+	float split = min(uGlitchShape.y, 0.5 * halfWidth) / halfWidth;
+	vec3 s = (length(q) - front) / halfWidth + vec3(-split, 0.0, split);
+	vec3 ramp = saturate(0.5 - 0.5 * s);
+	g.weight = mix(ramp, step(block + vec3(-0.5, 0.0, 0.5) * split, ramp), uGlitchShape.w);
+	vec3 tint = k.y < 0.5 ? vec3(1.35, 0.65, 1.25) : vec3(0.6, 1.25, 1.4);
+	g.gain = (1.0 + (h.w - 0.5) * 0.6 * window) * mix(vec3(1.0), tint, step(k.z, 0.2) * window);
+	return g;
 }
 
 // The lens' radiance at `q` (mm from the pupil's center, on the iris

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { GLITCH, glitchEnvelope, glitchPeakTime, glitchStep } from '../src/eye/glitch'
 
-test('the glitch rises to its peak, holds, and sinks back to nothing', () => {
+test('the front runs out to its peak, holds, and draws back to the axis', () => {
 	const duration = 0.6
 	const peak = 0.85
 	assert.equal(glitchEnvelope(-0.1, duration, peak), 0)
@@ -24,6 +24,10 @@ test('the glitch rises to its peak, holds, and sinks back to nothing', () => {
 		assert.ok(value <= last + 1e-12 && value >= 0)
 		last = value
 	}
+})
+
+test('the glitch shows from the shot to its end', () => {
+	for (let i = 1; i < 200; i++) assert.ok(glitchEnvelope((i / 200) * 0.8, 0.8, 0.65) > 0)
 })
 
 test('the photo is taken in the middle of the hold', () => {

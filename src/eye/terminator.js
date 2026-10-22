@@ -1,19 +1,20 @@
 // The easter egg (docs/RENDERING.md): shot by the volume cannon (main.js),
-// the eye glitches and the T-800 shows through, in blocks: a red lens
-// glows where the iris was, in a chrome socket (terminator.glsl). The mask's
-// coverage follows the shot's envelope (src/eye/glitch.js), or glitch.amount
-// for a still preview, whichever is more. The eyeball's two programs share
-// its uniforms.
-import { Color, Uniform, Vector2, Vector4 } from 'three'
+// a shockwave runs over the eye from its axis and the T-800's shows behind
+// it, a red lens glowing where the iris was, in a chrome socket; on the
+// front the two glitch into each other (terminator.glsl). The front's reach
+// follows the shot (src/eye/glitch.js), or glitch.amount for a still
+// preview, whichever is more. The eyeball's two programs share its uniforms.
+import { Color, Uniform, Vector4 } from 'three'
 import { glitchEnvelope, glitchPeakTime, glitchStep } from './glitch'
 
 export default class Terminator {
 	constructor() {
 		this.uniforms = {
-			// coverage (0–1), block height (mm), pattern
-			uGlitch: new Uniform(new Vector4(0, 1, 0, 0)),
-			// full-width slices' share, the rows' shift (cells)
-			uGlitchShape: new Uniform(new Vector2()),
+			// the front's reach (0–1 of the globe's radius), its band's half-width
+			// and the rows' height (mm), the pattern
+			uGlitch: new Uniform(new Vector4(0, 1, 0.3, 0)),
+			// tears, color split, ripple (mm), blockiness
+			uGlitchShape: new Uniform(new Vector4()),
 			uTerminatorLens: new Uniform(new Color()),
 			uTerminatorCore: new Uniform(new Color()),
 			// the chrome's tint (linear), its roughness
@@ -31,8 +32,8 @@ export default class Terminator {
 		return this.time !== null
 	}
 
-	// Glitches the eye now; resolves when the mask is at its peak. `still`
-	// (reduced motion): the blocks do not flicker.
+	// Glitches the eye now; resolves when the front holds, for the photo.
+	// `still` (reduced motion): the pattern does not flicker.
 	trigger(still = false) {
 		this.time = 0
 		this.still = still
@@ -60,11 +61,11 @@ export default class Terminator {
 		const shot = this.time === null ? 0 : glitchEnvelope(this.time, glitch.duration, glitch.peak)
 		this.uniforms.uGlitch.value.set(
 			Math.max(glitch.amount, shot),
+			glitch.band,
 			glitch.cell,
 			glitchStep(this.still ? 0 : (this.time ?? 0), glitch.speed) % 65536,
-			0,
 		)
-		this.uniforms.uGlitchShape.value.set(glitch.bands, glitch.shift)
+		this.uniforms.uGlitchShape.value.set(glitch.tear, glitch.split, glitch.ripple, glitch.blocks)
 		const glow = terminator.glow * white
 		this.uniforms.uTerminatorLens.value.set(terminator.lensColor).multiplyScalar(glow)
 		this.uniforms.uTerminatorCore.value.set(terminator.coreColor).multiplyScalar(glow)

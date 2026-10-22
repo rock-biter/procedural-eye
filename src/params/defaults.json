@@ -417,11 +417,14 @@
   },
   "glitch": {
     "amount": 0,
-    "peak": 0.85,
-    "duration": 0.6,
-    "cell": 1.2,
-    "bands": 0.25,
-    "shift": 1,
+    "peak": 0.65,
+    "duration": 0.8,
+    "band": 1.5,
+    "cell": 0.3,
+    "tear": 0.8,
+    "ripple": 0.4,
+    "split": 0.6,
+    "blocks": 0.7,
     "speed": 24
   },
   "terminator": {

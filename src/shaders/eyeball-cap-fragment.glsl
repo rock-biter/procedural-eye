@@ -1,9 +1,10 @@
 // The cornea and limbus: tear-film reflection of the analytic rig, refraction
 // through both corneal surfaces into the anterior chamber, and the limbus
 // fading the clear cornea into the sclera. Alpha carries the apparent focus
-// distance for the depth of field. In the Terminator glitch's blocks
+// distance for the depth of field. Behind the Terminator glitch's front
 // (terminator.glsl) the T-800's red lens lies behind the cornea, on the iris
-// plane, and the limbus is the chrome of its socket.
+// plane, and the limbus is the chrome of its socket; on the front both are
+// shaded and glitch into each other.
 #include ./debug-views.glsl
 #include ./chamber.glsl
 #include ./sclera.glsl
@@ -24,13 +25,22 @@ float limbusRadius(vec2 xy) {
 	return r * (1.0 + uLimbusOverlap / uGlobe.y * s * s);
 }
 
-void main() {
-	vec3 dir = normalize(vEyePos - uCameraEye);
-	vec3 p = refineOnSurface(uCameraEye, dir, vEyePos);
+// What the cap shows at eye-space point p of its surface, seen along dir:
+// the eye or the T-800's (`terminator`).
+struct Cap {
+	vec3 color;
+	vec3 reflected;
+	vec3 refracted;
+	float fresnel;
+	float opacity;
+	float focusDistance;
+};
+
+Cap shadeCap(vec3 p, vec3 dir, bool terminator) {
+	Cap cap;
 	vec3 n = surfaceNormal(p);
 	float rLimbus = limbusRadius(p.xy);
 	float opacity = smoothstep(uGlobe.y - uLimbus.x, uGlobe.y + uLimbus.y, rLimbus);
-	bool terminator = glitched((uEyeToWorld * vec4(p, 1.0)).xyz);
 	// The clear cornea is a near-perfect mirror; the conjunctiva over the
 	// limbus already has the irregular surface of the sclera. The sclera's
 	// relief and diffuse light are only computed where the limbus shows them.
@@ -68,29 +78,56 @@ void main() {
 		float footprint = length(p - uCameraEye) * uPixelAngle;
 		diffuse = terminator ? socketChrome(p, n, dir, footprint) : scleraDiffuse(p, n) * (1.0 - fresnel);
 	}
-	vec3 refracted = mix(inside, diffuse, opacity);
+	cap.refracted = mix(inside, diffuse, opacity);
 	// The chrome has its own reflection: the tear film's covers only the lens.
-	vec3 reflected = reflection * fresnel * (terminator ? 1.0 - opacity : 1.0);
-	vec3 color = refracted + reflected;
+	cap.reflected = reflection * fresnel * (terminator ? 1.0 - opacity : 1.0);
+	cap.color = cap.refracted + cap.reflected;
+	cap.fresnel = fresnel;
+	cap.opacity = opacity;
 
 	// Apparent depth: the iris through the cornea (paraxial single surface),
 	// the reflection as the virtual image of a convex mirror (R / 2).
 	float cameraDistance = length(p - uCameraEye);
 	float refractedDepth = apparentDepth(insideDistance);
 	float reflectedDepth = 0.5 * uCornea.x;
-	float weight = luma(reflected) / (luma(reflected) + luma(refracted * (1.0 - opacity)) + 1e-6);
-	float focusDistance = cameraDistance + mix(mix(refractedDepth, 0.0, opacity), reflectedDepth, weight);
+	float weight = luma(cap.reflected) / (luma(cap.reflected) + luma(cap.refracted * (1.0 - opacity)) + 1e-6);
+	cap.focusDistance = cameraDistance + mix(mix(refractedDepth, 0.0, opacity), reflectedDepth, weight);
+	return cap;
+}
+
+void main() {
+	vec3 dir = normalize(vEyePos - uCameraEye);
+	vec3 p = refineOnSurface(uCameraEye, dir, vEyePos);
+	// On the glitch's front the point slides along the surface, and the eye
+	// and the T-800 are blended per channel; elsewhere one of them shows. A
+	// loop, so the iris' trace is compiled once.
+	Glitch glitch = glitchAt(p);
+	vec2 xy = p.xy + glitch.shift;
+	vec3 q = glitch.band ? vec3(xy, surfaceZ(length(xy))) : p;
+	vec3 color = vec3(0.0);
+	float focusDistance = 0.0;
+	Cap shown;
+	for (int i = ZERO; i < 2; i++) {
+		bool terminator = i == 1;
+		vec3 share = terminator ? glitch.weight : 1.0 - glitch.weight;
+		if (max(share.r, max(share.g, share.b)) <= 0.0) continue;
+		Cap cap = shadeCap(q, dir, terminator);
+		color += share * cap.color;
+		focusDistance += share.g * cap.focusDistance;
+		if (!terminator || glitch.weight.g >= 1.0) shown = cap;
+	}
+	color *= glitch.gain;
 
 #if DEBUG_VIEW == DEBUG_NORMALS
-	color = n * 0.5 + 0.5;
+	color = surfaceNormal(p) * 0.5 + 0.5;
 #elif DEBUG_VIEW == DEBUG_FRESNEL
-	color = vec3(fresnel * 20.0);
+	color = vec3(shown.fresnel * 20.0);
 #elif DEBUG_VIEW == DEBUG_REFLECTION_ONLY
-	color = reflected;
+	color = shown.reflected;
 #elif DEBUG_VIEW == DEBUG_REFRACTION_ONLY
-	color = refracted;
+	color = shown.refracted;
 #elif DEBUG_VIEW == DEBUG_LIMBUS_MASK
-	color = vec3(opacity);
+	color = vec3(shown.opacity);
 #endif
 	gl_FragColor = vec4(color, focusDistance);
 }

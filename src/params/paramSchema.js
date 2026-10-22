@@ -551,18 +551,24 @@ export const BASE_PARAM_SCHEMA = {
 		squeezeRate: num(0.5, 0.25, 1, 0.05, '×', 'uniform', 'music speed at full squeeze'),
 	},
 	// The easter egg's glitch (src/eye/terminator.js, docs/RENDERING.md): the
-	// volume cannon's shot (main.js) uncovers the T-800's eye in blocks for
-	// `duration`, the blocks covering up to `peak` of it, when the
-	// photo is taken. `amount` shows them still, for tuning (0 in use). The
-	// blocks: their height, the share of rows that are one full-width slice,
-	// how far the rows shift sideways, and how many times a second they change.
+	// volume cannon's shot (main.js) sends a shockwave over the eye from its
+	// axis for `duration`, the T-800's eye behind its front. The front reaches
+	// `peak` of the globe's radius, holds there while the photo is taken, and
+	// draws back. `amount` holds it still, for tuning (0 in use). On the front,
+	// a band `band` either side, the two glitch into each other: rows `cell`
+	// high torn sideways up to `tear`, the image pulled toward the front by
+	// `ripple`, red and blue seeing it `split` apart, in blocks as much as
+	// `blocks`, the pattern changing `speed` times a second.
 	glitch: {
-		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview'),
-		peak: num(0.85, 0, 1, 0.01, '', 'uniform', 'coverage at the photo'),
-		duration: num(0.6, 0.1, 3, 0.05, 's', 'uniform', 'shot glitch duration'),
-		cell: num(1.2, 0.2, 10, 0.05, 'mm', 'uniform', 'block height'),
-		bands: num(0.25, 0, 1, 0.01, '', 'uniform', 'full-width slices'),
-		shift: num(1, 0, 4, 0.05, 'cells', 'uniform', 'row shift'),
+		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview (front reach)'),
+		peak: num(0.65, 0, 1, 0.01, '', 'uniform', 'front reach at the photo'),
+		duration: num(0.8, 0.1, 3, 0.05, 's', 'uniform', 'shot glitch duration'),
+		band: num(1.5, 0.2, 6, 0.05, 'mm', 'uniform', 'glitch band half-width'),
+		cell: num(0.3, 0.05, 3, 0.01, 'mm', 'uniform', 'row height'),
+		tear: num(0.8, 0, 4, 0.01, 'mm', 'uniform', 'row tear'),
+		ripple: num(0.4, 0, 2, 0.01, 'mm', 'uniform', 'ripple'),
+		split: num(0.6, 0, 3, 0.01, 'mm', 'uniform', 'color split'),
+		blocks: num(0.7, 0, 1, 0.01, '', 'uniform', 'blockiness'),
 		speed: num(24, 1, 60, 1, 'per s', 'uniform', 'pattern changes'),
 	},
 	// The T-800's eye under the glitch: its lens' glow (× a white surface
