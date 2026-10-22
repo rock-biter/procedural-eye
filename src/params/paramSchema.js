@@ -558,7 +558,9 @@ export const BASE_PARAM_SCHEMA = {
 	// a band `band` either side, the two glitch into each other: rows `cell`
 	// high torn sideways up to `tear`, the image pulled toward the front by
 	// `ripple`, red and blue seeing it `split` apart, in blocks as much as
-	// `blocks`, the pattern changing `speed` times a second.
+	// `blocks`, the pattern ticking on `speed` times a second; some blocks
+	// jump up to `jump`, and `flicker` sets how often rows drop out, blocks
+	// flicker, blocks jump, and the front jumps, flips or flashes.
 	glitch: {
 		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview (front reach)'),
 		peak: num(0.65, 0, 1, 0.01, '', 'uniform', 'front reach at the photo'),
@@ -569,7 +571,9 @@ export const BASE_PARAM_SCHEMA = {
 		ripple: num(0.4, 0, 2, 0.01, 'mm', 'uniform', 'ripple'),
 		split: num(0.6, 0, 3, 0.01, 'mm', 'uniform', 'color split'),
 		blocks: num(0.7, 0, 1, 0.01, '', 'uniform', 'blockiness'),
-		speed: num(24, 1, 60, 1, 'per s', 'uniform', 'pattern changes'),
+		jump: num(1, 0, 4, 0.01, 'mm', 'uniform', 'block jumps'),
+		flicker: num(0.6, 0, 1, 0.01, '', 'uniform', 'flicker'),
+		speed: num(24, 1, 60, 1, 'per s', 'uniform', 'pattern ticks'),
 	},
 	// The T-800's eye under the glitch: its lens' glow (× a white surface
 	// under the rig), red and at its white-hot core, and the tint and

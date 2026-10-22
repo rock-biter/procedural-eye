@@ -3,7 +3,8 @@
 // `duration` seconds: its front reaches `peak` (1: the globe's edge) by
 // RISE of it, fast at first and slowing, holds there until FALL, and draws
 // back to the axis by the end. The photo is taken in the middle of the hold.
-// The glitch's pattern changes `speed` times a second.
+// The glitch's pattern ticks on `speed` times a second (unevenly, in the
+// shader: terminator.glsl).
 import { smoothstep } from '../math'
 
 export const GLITCH = Object.freeze({ rise: 0.4, fall: 0.6 })
@@ -21,5 +22,5 @@ export function glitchEnvelope(t, duration, peak) {
 // When the photo is taken (s after the shot): the middle of the hold.
 export const glitchPeakTime = (duration) => ((GLITCH.rise + GLITCH.fall) / 2) * duration
 
-// Which pattern shows `t` seconds after the shot.
-export const glitchStep = (t, speed) => Math.floor(Math.max(t, 0) * speed)
+// The pattern's clock `t` seconds after the shot: its ticks so far.
+export const glitchClock = (t, speed) => Math.max(t, 0) * speed

@@ -4,17 +4,19 @@
 // front the two glitch into each other (terminator.glsl). The front's reach
 // follows the shot (src/eye/glitch.js), or glitch.amount for a still
 // preview, whichever is more. The eyeball's two programs share its uniforms.
-import { Color, Uniform, Vector4 } from 'three'
-import { glitchEnvelope, glitchPeakTime, glitchStep } from './glitch'
+import { Color, Uniform, Vector2, Vector4 } from 'three'
+import { glitchClock, glitchEnvelope, glitchPeakTime } from './glitch'
 
 export default class Terminator {
 	constructor() {
 		this.uniforms = {
 			// the front's reach (0–1 of the globe's radius), its band's half-width
-			// and the rows' height (mm), the pattern
+			// and the rows' height (mm), the pattern's clock
 			uGlitch: new Uniform(new Vector4(0, 1, 0.3, 0)),
 			// tears, color split, ripple (mm), blockiness
 			uGlitchShape: new Uniform(new Vector4()),
+			// jumps (mm), flicker
+			uGlitchMotion: new Uniform(new Vector2()),
 			uTerminatorLens: new Uniform(new Color()),
 			uTerminatorCore: new Uniform(new Color()),
 			// the chrome's tint (linear), its roughness
@@ -63,9 +65,10 @@ export default class Terminator {
 			Math.max(glitch.amount, shot),
 			glitch.band,
 			glitch.cell,
-			glitchStep(this.still ? 0 : (this.time ?? 0), glitch.speed) % 65536,
+			glitchClock(this.still ? 0 : (this.time ?? 0), glitch.speed),
 		)
 		this.uniforms.uGlitchShape.value.set(glitch.tear, glitch.split, glitch.ripple, glitch.blocks)
+		this.uniforms.uGlitchMotion.value.set(glitch.jump, glitch.flicker)
 		const glow = terminator.glow * white
 		this.uniforms.uTerminatorLens.value.set(terminator.lensColor).multiplyScalar(glow)
 		this.uniforms.uTerminatorCore.value.set(terminator.coreColor).multiplyScalar(glow)

@@ -418,13 +418,15 @@
   "glitch": {
     "amount": 0,
     "peak": 0.65,
-    "duration": 0.8,
+    "duration": 0.05,
     "band": 1.5,
     "cell": 0.3,
     "tear": 0.8,
     "ripple": 0.4,
     "split": 0.6,
     "blocks": 0.7,
+    "jump": 1,
+    "flicker": 0.6,
     "speed": 24
   },
   "terminator": {

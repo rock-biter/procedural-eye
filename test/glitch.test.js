@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { GLITCH, glitchEnvelope, glitchPeakTime, glitchStep } from '../src/eye/glitch'
+import { GLITCH, glitchClock, glitchEnvelope, glitchPeakTime } from '../src/eye/glitch'
 
 test('the front runs out to its peak, holds, and draws back to the axis', () => {
 	const duration = 0.6
@@ -37,10 +37,9 @@ test('the photo is taken in the middle of the hold', () => {
 	assert.equal(glitchEnvelope(t, duration, 0.85), 0.85)
 })
 
-test('the pattern changes `speed` times a second', () => {
-	assert.equal(glitchStep(0, 24), 0)
-	assert.equal(glitchStep(-1, 24), 0)
-	assert.equal(glitchStep(0.5, 24), 12)
-	assert.equal(glitchStep(1 / 24 - 1e-9, 24), 0)
-	assert.ok(Number.isInteger(glitchStep(0.37, 30)))
+test('the pattern ticks on `speed` times a second', () => {
+	assert.equal(glitchClock(0, 24), 0)
+	assert.equal(glitchClock(-1, 24), 0)
+	assert.equal(glitchClock(0.5, 24), 12)
+	assert.ok(Math.floor(glitchClock(1 / 24 - 1e-9, 24)) === 0)
 })
