@@ -721,10 +721,11 @@ if (urlParams.get('gui') !== '0') {
 	// handle is thrown along the line to that level and the music speeds back
 	// up. At the limit the spring is armed and the handle trembles: let go, it
 	// shoots the handle at Snapshot (on a phone, where Snapshot is above it,
-	// off the window's right edge first), which takes a photo and recoils the
-	// way it was hit, and the handle bounces off it and tumbles out of the
-	// window, the volume going to full; a moment later a new handle pops up at
-	// the end of the line.
+	// off the window's right edge first), which recoils the way it was hit,
+	// and the handle bounces off it and tumbles out of the window, the volume
+	// going to full; a moment later a new handle pops up at the end of the
+	// line. The hit glitches the eye, the T-800 showing through
+	// (src/eye/terminator.js), and the photo is taken at the glitch's peak.
 	const SPRING_RELEASE = 0.8
 	const SQUEEZE_BULGE = 0.8
 	const SHOT_SPEED = 2200
@@ -886,10 +887,11 @@ if (urlParams.get('gui') !== '0') {
 			snapshot.classList.add('recoil')
 			cue('press', { control: 'snapshot', element: snapshot })
 			cue('snapshot', { element: snapshot })
+			// The easter egg: the photo catches the T-800 (rendering it holds
+			// the fall for a moment). With reduced motion its blocks hold still.
+			app.terminator.trigger(motionless.matches).then(takePhoto)
 			// Bounced off Snapshot (back and up from its side; down from below,
-			// still drifting left), then falling, spinning; the photo is saved
-			// once it is out of the window, so its rendering does not hold the
-			// fall.
+			// still drifting left), then falling, spinning.
 			let [x, y] = hit
 			let vx = bank ? 0.5 * velocity[0] : -0.3 * velocity[0]
 			let vy = bank ? 250 : -380
@@ -904,7 +906,6 @@ if (urlParams.get('gui') !== '0') {
 				place(x, y, turn)
 				if (y < window.innerHeight + 40) return requestAnimationFrame(fall)
 				shot.remove()
-				takePhoto()
 			}
 			requestAnimationFrame(fall)
 		})

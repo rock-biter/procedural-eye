@@ -1,10 +1,13 @@
 // The cornea and limbus: tear-film reflection of the analytic rig, refraction
 // through both corneal surfaces into the anterior chamber, and the limbus
 // fading the clear cornea into the sclera. Alpha carries the apparent focus
-// distance for the depth of field.
+// distance for the depth of field. In the Terminator glitch's blocks
+// (terminator.glsl) the T-800's red lens lies behind the cornea, on the iris
+// plane, and the limbus is the chrome of its socket.
 #include ./debug-views.glsl
 #include ./chamber.glsl
 #include ./sclera.glsl
+#include ./terminator.glsl
 
 uniform vec3 uCameraEye;
 uniform float uPixelAngle; // radians per pixel
@@ -27,6 +30,7 @@ void main() {
 	vec3 n = surfaceNormal(p);
 	float rLimbus = limbusRadius(p.xy);
 	float opacity = smoothstep(uGlobe.y - uLimbus.x, uGlobe.y + uLimbus.y, rLimbus);
+	bool terminator = glitched((uEyeToWorld * vec4(p, 1.0)).xyz);
 	// The clear cornea is a near-perfect mirror; the conjunctiva over the
 	// limbus already has the irregular surface of the sclera. The sclera's
 	// relief and diffuse light are only computed where the limbus shows them.
@@ -41,20 +45,32 @@ void main() {
 		vec3 inner;
 		vec3 innerDir;
 		if (traceCornea(p, n, dir, inner, innerDir)) {
-			// Pixel footprint: the cone from the camera, narrowed by the refraction.
-			float coneOrigin = length(inner - uCameraEye) * uPixelAngle;
-			gIrisSight = vec2(length(p - uCameraEye), length(inner - p));
-			ChamberResult chamber = traceChamber(inner, innerDir, coneOrigin, uPixelAngle / uIor.z);
-			inside = chamber.radiance;
-			insideDistance = length(inner - p) + chamber.distance;
+			if (terminator) {
+				float t = max((uIrisShape.x - inner.z) / min(innerDir.z, -1e-3), 0.0);
+				inside = terminatorLens((inner + innerDir * t).xy - uPupil.xy, uPupil.z, uGlobe.y);
+				insideDistance = length(inner - p) + t;
+			} else {
+				// Pixel footprint: the cone from the camera, narrowed by the refraction.
+				float coneOrigin = length(inner - uCameraEye) * uPixelAngle;
+				gIrisSight = vec2(length(p - uCameraEye), length(inner - p));
+				ChamberResult chamber = traceChamber(inner, innerDir, coneOrigin, uPixelAngle / uIor.z);
+				inside = chamber.radiance;
+				insideDistance = length(inner - p) + chamber.distance;
+			}
 		}
-		// The limbal ring: a dark band where the iris disappears under the limbus.
+		// The limbal ring: a dark band where the iris disappears under the
+		// limbus (black, where the lens meets its socket).
 		float ring = smoothstep(uGlobe.y - uLimbus.x - uLimbus.z, uGlobe.y - 0.25 * uLimbus.x, rLimbus);
-		inside *= (1.0 - fresnel) * (1.0 - uLimbus.w * ring);
+		inside *= (1.0 - fresnel) * (1.0 - (terminator ? 1.0 : uLimbus.w) * ring);
 	}
-	vec3 diffuse = opacity > 0.0 ? scleraDiffuse(p, n) * (1.0 - fresnel) : vec3(0.0);
+	vec3 diffuse = vec3(0.0);
+	if (opacity > 0.0) {
+		float footprint = length(p - uCameraEye) * uPixelAngle;
+		diffuse = terminator ? socketChrome(p, n, dir, footprint) : scleraDiffuse(p, n) * (1.0 - fresnel);
+	}
 	vec3 refracted = mix(inside, diffuse, opacity);
-	vec3 reflected = reflection * fresnel;
+	// The chrome has its own reflection: the tear film's covers only the lens.
+	vec3 reflected = reflection * fresnel * (terminator ? 1.0 - opacity : 1.0);
 	vec3 color = refracted + reflected;
 
 	// Apparent depth: the iris through the cornea (paraxial single surface),

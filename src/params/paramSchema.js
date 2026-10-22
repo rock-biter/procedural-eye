@@ -550,6 +550,31 @@ export const BASE_PARAM_SCHEMA = {
 		squeeze: num(0.5, 0, 0.8, 0.01, '', 'uniform', 'credit squeeze at the spring limit'),
 		squeezeRate: num(0.5, 0.25, 1, 0.05, '×', 'uniform', 'music speed at full squeeze'),
 	},
+	// The easter egg's glitch (src/eye/terminator.js, docs/RENDERING.md): the
+	// volume cannon's shot (main.js) uncovers the T-800's eye in blocks for
+	// `duration`, the blocks covering up to `peak` of it, when the
+	// photo is taken. `amount` shows them still, for tuning (0 in use). The
+	// blocks: their height, the share of rows that are one full-width slice,
+	// how far the rows shift sideways, and how many times a second they change.
+	glitch: {
+		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview'),
+		peak: num(0.85, 0, 1, 0.01, '', 'uniform', 'coverage at the photo'),
+		duration: num(0.6, 0.1, 3, 0.05, 's', 'uniform', 'shot glitch duration'),
+		cell: num(1.2, 0.2, 10, 0.05, 'mm', 'uniform', 'block height'),
+		bands: num(0.25, 0, 1, 0.01, '', 'uniform', 'full-width slices'),
+		shift: num(1, 0, 4, 0.05, 'cells', 'uniform', 'row shift'),
+		speed: num(24, 1, 60, 1, 'per s', 'uniform', 'pattern changes'),
+	},
+	// The T-800's eye under the glitch: its lens' glow (× a white surface
+	// under the rig), red and at its white-hot core, and the tint and
+	// roughness of its socket's chrome.
+	terminator: {
+		glow: num(1.2, 0, 10, 0.05, '×', 'uniform', 'lens glow'),
+		lensColor: color('#ff1a0a', 'uniform', 'lens color'),
+		coreColor: color('#ffd2a0', 'uniform', 'core color'),
+		chrome: color('#c9ced6', 'uniform', 'chrome tint'),
+		roughness: num(0.15, 0, 1, 0.01, '', 'uniform', 'chrome roughness'),
+	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),
 		grain: num(0.035, 0, 0.3, 0.001),

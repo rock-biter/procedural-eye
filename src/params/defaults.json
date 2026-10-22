@@ -415,6 +415,22 @@
     "squeeze": 0.5,
     "squeezeRate": 0.5
   },
+  "glitch": {
+    "amount": 0,
+    "peak": 0.85,
+    "duration": 0.6,
+    "cell": 1.2,
+    "bands": 0.25,
+    "shift": 1,
+    "speed": 24
+  },
+  "terminator": {
+    "glow": 1.2,
+    "lensColor": "#ff1a0a",
+    "coreColor": "#ffd2a0",
+    "chrome": "#c9ced6",
+    "roughness": 0.15
+  },
   "post": {
     "toneMapping": "agx",
     "grain": 0.035,

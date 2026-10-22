@@ -31,6 +31,7 @@ import TearFilm from './adnexa/tearFilm'
 import Eyeball from './eye/eyeball'
 import { createEyeGeometry } from './eye/eyeProfile'
 import EyeRig from './eye/eyeRig'
+import Terminator from './eye/terminator'
 import IrisAtlas from './iris/irisAtlas'
 import IrisColorLut from './iris/irisColorLut'
 import { createIrisSpace } from './iris/irisSpace'
@@ -102,6 +103,8 @@ export default class EyeApp {
 			...this.keyShadow.coverage.uniforms,
 			...this.shaftLight.coverage.uniforms,
 		}
+		// The easter egg: the volume cannon's glitch on the eye (main.js).
+		this.terminator = new Terminator()
 		this.scleraMaps = new ScleraMaps()
 		// The fissure map: r where the lids rest, g closed (the blink's,
 		// src/adnexa/lidBlink.js).
@@ -121,7 +124,7 @@ export default class EyeApp {
 				pigment: this.irisAtlas.pigmentTexture,
 				colorLut: this.irisColorLut.texture,
 			},
-			keyLight,
+			{ ...keyLight, ...this.terminator.uniforms },
 			{ texture: this.fissureMap, extent: [FISSURE_MAP.halfWidth, FISSURE_MAP.halfHeight] },
 			{ texture: this.scleraMaps.texture, psi: SCLERA_PSI },
 			params.debug.view,
@@ -511,6 +514,8 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
 		if (this.shaftsMove) this.invalidate()
+		// The glitch runs in photo mode too.
+		if (this.terminator.step(Math.min(delta / 1000, 0.1), this.params)) this.invalidate()
 		if (this.converged) {
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
@@ -574,7 +579,10 @@ export default class EyeApp {
 
 	get restartsEveryFrame() {
 		return (
-			(this.params.animation.enabled && !this.frozen) || this.transition !== null || this.shaftsMove
+			(this.params.animation.enabled && !this.frozen) ||
+			this.transition !== null ||
+			this.shaftsMove ||
+			this.terminator.active
 		)
 	}
 
@@ -647,6 +655,7 @@ export default class EyeApp {
 		const camera = this.physicalCamera.camera
 		const pixelAngle = (camera.fov * Math.PI) / 180 / size.height
 		this.pixelAngle = pixelAngle
+		this.terminator.update(this.params, this.lightRig.luminance * 0.05)
 		this.eyeball.update(
 			this.params,
 			this.pupilDiameter,
@@ -741,6 +750,9 @@ export default class EyeApp {
 			// Blinks now; false while the blink's frames are not built yet.
 			blink: () => this.blink(),
 			isBlinkReady: () => this.lidBlink.ready,
+			// The volume cannon's glitch, now; resolves at its peak.
+			glitch: () => this.terminator.trigger(),
+			isGlitching: () => this.terminator.active,
 			measure: (frames) => this.measure(frames),
 			measureSync: (frames) => this.measureSync(frames),
 			getCompileMs: () => this.compileMs,
