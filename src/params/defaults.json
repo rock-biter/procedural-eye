@@ -411,7 +411,9 @@
     "glassKey": "D",
     "fadeIn": 10,
     "stretch": 200,
-    "stretchRate": 2
+    "stretchRate": 2,
+    "squeeze": 0.5,
+    "squeezeRate": 0.5
   },
   "post": {
     "toneMapping": "agx",

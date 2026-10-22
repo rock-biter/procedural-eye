@@ -516,7 +516,9 @@ export const BASE_PARAM_SCHEMA = {
 	// over them, the key they are tuned to and how slowly it fades in at the
 	// first gesture, and how far a drag can pull the volume slider's handle
 	// past its right end (resisted, as the HUD's knobs), the music playing up
-	// to `stretchRate` times as fast as it is pulled. The mute is the viewer's, kept by the
+	// to `stretchRate` times as fast as it is pulled; pulled past its left end
+	// it squeezes the credit line as a spring, up to `squeeze` of its width,
+	// the music slowing to `squeezeRate` of its speed. The mute is the viewer's, kept by the
 	// browser, not a parameter; the volume slider by the sound toggle sets
 	// the master volume (main.js), which the browser keeps too.
 	sound: {
@@ -545,6 +547,8 @@ export const BASE_PARAM_SCHEMA = {
 		fadeIn: num(10, 0, 30, 0.5, 's', 'uniform', 'music fade in'),
 		stretch: num(200, 0, 400, 1, 'px', 'uniform', 'volume handle run past the end'),
 		stretchRate: num(2, 1, 4, 0.05, '×', 'uniform', 'music speed at full overshoot'),
+		squeeze: num(0.5, 0, 0.8, 0.01, '', 'uniform', 'credit squeeze at the spring limit'),
+		squeezeRate: num(0.5, 0.25, 1, 0.05, '×', 'uniform', 'music speed at full squeeze'),
 	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),

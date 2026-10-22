@@ -1045,6 +1045,68 @@ canvas {
 	pointer-events: none;
 }
 
+/* The spring (main.js): pulled past the left end the credit squeezes toward
+   its left edge and the volume, scaled back, keeps its size. Armed at the
+   limit, the handle trembles; shot at Snapshot (.volume-shot) it is gone
+   until it pops up again. */
+.credit,
+.volume {
+	transform-origin: left center;
+}
+
+.volume.armed .volume-handle {
+	background: var(--accent);
+	animation: volume-armed 0.06s linear infinite alternate;
+}
+
+@keyframes volume-armed {
+	from {
+		translate: calc(-50% - 0.75px) -50%;
+	}
+	to {
+		translate: calc(-50% + 0.75px) -50%;
+	}
+}
+
+.volume.fired .volume-handle {
+	visibility: hidden;
+}
+
+.volume.respawn .volume-handle {
+	animation: volume-respawn 0.5s var(--spring);
+}
+
+@keyframes volume-respawn {
+	from {
+		scale: 0;
+	}
+}
+
+.volume-shot {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 30;
+	width: 8px;
+	height: 8px;
+	margin: -4px 0 0 -4px;
+	background: #fff;
+	opacity: 0.8;
+	pointer-events: none;
+}
+
+/* Snapshot hit by the shot handle knocks back and settles. */
+.snapshot.recoil {
+	animation: snapshot-recoil 0.5s var(--spring);
+}
+
+@keyframes snapshot-recoil {
+	18% {
+		translate: 8px -2px;
+		rotate: 2.5deg;
+	}
+}
+
 /* Hovered, focused or dragged it grows, as the zoom's marker does. */
 .volume:is(:hover, :focus-visible, .dragging) .volume-handle {
 	background: var(--accent);
@@ -1056,6 +1118,12 @@ canvas {
 	.swap-underline::after,
 	.volume-handle {
 		transition: none;
+	}
+
+	.volume.armed .volume-handle,
+	.volume.respawn .volume-handle,
+	.snapshot.recoil {
+		animation: none;
 	}
 }
 

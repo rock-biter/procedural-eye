@@ -259,6 +259,12 @@ let refreshPanel = () => {}
 // given).
 async function savePng(element) {
 	cue('snapshot', { element })
+	await takePhoto()
+}
+
+// The download of savePng(), without its sound. Rendering the PNG holds the
+// page for a moment.
+async function takePhoto() {
 	const { insertPngText } = await import('./src/render/pngMetadata')
 	const dataUrl = window.__EYE__.capture()
 	const bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) =>
@@ -587,10 +593,10 @@ if (urlParams.get('gui') !== '0') {
 	volume.setAttribute('aria-valuemax', '100')
 	volume.style.setProperty('--volume-track', `${VOLUME_TRACK}px`)
 	volume.innerHTML = '<span class="volume-line"></span><span class="volume-handle"></span>'
-	const showVolume = () => {
-		const level = app.params.sound.volume
-		volume.style.setProperty('--volume', level)
-		volume.setAttribute('aria-valuenow', String(Math.round(level * 100)))
+	// The handle at `shown` (the level, but for the spring below).
+	const showVolume = (shown = app.params.sound.volume) => {
+		volume.style.setProperty('--volume', shown)
+		volume.setAttribute('aria-valuenow', String(Math.round(app.params.sound.volume * 100)))
 	}
 	const putVolume = (level) => {
 		const rounded = Math.round(Math.min(Math.max(level, 0), 1) * 100) / 100
@@ -669,6 +675,11 @@ if (urlParams.get('gui') !== '0') {
 	}
 	// Pulled to `pull` (of the track; past 1, past the end).
 	const pullVolume = (pull) => {
+		if (pull < 0 && spring.reach > 0) {
+			compress(-pull * VOLUME_TRACK)
+			return
+		}
+		unspring()
 		const reach = stretchReach()
 		if (pull <= 1 || reach <= 0) {
 			if (stretch.over !== 0) showStretch((stretch.over = 0), (stretch.amount = 0))
@@ -696,15 +707,182 @@ if (urlParams.get('gui') !== '0') {
 			onUpdate: () => ease(stretch.over),
 		})
 	}
+	// Past the left end a drag compresses the credit line as a spring: the
+	// handle runs on left with the line held to it, and everything left of it
+	// (the credit and the sound toggle) squeezes toward the left edge to make
+	// room, up to `sound.squeeze` of its width. The handle follows the pointer
+	// one to one at first, ever more stiffly, and stops at that limit once the
+	// pointer has gone twice as far (sooner where the window ends). The
+	// further it is compressed the louder the spring will throw the handle:
+	// meanwhile the volume rises from silence to that level and the glass harp
+	// slows, down to `sound.squeezeRate` of its speed at the limit, the handle
+	// staying at the line's start. Let go, the line and the text spring back
+	// with an elastic bounce, stronger the more they were compressed, the
+	// handle is thrown along the line to that level and the music speeds back
+	// up. At the limit the spring is armed and the handle trembles: let go, it
+	// shoots the handle at Snapshot, which takes a photo and recoils, and the
+	// handle bounces off it and tumbles out of the window, the volume going to
+	// full; a moment later a new handle pops up at the end of the line.
+	const SPRING_RELEASE = 0.8
+	const SHOT_SPEED = 2200
+	const GRAVITY = 2600
+	const RESPAWN = 1.4
+	// The handle's run past the left end (px), its limit (px), the width the
+	// text squeezes (px), the pointer's run to the limit (px), whether the
+	// spring is armed, and the level the handle is shown at.
+	const spring = { under: 0, reach: 0, width: 0, travel: 0, armed: false, shown: 0 }
+	const showSpring = (under) => {
+		const squeeze = Math.max((spring.width - under) / spring.width, 0.05)
+		credit.style.scale = under ? `${squeeze} 1` : ''
+		volume.style.scale = under ? `${1 / squeeze} 1` : ''
+	}
+	const setArmed = (armed) => {
+		spring.armed = armed
+		volume.classList.toggle('armed', armed)
+	}
+	const slowed = (amount) => 1 - (1 - app.params.sound.squeezeRate) * Math.max(amount, 0)
+	// Compressed by a pointer `pushed` px past the left end.
+	const compress = (pushed) => {
+		const t = Math.min(pushed / spring.travel, 1)
+		spring.under = spring.reach * (1 - (1 - t) ** 2)
+		const amount = spring.under / spring.reach
+		setArmed(t >= 1)
+		showSpring(spring.under)
+		userVolume(amount)
+		showVolume(0)
+		ambience.setSpeed(slowed(amount))
+	}
+	const unspring = () => {
+		if (spring.under === 0) return
+		spring.under = 0
+		setArmed(false)
+		showSpring(0)
+		ambience.setSpeed(1)
+	}
+	// Let go: the spring releases, throwing the handle to the level it was
+	// compressed to, or, armed and let go by the pointer (`fire`), at Snapshot.
+	const release = (fire) => {
+		const { under, armed } = spring
+		if (under <= 0) return
+		const amount = under / spring.reach
+		setArmed(false)
+		if (fire && armed) shoot()
+		const level = fire && armed ? 1 : amount
+		const ease = () => {
+			showSpring(spring.under)
+			ambience.setSpeed(slowed((amount * Math.max(spring.under, 0)) / under))
+			if (!volume.classList.contains('fired')) showVolume(spring.shown)
+		}
+		spring.shown = 0
+		if (motionless.matches) {
+			spring.under = 0
+			spring.shown = level
+			ease()
+			settle()
+			return
+		}
+		gsap.to(spring, {
+			under: 0,
+			duration: SPRING_RELEASE * (0.6 + 0.4 * amount),
+			ease: `elastic.out(1, ${0.75 - 0.35 * amount})`,
+			onUpdate: ease,
+		})
+		gsap.to(spring, {
+			shown: level,
+			duration: SPRING_RELEASE * 0.7,
+			ease: 'power3.out',
+			onUpdate: ease,
+			onComplete: settle,
+		})
+	}
+	// The handle shot at Snapshot from where it is: it flies there, Snapshot
+	// takes a photo and recoils, and the handle bounces off it, falls out of
+	// the window tumbling and comes back later at the end of the line.
+	const shoot = () => {
+		const from = volume.querySelector('.volume-handle').getBoundingClientRect()
+		const to = snapshot.getBoundingClientRect()
+		volume.classList.add('fired')
+		userVolume(1)
+		showVolume()
+		const shot = document.createElement('div')
+		shot.className = 'volume-shot'
+		document.body.append(shot)
+		const place = (x, y, turn) => {
+			shot.style.translate = `${x}px ${y}px`
+			shot.style.rotate = `${turn}deg`
+		}
+		const x0 = from.left + from.width / 2
+		const y0 = from.top + from.height / 2
+		const x1 = to.left + 4
+		const y1 = to.top + to.height / 2
+		const distance = Math.hypot(x1 - x0, y1 - y0)
+		const duration = Math.max(distance / SHOT_SPEED, 0.2)
+		const flight = { t: 0 }
+		place(x0, y0, 0)
+		gsap.to(flight, {
+			t: 1,
+			duration,
+			ease: 'none',
+			onUpdate: () => {
+				const { t } = flight
+				const arc = distance * 0.06 * 4 * t * (1 - t)
+				place(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - arc, 540 * t)
+			},
+			onComplete: () => {
+				snapshot.classList.remove('recoil')
+				void snapshot.offsetWidth
+				snapshot.classList.add('recoil')
+				cue('press', { control: 'snapshot', element: snapshot })
+				cue('snapshot', { element: snapshot })
+				// Bounced back a little, up, then falling, spinning; the photo is
+				// saved once it is out of the window, so its rendering does not
+				// hold the fall.
+				let x = x1
+				let y = y1
+				let vx = (-0.3 * distance) / duration
+				let vy = -380
+				let turn = 540
+				let last = performance.now()
+				const fall = (now) => {
+					const dt = Math.min((now - last) / 1000, 0.05)
+					last = now
+					vy += GRAVITY * dt
+					x += vx * dt
+					y += vy * dt
+					turn -= 900 * dt
+					place(x, y, turn)
+					if (y < window.innerHeight + 40) return requestAnimationFrame(fall)
+					shot.remove()
+					takePhoto()
+				}
+				requestAnimationFrame(fall)
+			},
+		})
+		setTimeout(() => {
+			volume.classList.remove('fired')
+			volume.classList.add('respawn')
+			showVolume()
+		}, RESPAWN * 1000)
+	}
+	volume.addEventListener('animationend', (event) => {
+		if (event.animationName === 'volume-respawn') volume.classList.remove('respawn')
+	})
 	const tapVolume = () => cue('tap', { control: 'volume', element: volume })
-	const volumeAt = (event) => (event.clientX - volume.getBoundingClientRect().left) / VOLUME_TRACK
+	const volumeAt = (event) =>
+		(event.clientX - (volumeDrag?.left ?? volume.getBoundingClientRect().left)) / VOLUME_TRACK
 	const settle = () => remember(app.params.sound.volume)
 	let volumeDrag = null
 	volume.addEventListener('pointerdown', (event) => {
 		if (event.button !== 0 || volumeDrag) return
+		if (gsap.isTweening(spring) || volume.classList.contains('fired')) return
 		volume.setPointerCapture(event.pointerId)
 		volume.classList.add('dragging')
-		const at = volumeAt(event)
+		// The spring: the text left of the line, measured at rest.
+		const left = volume.getBoundingClientRect().left
+		spring.width = left - credit.getBoundingClientRect().left
+		spring.reach = app.params.sound.squeeze * spring.width
+		spring.travel = Math.max(Math.min(2 * spring.reach, left - 8), 1)
+		const at = (event.clientX - left) / VOLUME_TRACK
 		// Grabbed while it springs back, it is held where it was grabbed: its
 		// offset counts the handle's run past the end.
 		const springing = gsap.isTweening(stretch)
@@ -715,7 +893,7 @@ if (urlParams.get('gui') !== '0') {
 			stretch.over > 0
 				? pullLevel(1 + stretch.over / VOLUME_TRACK, stretchReach())
 				: app.params.sound.volume
-		volumeDrag = { id: event.pointerId, offset: onHandle ? at - pull : 0 }
+		volumeDrag = { id: event.pointerId, offset: onHandle ? at - pull : 0, left }
 		if (onHandle) gsap.killTweensOf(glide)
 		else glideVolume(at, VOLUME_GLIDE, userVolume, settle)
 	})
@@ -734,8 +912,10 @@ if (urlParams.get('gui') !== '0') {
 		volume.classList.remove('dragging')
 		volume.blur()
 		springBack()
-		if (!gliding()) settle()
-		if (tap) tapVolume()
+		const sprung = spring.under > 0
+		release(tap)
+		if (!gliding() && !sprung) settle()
+		if (tap && !sprung) tapVolume()
 	}
 	volume.addEventListener('pointerup', (event) => releaseVolume(event, true))
 	volume.addEventListener('pointercancel', (event) => releaseVolume(event, false))
