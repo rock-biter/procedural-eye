@@ -557,7 +557,9 @@ export const BASE_PARAM_SCHEMA = {
 	// axis for `duration`, the T-800's eye behind its front. The front reaches
 	// `peak` of the globe's radius, holds there while the photo is taken, and
 	// draws back. While the cannon is armed, a hint of it shows, its front
-	// reaching `charge`. `amount` shows it for tuning (0 in use). On the front,
+	// reaching `charge`, and the lights and the backdrop turn `chargeFlash`
+	// of the way to the shot's red flash. `amount` shows it for tuning (0 in
+	// use). On the front,
 	// a band `band` either side, the two glitch into each other: rows `cell`
 	// high torn sideways up to `tear`, the image pulled toward the front by
 	// `ripple`, red and blue seeing it `split` apart, in blocks as much as
@@ -575,6 +577,7 @@ export const BASE_PARAM_SCHEMA = {
 		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview (front reach)'),
 		peak: num(0.65, 0, 1, 0.01, '', 'uniform', 'front reach at the photo'),
 		charge: num(0.07, 0, 0.5, 0.01, '', 'uniform', 'front reach while armed'),
+		chargeFlash: num(0.5, 0, 1, 0.01, '', 'uniform', 'flash share while armed'),
 		duration: num(0.8, 0.1, 3, 0.05, 's', 'uniform', 'shot glitch duration'),
 		band: num(1.5, 0.2, 6, 0.05, 'mm', 'uniform', 'glitch band half-width'),
 		cell: num(0.3, 0.05, 3, 0.01, 'mm', 'uniform', 'row height'),

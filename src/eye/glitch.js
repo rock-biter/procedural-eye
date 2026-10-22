@@ -6,7 +6,8 @@
 // The glitch's pattern ticks on `speed` times a second (unevenly, in the
 // shader: terminator.glsl), and some of its settings jump all the while, so
 // it stays wild while the front holds. Before the shot, while the cannon is
-// armed, a hint of it rises at the axis (glitchCharge()).
+// armed, a hint of it rises at the axis, and the lights and the backdrop
+// turn toward the shot's red flash (chargeReach()).
 import { smoothstep } from '../math'
 import { hash01 } from '../random'
 
@@ -66,7 +67,8 @@ export function glitchJumps(clock, seed, chaos) {
 
 // The hint of the glitch while the volume cannon is armed: its progress
 // rises over CHARGE.rise seconds, and sinks back over CHARGE.fall once the
-// cannon fires or is let off, the front reaching glitch.charge at the top.
+// cannon fires or is let off, the front reaching glitch.charge at the top
+// and the red flash glitch.chargeFlash.
 export const CHARGE = Object.freeze({ rise: 0.6, fall: 0.25 })
 
 // The progress `dt` seconds on, armed (`charged`) or not.
@@ -76,7 +78,7 @@ export function chargeStep(progress, charged, dt) {
 		: Math.max(progress - dt / CHARGE.fall, 0)
 }
 
-// The front's reach at `progress`, `level` at the top.
+// The front's reach, or the red flash, at `progress`, `level` at the top.
 export const chargeReach = (progress, level) => level * smoothstep(0, 1, progress)
 
 // The red flash of the lights and the backdrop `t` seconds after a shot:

@@ -3,7 +3,8 @@
 // it, a red lens glowing where the iris was, in a chrome socket; on the
 // front the two glitch into each other (terminator.glsl). The front's reach
 // follows the shot (src/eye/glitch.js), or glitch.amount for a preview,
-// whichever is more, or a hint of it while the cannon is armed. The glitch
+// whichever is more, or a hint of it while the cannon is armed, the lights
+// and the backdrop turning toward the shot's red flash meanwhile. The glitch
 // has its own time, which runs while it shows (outside photo mode, the
 // preview's too): its pattern and its jumping settings follow it. The
 // eyeball's two programs share its uniforms.
@@ -80,11 +81,11 @@ export default class Terminator {
 	// Whether the glitch moves: a shot runs, the hint shows, or the preview
 	// shows outside photo mode (`frozen`).
 	moving(params, frozen) {
-		const { amount, charge } = params.glitch
+		const { amount, charge, chargeFlash } = params.glitch
 		return (
 			this.time !== null ||
 			this.flashTime !== null ||
-			(charge > 0 && (this.charged || this.charge > 0)) ||
+			((charge > 0 || chargeFlash > 0) && (this.charged || this.charge > 0)) ||
 			(amount > 0 && !frozen)
 		)
 	}
@@ -114,12 +115,13 @@ export default class Terminator {
 		return true
 	}
 
-	// How far the lights and the backdrop have turned red (0–1): only a shot
-	// flashes them.
+	// How far the lights and the backdrop have turned red (0–1): a shot
+	// flashes them, the armed cannon a little.
 	flash(params) {
-		if (this.flashTime === null) return 0
-		const { duration, flashIn, flashOut } = params.glitch
-		return flashEnvelope(this.flashTime, duration, flashIn, flashOut)
+		const { duration, flashIn, flashOut, chargeFlash } = params.glitch
+		const shot =
+			this.flashTime === null ? 0 : flashEnvelope(this.flashTime, duration, flashIn, flashOut)
+		return Math.max(shot, chargeReach(this.charge, chargeFlash))
 	}
 
 	// Per-sample uniforms; `white`: the radiance of a white diffuse surface
