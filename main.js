@@ -724,7 +724,7 @@ if (urlParams.get('gui') !== '0') {
 	// handle bounces off it and tumbles out of the window, the volume going to
 	// full; a moment later a new handle pops up at the end of the line.
 	const SPRING_RELEASE = 0.8
-	const SQUEEZE_BULGE = 0.3
+	const SQUEEZE_BULGE = 0.8
 	const SHOT_SPEED = 2200
 	const GRAVITY = 2600
 	const RESPAWN = 1.4
