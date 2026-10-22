@@ -22,6 +22,7 @@ import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
+import { createShotLog, terminatorLog } from './src/ui/consoleArt'
 import { INTRO, createIntro } from './src/ui/intro'
 import {
 	apertureFNumber,
@@ -866,9 +867,10 @@ if (urlParams.get('gui') !== '0') {
 	}
 	// The handle shot at Snapshot from where it is: it flies there (SHOT_SPEED
 	// px/s; a bank shot BANK_SPEED, its legs short), spinning SHOT_SPIN
-	// degrees a second, Snapshot takes a photo and recoils, and the handle
-	// bounces off it, falls out of the window tumbling and comes back later at
-	// the end of the line.
+	// degrees a second, Snapshot takes a photo and recoils (the T-800 reports
+	// each hit in the console, shotLog), and the handle bounces off it, falls
+	// out of the window tumbling and comes back later at the end of the line.
+	const shotLog = createShotLog()
 	const shoot = () => {
 		const from = volume.querySelector('.volume-handle').getBoundingClientRect()
 		const to = snapshot.getBoundingClientRect()
@@ -946,8 +948,9 @@ if (urlParams.get('gui') !== '0') {
 			cue('press', { control: 'snapshot', element: snapshot })
 			cue('snapshot', { element: snapshot })
 			// The easter egg: the photo catches the T-800. With reduced motion
-			// the glitch holds still.
+			// the glitch holds still. The T-800 reports the hit in the console.
 			app.terminator.trigger(motionless.matches).then(takePhoto)
+			console.log(...shotLog.next())
 			// Bounced off Snapshot (back and up from its side; down from below,
 			// still drifting left), then falling, spinning.
 			let [x, y] = hit
@@ -1197,6 +1200,11 @@ if (urlParams.get('gui') !== '0') {
 	window.__EYE__.replayIntro = () => intro.replay()
 	window.__EYE__.getIntro = () => intro.timeline
 	window.__EYE__.getIntroConfig = () => INTRO
+
+	// For whoever opens the console: the T-800's eye, with its warnings about
+	// the volume (src/ui/consoleArt.js); each shot that hits Snapshot adds a
+	// line (shoot()).
+	console.log(...terminatorLog())
 
 	// The panel shows while the URL ends in #debug: built the first time, then
 	// hidden and shown again as the hash changes.
