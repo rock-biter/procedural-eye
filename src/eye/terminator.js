@@ -3,11 +3,20 @@
 // it, a red lens glowing where the iris was, in a chrome socket; on the
 // front the two glitch into each other (terminator.glsl). The front's reach
 // follows the shot (src/eye/glitch.js), or glitch.amount for a preview,
-// whichever is more. The glitch has its own time, which runs while it shows
-// (outside photo mode, the preview's too): its pattern and its jumping
-// settings follow it. The eyeball's two programs share its uniforms.
+// whichever is more, or a hint of it while the cannon is armed. The glitch
+// has its own time, which runs while it shows (outside photo mode, the
+// preview's too): its pattern and its jumping settings follow it. The
+// eyeball's two programs share its uniforms.
 import { Color, Uniform, Vector2, Vector4 } from 'three'
-import { GLITCH_JUMPS, glitchClock, glitchEnvelope, glitchJumps, glitchPeakTime } from './glitch'
+import {
+	GLITCH_JUMPS,
+	chargeReach,
+	chargeStep,
+	glitchClock,
+	glitchEnvelope,
+	glitchJumps,
+	glitchPeakTime,
+} from './glitch'
 
 // The jumping settings held still: the glitch's time stands, in photo mode or
 // with reduced motion.
@@ -33,6 +42,9 @@ export default class Terminator {
 		this.time = null
 		this.still = false
 		this.seed = 0
+		// Whether the cannon is armed, and the progress of the hint.
+		this.charged = false
+		this.charge = 0
 		// The glitch's time (s), and whether it runs.
 		this.elapsed = 0
 		this.running = false
@@ -53,19 +65,33 @@ export default class Terminator {
 		return new Promise((resolve) => this.waiting.push(resolve))
 	}
 
-	// Whether the glitch moves: a shot runs, or the preview shows outside
-	// photo mode (`frozen`).
+	// The volume cannon armed or not (main.js): the hint of the glitch rises
+	// or sinks. `still` (reduced motion): its pattern does not flicker.
+	setCharged(charged, still = false) {
+		this.charged = charged
+		if (charged) this.still = still
+	}
+
+	// Whether the glitch moves: a shot runs, the hint shows, or the preview
+	// shows outside photo mode (`frozen`).
 	moving(params, frozen) {
-		return this.time !== null || (params.glitch.amount > 0 && !frozen)
+		const { amount, charge } = params.glitch
+		return (
+			this.time !== null ||
+			(charge > 0 && (this.charged || this.charge > 0)) ||
+			(amount > 0 && !frozen)
+		)
 	}
 
 	// Moves the glitch's time and the shot's clock on; true while the image
 	// must restart (the glitch moves, or a shot has just ended).
 	step(dt, params, frozen) {
+		const hinted = this.charge > 0
+		this.charge = chargeStep(this.charge, this.charged, dt)
 		const moving = this.moving(params, frozen)
-		this.running = moving && !(this.time !== null && this.still)
+		this.running = moving && !(this.still && (this.time !== null || this.charge > 0))
 		if (this.running) this.elapsed += dt
-		if (this.time === null) return moving
+		if (this.time === null) return moving || hinted
 		this.time += dt
 		const { duration } = params.glitch
 		if (this.waiting.length > 0 && this.time >= glitchPeakTime(duration)) {
@@ -84,7 +110,7 @@ export default class Terminator {
 		const clock = glitchClock(this.elapsed, glitch.speed)
 		const jumps = this.running ? glitchJumps(clock, this.seed, glitch.chaos) : STEADY
 		this.uniforms.uGlitch.value.set(
-			Math.max(glitch.amount, shot),
+			Math.max(glitch.amount, shot, chargeReach(this.charge, glitch.charge)),
 			glitch.band * jumps.band,
 			glitch.cell * jumps.cell,
 			// Each shot its own pattern.

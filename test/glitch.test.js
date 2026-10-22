@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+	CHARGE,
 	GLITCH,
 	GLITCH_JUMPS,
+	chargeReach,
+	chargeStep,
 	glitchClock,
 	glitchEnvelope,
 	glitchJumps,
@@ -75,4 +78,20 @@ test('the settings jump apart, within their ranges, holding a few ticks', () => 
 	}
 	// Not in step with one another.
 	assert.notDeepEqual(changes.tear, changes.split)
+})
+
+test('armed, a hint of the glitch rises to its level, and sinks back once let off', () => {
+	let progress = 0
+	let last = 0
+	for (let t = 0; t < CHARGE.rise; t += 0.01) {
+		progress = chargeStep(progress, true, 0.01)
+		const reach = chargeReach(progress, 0.07)
+		assert.ok(reach >= last && reach <= 0.07)
+		last = reach
+	}
+	progress = chargeStep(progress, true, 0.05)
+	assert.equal(chargeReach(progress, 0.07), 0.07)
+	assert.equal(chargeStep(progress, false, CHARGE.fall), 0)
+	assert.ok(chargeStep(progress, false, CHARGE.fall / 2) > 0)
+	assert.equal(chargeReach(0, 0.07), 0)
 })

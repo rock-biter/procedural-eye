@@ -418,6 +418,7 @@
   "glitch": {
     "amount": 0,
     "peak": 0.65,
+    "charge": 0.07,
     "duration": 0.05,
     "band": 1.5,
     "cell": 0.3,
@@ -428,7 +429,7 @@
     "jump": 1,
     "flicker": 0.24,
     "chaos": 0.8,
-    "speed": 24
+    "speed": 10
   },
   "terminator": {
     "glow": 1.2,

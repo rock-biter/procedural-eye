@@ -45,6 +45,7 @@ import { PARAM_SCHEMA } from './params/paramSchema'
 import { SKIN_TONES } from './params/skinTones'
 import { ParamTransition, TRANSITION } from './params/paramTransition'
 import Backdrop from './render/backdrop'
+import { encodePng } from './render/pngEncoder'
 import PostProcessing from './render/postProcessing'
 import { FOCUS_AT_INFINITY } from './renderSetup'
 import ScleraMaps from './sclera/scleraMaps'
@@ -709,16 +710,27 @@ export default class EyeApp {
 	// The current image as a PNG data URL: the accumulated mean, re-presented
 	// in the same task so the drawing buffer is still intact.
 	capture() {
+		return this.present((canvas) => canvas.toDataURL('image/png'))
+	}
+
+	// The same as a PNG blob, encoded off the main thread
+	// (src/render/pngEncoder.js): the page, and a glitch, go on meanwhile.
+	captureBlob() {
+		return this.present(encodePng)
+	}
+
+	// Re-presents the current image and reads the canvas with `read`.
+	present(read) {
 		const { renderPass, accumulation } = this.post
 		// A living eye keeps no frame: keep this one.
 		if (this.samples === 0) this.renderSample(null)
 		renderPass.enabled = false
 		accumulation.displayOnly = true
 		this.post.render()
-		const url = this.setup.renderer.domElement.toDataURL('image/png')
+		const result = read(this.setup.renderer.domElement)
 		renderPass.enabled = true
 		accumulation.displayOnly = false
-		return url
+		return result
 	}
 
 	// window.__EYE__: the hooks of the capture script and the console.
@@ -746,6 +758,7 @@ export default class EyeApp {
 				return unknown
 			},
 			capture: () => this.capture(),
+			captureBlob: () => this.captureBlob(),
 			toggleFrozen: () => this.toggleFrozen(),
 			isFrozen: () => this.frozen,
 			// Blinks now; false while the blink's frames are not built yet.
