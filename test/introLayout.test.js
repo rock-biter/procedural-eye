@@ -8,6 +8,7 @@ import {
 	framingBetween,
 	maskedLine,
 	outwardRanks,
+	reelEase,
 	revealPolygon,
 } from '../src/ui/introLayout'
 
@@ -111,6 +112,24 @@ test('the camera glides geometrically and lands on its framing', () => {
 	assert.ok(Math.abs(half.sensor - Math.sqrt(12 * 18)) < 1e-9)
 	assert.deepEqual(framingBetween(from, to, 0), from)
 	assert.deepEqual(framingBetween(from, to, 1), to)
+})
+
+test('the reel of irises slows down steadily, its steps growing geometrically', () => {
+	const ease = reelEase(10)
+	assert.equal(ease(0), 0)
+	assert.ok(Math.abs(ease(1) - 1) < 1e-12)
+	// The times at which a reel of 16 steps reaches each step.
+	const steps = 16
+	const times = Array.from({ length: steps + 1 }, (_, k) => (10 ** (k / steps) - 1) / 9)
+	times.forEach((t, k) => assert.ok(Math.abs(ease(t) * steps - k) < 1e-9))
+	const gaps = times.slice(1).map((t, k) => t - times[k])
+	// Each step a little longer than the one before, by the same ratio.
+	const ratio = gaps[1] / gaps[0]
+	gaps.slice(1).forEach((gap, k) => assert.ok(Math.abs(gap / gaps[k] - ratio) < 1e-9))
+	// From the start to the end the reel turns 10 times slower.
+	const speed = (t) => (ease(t + 1e-6) - ease(t)) / 1e-6
+	assert.ok(Math.abs(speed(0) / speed(1 - 1e-6) - 10) < 1e-3)
+	assert.equal(reelEase(1)(0.3), 0.3)
 })
 
 test('the HUD comes in from the center outward', () => {

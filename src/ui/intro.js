@@ -1,13 +1,17 @@
 // The intro (main.js): the page starts black. A black mask over the image
 // opens with a sharp diagonal cut from the bottom left to the top right as
 // the camera pulls back from a little closer and turns clockwise into its
-// framing; meanwhile the HUD's layers come in from the center outward, each
-// circle's buttons a moment after it, the frame draws its sides around the
-// page, and last the texts at the corners rise line by line out of their
-// masks, with Snapshot. One GSAP timeline holds it all, a part of its own
-// for each (`reveal`, `camera`, `hud`, `frame`, `texts`), placed and timed
-// by INTRO. Nothing waits for a preloader: the intro starts on the first
-// frames of the image, once the fonts the texts are split in have loaded.
+// framing, and the iris shuffles through random eyes like a slot machine's
+// reel, fast then slower, to stop on the page's own; meanwhile the HUD's
+// layers come in from the center outward, each circle's buttons a moment
+// after it, the frame draws its sides around the page, and last the texts at
+// the corners rise line by line out of their masks, with Snapshot; as it
+// ends, the eye blinks for the first time. One GSAP
+// timeline holds it all, a part of its own for each (`reveal`, `camera`,
+// `shuffle`, `hud`, `frame`, `texts`), placed and timed by INTRO. Nothing
+// waits for a preloader: the intro starts on the first frames of the image,
+// once the fonts the texts are split in have loaded and the shuffle's irises
+// are prepared.
 import { gsap } from 'gsap'
 import {
 	clockwise,
@@ -16,6 +20,7 @@ import {
 	framingBetween,
 	maskedLine,
 	outwardRanks,
+	reelEase,
 	revealPolygon,
 } from './introLayout'
 import { splitLines } from './splitLines'
@@ -35,6 +40,13 @@ export const INTRO = {
 	// distance meanwhile (the wheel, the knob, a zoom button) takes it over;
 	// the turn goes on.
 	camera: { at: 0, duration: 3.6, ease: 'power2.out', zoom: 0.3, turn: 14 },
+	// The iris shuffles through `count` random eyes (drawn at load, main.js)
+	// and stops on the page's own, each shown at once: a reel turning through
+	// them and slowing down steadily, `slowdown` times slower at the end than
+	// at the start (each eye shows a little longer than the one before), the
+	// page's eye coming in at the end. `ease`, a GSAP ease's name, replaces
+	// that slowdown.
+	shuffle: { at: 0.8, duration: 1.4, count: 16, slowdown: 10, ease: null },
 	// The HUD's layers from the center outward (the tones' arcs, the inner
 	// zoom ring, the central circle, the aperture knob's track, the spinning
 	// circle, the readouts, the zoom's wider circle on phones, the outer zoom
@@ -80,6 +92,9 @@ export const INTRO = {
 	// its size as it fades in, and its word rises out of its mask `label` s
 	// after.
 	snapshot: { duration: 1, ease: 'expo.out', scale: 1.35, label: 0.1 },
+	// The eye's first blink, `delay` s after the rest of the intro has ended
+	// (negative: before): until then the eye does not blink.
+	blink: { delay: -0.6 },
 }
 
 // The intro over the page main.js builds: `hud` (createHud()), `frame` (the
@@ -91,12 +106,27 @@ export const INTRO = {
 // closer it starts from ({ from, to }, each { distance, sensor }), set(framing),
 // which moves the camera there and returns the distance it took, distance(),
 // the camera's distance now, and turn(degrees), the image's turn about the
-// line of sight. `dev` keeps the timeline once it ends and loads GSDevTools
-// to scrub it. Returns hold(), which hides the interface and covers the image
-// until play() (at load), play(), which builds the timeline and plays it,
-// replay(), which builds it again from the page as it is and plays it, and
-// `timeline`.
-export function createIntro({ hud, frame, texts, lines, snapshot, camera, dev = false }) {
+// line of sight; `irises` (main.js), if given: eyes(), the reel's eyes
+// before the page's (deep partials of the params), current(), the page's,
+// show(eye), which switches to it at once and returns its token, and
+// token(), the token of the eye the page heads for; `blinks` (main.js), if
+// given: hold(), which keeps the eye from blinking, and first(), which lets
+// it blink again, with a blink now. `dev` keeps the timeline
+// once it ends and loads GSDevTools to scrub it. Returns hold(), which hides
+// the interface and covers the image until play() (at load), play(), which
+// builds the timeline and plays it, replay(), which builds it again from the
+// page as it is and plays it, and `timeline`.
+export function createIntro({
+	hud,
+	frame,
+	texts,
+	lines,
+	snapshot,
+	camera,
+	irises = null,
+	blinks = null,
+	dev = false,
+}) {
 	const root = document.documentElement
 	const mask = document.createElement('div')
 	mask.className = 'intro-mask'
@@ -149,6 +179,33 @@ export function createIntro({ hud, frame, texts, lines, snapshot, camera, dev = 
 		}
 		show()
 		return gsap.timeline({ id: 'camera' }).to(state, { t: 1, duration, ease, onUpdate: show })
+	}
+
+	// The reel of irises, through the random eyes to the page's: the eye at
+	// the reel's whole position, switched as it reaches one. Once something
+	// else changes the iris (Random eye, a preset), the iris is theirs.
+	const shufflePart = () => {
+		const part = gsap.timeline({ id: 'shuffle' })
+		if (!irises) return part
+		const { duration, slowdown } = INTRO.shuffle
+		const ease = INTRO.shuffle.ease ?? reelEase(slowdown)
+		const reel = [...irises.eyes(), irises.current()]
+		const state = { position: 0 }
+		let shown = -1
+		let token = null
+		let yielded = false
+		const show = () => {
+			const index = Math.min(Math.floor(state.position), reel.length - 1)
+			if (yielded || index === shown) return
+			if (token !== null && irises.token() !== token) {
+				yielded = true
+				return
+			}
+			shown = index
+			token = irises.show(reel[index])
+		}
+		show()
+		return part.to(state, { position: reel.length - 1, duration, ease, onUpdate: show })
 	}
 
 	// The HUD's layers from the center outward, with their buttons and
@@ -340,9 +397,13 @@ export function createIntro({ hud, frame, texts, lines, snapshot, camera, dev = 
 		master
 			.add(revealPart(), INTRO.reveal.at)
 			.add(cameraPart(), INTRO.camera.at)
+			.add(shufflePart(), INTRO.shuffle.at)
 			.add(hudPart(), INTRO.hud.at)
 			.add(framePart(), INTRO.frame.at)
 			.add(textsPart(), INTRO.texts.at)
+		// The eye blinks first as the rest ends.
+		blinks?.hold()
+		master.call(() => blinks?.first(), [], master.duration() + INTRO.blink.delay)
 		return master
 	}
 
@@ -364,6 +425,7 @@ export function createIntro({ hud, frame, texts, lines, snapshot, camera, dev = 
 		hold() {
 			root.classList.add('intro-pending')
 			mask.hidden = false
+			blinks?.hold()
 		},
 		// Two frames after the call, so the image the mask opens on is drawn.
 		play() {

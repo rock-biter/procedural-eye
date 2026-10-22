@@ -40,7 +40,7 @@ import { EMITTER_TYPE, sceneLuminance, sphericalDirection } from './lighting/env
 import KeyShadow from './lighting/keyShadow'
 import LightRig from './lighting/lightRig'
 import ShaftLight from './lighting/shaftLight'
-import { applyOverrides, cloneParams, encodeState, getLeaf } from './params/params'
+import { applyOverrides, cloneParams, diffParams, encodeState, getLeaf } from './params/params'
 import { PARAM_SCHEMA } from './params/paramSchema'
 import { SKIN_TONES } from './params/skinTones'
 import { ParamTransition, TRANSITION } from './params/paramTransition'
@@ -346,6 +346,24 @@ export default class EyeApp {
 		this.notifyChange('*')
 	}
 
+	// Switches the leaves of `overrides` (a deep partial) to its values at once,
+	// without a transition (the intro's shuffle of irises): each leaf that
+	// changes marks its kind dirty and is notified, as an edit is. A running
+	// transition heads for these values too and stops gliding them.
+	switchParams(overrides) {
+		const before = cloneParams(this.params)
+		applyOverrides(PARAM_SCHEMA, this.params, overrides)
+		const changed = diffParams(PARAM_SCHEMA, before, this.params)
+		if (this.transition) {
+			applyOverrides(PARAM_SCHEMA, this.transition.target, overrides)
+			for (const path of changed) this.transition.cancel(path)
+		}
+		for (const path of changed) {
+			this.markDirty(path)
+			this.notifyChange(path)
+		}
+	}
+
 	// The params as they will be when the running transition ends.
 	get targetParams() {
 		return this.transition ? this.transition.target : this.params
@@ -412,11 +430,19 @@ export default class EyeApp {
 		this.notifyChange('frozen')
 	}
 
-	// Starts a blink now (a living eye whose blink frames are built).
+	// Starts a blink now (a living eye whose blink frames are built), held or
+	// not; it counts as the spontaneous one, which is rescheduled.
 	blink() {
 		if (!this.params.animation.enabled || this.frozen) return false
 		this.animator.blink.start()
+		this.animator.blink.schedule()
 		return this.lidBlink.ready
+	}
+
+	// Holds the blinks (`held`: the intro, until its end), or lets them go
+	// on: held, none starts on its own and the spontaneous ones' timer waits.
+	holdBlinks(held) {
+		this.animator.blink.held = held
 	}
 
 	// The eye's pose for this frame. A living eye steps the animation and keeps

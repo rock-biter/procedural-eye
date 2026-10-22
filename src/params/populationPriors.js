@@ -385,3 +385,28 @@ export function randomEye(ancestry = 'european', seed = Math.floor(Math.random()
 	}
 	return eye
 }
+
+// Whether a color class is of light irises (blue, green, grey) or dark ones
+// (hazel to black).
+export const lightColorClass = (colorClass) => colorClass <= 1
+
+// `count` random irises for a reel of eyes (the intro's shuffle,
+// src/ui/intro.js), each of a random ancestry, light and dark ones taking
+// turns (the first either), so the reel shows the range of iris colors:
+// [{ colorClass, shade, params }], `params` the iris part of a random eye's
+// override (irisColor, irisStructure).
+export function randomIrises(count, seed = Math.floor(Math.random() * 1e9)) {
+	const random = createRandom(`irises:${seed}`)
+	const irises = []
+	let light = random() < 0.5
+	for (let draw = 0; irises.length < count; draw++) {
+		const ancestry = ANCESTRIES[Math.floor(random() * ANCESTRIES.length)]
+		const { features, params } = randomEye(ancestry, `${seed}:${draw}`)
+		const { colorClass, shade } = features
+		if (lightColorClass(colorClass) !== light) continue
+		light = !light
+		const { irisColor, irisStructure } = params
+		irises.push({ colorClass, shade, params: { irisColor, irisStructure } })
+	}
+	return irises
+}

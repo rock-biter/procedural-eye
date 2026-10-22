@@ -181,6 +181,28 @@ test('random eyes: shades within the ranges, with vivid blues, ambers and a tent
 	assert.ok(Math.abs(mako / 1000 - MAKO_SHARE) < 0.03, `mako ${mako}/1000`)
 })
 
+test('random irises: seeded, valid iris overrides, light and dark ones taking turns', async () => {
+	const { lightColorClass, randomIrises } = await import('../src/params/populationPriors')
+	const irises = randomIrises(40, 7)
+	assert.equal(irises.length, 40)
+	assert.deepEqual(randomIrises(40, 7), irises)
+	const shades = new Set()
+	const classes = new Set()
+	irises.forEach(({ colorClass, shade, params }, i) => {
+		assert.deepEqual(Object.keys(params).sort(), ['irisColor', 'irisStructure'])
+		assert.deepEqual(
+			applyOverrides(BASE_PARAM_SCHEMA, createDefaults(BASE_PARAM_SCHEMA), params),
+			[],
+		)
+		if (i > 0)
+			assert.notEqual(lightColorClass(colorClass), lightColorClass(irises[i - 1].colorClass))
+		shades.add(shade)
+		classes.add(colorClass)
+	})
+	assert.ok(shades.size >= 5, `${shades.size} shades`)
+	assert.ok(classes.size >= 3, `${classes.size} color classes`)
+})
+
 test('PNG text metadata round-trips and keeps the chunk CRC valid', async () => {
 	const { crc32, insertPngText, readPngText } = await import('../src/render/pngMetadata')
 	assert.equal(crc32(new TextEncoder().encode('IEND')), 0xae426082)

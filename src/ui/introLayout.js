@@ -117,6 +117,17 @@ export function framingBetween(from, to, t) {
 	}
 }
 
+// The ease of a reel that slows down steadily (the intro's shuffle of
+// irises): its speed falls `slowdown` times from the start to the end, each
+// step taking a little longer than the one before (a geometric series), where
+// an ease out would crawl to a halt over its last step. t ↦ ln(1 + (s − 1)t) /
+// ln s; linear for a slowdown of 1 or less.
+export function reelEase(slowdown) {
+	if (!(slowdown > 1)) return (t) => t
+	const log = Math.log(slowdown)
+	return (t) => Math.log(1 + (slowdown - 1) * t) / log
+}
+
 // Layers ({ radius }, px) in the order they come in, from the center
 // outward, each as { layer, rank }: the rank counts the radii inside it,
 // layers less than `tie` px apart sharing one (the zoom's circle is the

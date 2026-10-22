@@ -16,7 +16,7 @@ import {
 	setValue,
 } from './src/params/params'
 import { TRANSITION } from './src/params/paramTransition'
-import { ANCESTRIES, randomEye } from './src/params/populationPriors'
+import { ANCESTRIES, randomEye, randomIrises } from './src/params/populationPriors'
 import { PRESETS } from './src/params/presets'
 import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
@@ -140,6 +140,25 @@ function loadRandomEye(ancestry = panelState.ancestry, seed, duration = panelSta
 	return features
 }
 
+// The irises of `count` random eyes for the intro's shuffle (randomIrises(),
+// no two of a shade in a row), each on the defaults of its groups, as a random
+// eye resets them: deep partials of the params. An iris's token (its seed,
+// its melanin and its stroma's scattering) tells it from another.
+const IRIS_GROUPS = ['irisColor', 'irisStructure']
+function drawIrises(count) {
+	const defaults = createDefaults(PARAM_SCHEMA)
+	return randomIrises(count).map(({ params: overrides }) => {
+		const eye = {}
+		for (const group of IRIS_GROUPS) eye[group] = structuredClone(defaults[group])
+		applyOverrides(PARAM_SCHEMA, eye, overrides)
+		return eye
+	})
+}
+const irisOf = (values) =>
+	Object.fromEntries(IRIS_GROUPS.map((group) => [group, structuredClone(values[group])]))
+const irisToken = ({ irisColor, irisStructure }) =>
+	[irisStructure.seed, irisColor.ablMelanin, irisColor.eumelanin, irisColor.stromaScattering].join()
+
 // Glides the camera back to its start ('in') or out to the whole figure
 // ('out', by the screen's shape), over zoom.duration (or `duration` s: the
 // HUD's knob snapping to an end). The rest keeps the values a running
@@ -258,6 +277,8 @@ let refreshPanel = () => {}
 // start-up: not with ?intro=0, not for a capture (?photo=), not with reduced
 // motion. ?intro=dev keeps its timeline and loads GSDevTools to scrub it.
 let intro = null
+// The color tables of the intro's irises, being built.
+let irisesReady = Promise.resolve()
 const introPlays =
 	urlParams.get('intro') !== '0' &&
 	!urlParams.has('photo') &&
@@ -1098,13 +1119,35 @@ if (urlParams.get('gui') !== '0') {
 	requestAnimationFrame(countFrame)
 
 	// The intro (src/ui/intro.js): the image opening under a diagonal cut, the
-	// camera pulling back and turning into its framing, the HUD, the frame and
-	// the texts coming in. Its camera starts `zoom` of the zoom knob's travel
+	// camera pulling back and turning into its framing, the iris shuffling, the
+	// HUD, the frame and the texts coming in, then the first blink. Its camera starts `zoom` of the zoom knob's travel
 	// closer than its framing (as far as zoom in), its distance and sensor on
 	// the zoom's curve, and moves as the knob moves it (setZoomLevel());
 	// it turns about the line of sight outside the params, as the parallax
-	// turns it (PhysicalCamera.roll). Until it plays, the interface waits
-	// hidden and a black mask covers the image.
+	// turns it (PhysicalCamera.roll). Its reel of irises, drawn now when it
+	// plays, has their color tables built ahead in workers
+	// (IrisColorLut.prepare()), so each switch (EyeApp.switchParams()) needs
+	// no rebuild; one not ready when it starts is left out. Until it plays,
+	// the interface waits hidden and a black mask covers the image.
+	// The eye's first blink comes as the intro ends: its blinks are held
+	// meanwhile (from load), and should the blink's frames still be building
+	// then, it waits for them, BLINK_WAIT ms at most. An eye that does not
+	// blink (animation.blinkRate 0, a still eye) is only let go.
+	const BLINK_WAIT = 4000
+	const firstBlink = () => {
+		const until = performance.now() + BLINK_WAIT
+		const go = () => {
+			const { enabled, blinkRate } = app.params.animation
+			const blinks = enabled && blinkRate > 0
+			if (blinks && !app.lidBlink.ready && performance.now() < until)
+				return requestAnimationFrame(go)
+			app.holdBlinks(false)
+			if (blinks) app.blink()
+		}
+		go()
+	}
+	const reelEyes = introPlays ? drawIrises(INTRO.shuffle.count) : []
+	irisesReady = app.irisColorLut.prepare(reelEyes.map((eye) => eye.irisColor))
 	intro = createIntro({
 		hud,
 		frame: frameElement,
@@ -1138,6 +1181,16 @@ if (urlParams.get('gui') !== '0') {
 				app.invalidate()
 			},
 		},
+		irises: {
+			eyes: () => reelEyes.filter((eye) => app.irisColorLut.has(eye.irisColor)),
+			current: () => irisOf(app.targetParams),
+			show(eye) {
+				app.switchParams(eye)
+				return irisToken(app.targetParams)
+			},
+			token: () => irisToken(app.targetParams),
+		},
+		blinks: { hold: () => app.holdBlinks(true), first: firstBlink },
 		dev: urlParams.get('intro') === 'dev',
 	})
 	if (introPlays) intro.hold()
@@ -1224,12 +1277,18 @@ window.addEventListener('hashchange', updateSkinMode)
 updateSkinMode()
 
 // The intro plays on the first frames of the image, once the fonts it splits
-// the texts in have loaded; should the start fail, the interface still shows
-// and the error is not swallowed.
+// the texts in have loaded and the color tables of its irises are built (for
+// IRISES_WAIT ms at most: the shuffle leaves out those not ready); should the
+// start fail, the interface still shows and the error is not swallowed.
+const IRISES_WAIT = 3000
 const started = app.start()
 if (intro && introPlays) {
 	const play = () => intro.play()
-	document.fonts.ready
+	const irises = Promise.race([
+		irisesReady.catch((error) => console.error(error)),
+		new Promise((resolve) => setTimeout(resolve, IRISES_WAIT)),
+	])
+	Promise.all([document.fonts.ready, irises])
 		.then(() => started)
 		.then(play, (error) => {
 			play()

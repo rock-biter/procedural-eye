@@ -14,6 +14,8 @@
 // - Depth: about one blink in seven stops short (14.5%, Argilés 2015).
 // - Gaze-evoked blinks: a large gaze shift brings a blink with it, nearly
 //   always past about 33° (Evinger 1994).
+// - Held (`held`, the intro until its end): no blink starts on its own and
+//   the spontaneous ones' timer waits.
 // `slowdown` stretches every phase (below 1 it shortens them).
 import { lerp, smoothstep } from '../math'
 import { gaussian } from '../random'
@@ -54,6 +56,8 @@ export class BlinkModel {
 		this.timer = null
 		// Blinks so far.
 		this.count = 0
+		// Whether blinks wait: none starts on its own, the timer stops.
+		this.held = false
 	}
 
 	// The next spontaneous blink: a log-normal interval of mean 1.
@@ -81,7 +85,7 @@ export class BlinkModel {
 	// A gaze shift of `amplitude` degrees may bring a blink with it; it counts
 	// as the spontaneous one. `rate` 0: no blinks at all.
 	gazeShift(amplitude, rate) {
-		if (rate <= 0 || this.closingOrClosed) return
+		if (rate <= 0 || this.held || this.closingOrClosed) return
 		const [low, high] = BLINK.evoked
 		if (this.random() < BLINK.evokedChance * smoothstep(low, high, amplitude)) {
 			this.start()
@@ -109,8 +113,8 @@ export class BlinkModel {
 	// Advances `dt` seconds at `rate` blinks per minute; returns the closure.
 	step(dt, rate, slowdown = 1) {
 		if (this.timer === null) this.schedule()
-		if (rate > 0) this.timer -= (dt * rate) / 60
-		if (this.timer <= 0 && !this.closingOrClosed) {
+		if (rate > 0 && !this.held) this.timer -= (dt * rate) / 60
+		if (this.timer <= 0 && !this.held && !this.closingOrClosed) {
 			this.start()
 			this.schedule()
 		}

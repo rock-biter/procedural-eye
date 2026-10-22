@@ -122,6 +122,31 @@ test('a large gaze shift brings a blink with it, a small one does not', () => {
 	assert.equal(blink.count, 1)
 })
 
+test('held, an eye blinks neither on its own nor with a gaze shift, and its timer waits', () => {
+	const blink = new BlinkModel(createRandom('held'))
+	blink.step(0, 15)
+	const timer = blink.timer
+	blink.held = true
+	for (let i = 0; i < 60 * 30; i++) blink.step(1 / 60, 15)
+	blink.gazeShift(40, 15)
+	assert.equal(blink.count, 0)
+	assert.equal(blink.closure, 0)
+	assert.equal(blink.timer, timer)
+	// Let go, it blinks again at its rate, the interval it had left first.
+	blink.held = false
+	let steps = 0
+	while (blink.count === 0) {
+		blink.step(1 / 60, 15)
+		steps++
+	}
+	close(steps / 60, (timer * 60) / 15, 1 / 60 + 1e-9, 'the interval left')
+	// A blink started by hand runs while held (the intro's first one is let go
+	// first).
+	blink.held = true
+	blink.start()
+	assert.ok(blink.step(0.05, 15) > 0)
+})
+
 test('the animator blinks a living eye, not a still one, nor a frozen start', () => {
 	const params = createDefaults(BASE_PARAM_SCHEMA)
 	params.animation.blinkRate = 30
