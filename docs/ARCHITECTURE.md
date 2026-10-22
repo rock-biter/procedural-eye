@@ -87,7 +87,7 @@
 | [`src/audio/foley.js`](../src/audio/foley.js) * | Detents crossed between two values, stops of an f-number, a level's overshoot and the creak's drive. |
 | [`src/audio/soundBank.js`](../src/audio/soundBank.js) * | `SOUNDS`: each sound's takes or synth, the `sound.volumes` leaf of its level, its variation, voices and gap; `SOUND_FILES`. |
 | [`src/audio/synth.js`](../src/audio/synth.js) * | The synthesized buffers: the hover's tick, the aperture's fine ticks and the autofocus beep. |
-| [`src/audio/ambience.js`](../src/audio/ambience.js) | `Ambience`: the glass harp, quiet glasses singing in turn and now and then a louder one, each a few sine partials with a beating twin, a swell and a whisper of friction, in a convolution reverb; the slow fade in. |
+| [`src/audio/ambience.js`](../src/audio/ambience.js) | `Ambience`: the glass harp, quiet glasses singing in turn and now and then a louder one, each a few sine partials with a beating twin, a swell and a whisper of friction, in a convolution reverb; the slow fade in; its speed (`setSpeed()`), which the volume slider pulled past its end raises. |
 | [`src/audio/soundscape.js`](../src/audio/soundscape.js) * | The glass harp's tuning (a pentatonic per key), the note a new glass takes by its consonance with those singing, each glass's voice, the waits between glasses and the fade-in curve. |
 | [`src/audio/impulse.js`](../src/audio/impulse.js) * | The reverb's synthetic impulse response. |
 | [`src/meshLayout.js`](../src/meshLayout.js) * | Vertices spaced by the surface's bend (the chord's sagitta under a tolerance), density integrals and even placement under them, rings of different counts zipped by angle: for the lids, the back shell and the eyeball. |

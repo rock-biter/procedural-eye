@@ -409,7 +409,9 @@
     "glasses": 4,
     "leadRate": 0.5,
     "glassKey": "D",
-    "fadeIn": 10
+    "fadeIn": 10,
+    "stretch": 200,
+    "stretchRate": 2
   },
   "post": {
     "toneMapping": "agx",

@@ -354,7 +354,7 @@ if (urlParams.get('gui') !== '0') {
 	const foley = new CameraFoley(audio)
 	const ambience = new Ambience(audio)
 	cue = (name, detail) => foley.cue(name, detail)
-	window.__EYE__.getSoundStats = () => audio.stats()
+	window.__EYE__.getSoundStats = () => ({ ...audio.stats(), musicSpeed: ambience.rate })
 	audition = (name) => {
 		audio.unlock()
 		return audio.play(name) !== null
@@ -642,6 +642,60 @@ if (urlParams.get('gui') !== '0') {
 	app.listeners.add((path) => {
 		if (path === '*' || path === 'sound.volume') showVolume()
 	})
+	// Past the right end a drag pulls on, as the HUD's knobs do: the volume
+	// stays full and the handle follows, resisted by the knobs' law
+	// (elasticZoomLevel()) up to `sound.stretch` px past the end (less where
+	// the window has no room for it), the line and the toggle dragged along by
+	// their shares of its run (VOLUME_FOLLOW), and the glass harp playing
+	// faster the further it is pulled, up to `sound.stretchRate` times at the
+	// limit. Let go, they spring back with an elastic ease in SPRING_BACK s,
+	// the music slowing back to its own speed with them.
+	const VOLUME_FOLLOW = { line: 0.3, toggle: 0.15 }
+	const SPRING_BACK = 0.9
+	// The handle's run past the end (px) and its share of the furthest it can
+	// run (0 to 1), which sets the music's speed.
+	const stretch = { over: 0, amount: 0 }
+	// The furthest the handle can run past the end (px), as a share of the
+	// track.
+	const stretchReach = () => {
+		const room = window.innerWidth - volume.getBoundingClientRect().right - 24
+		return Math.max(Math.min(app.params.sound.stretch, room), 0) / VOLUME_TRACK
+	}
+	const showStretch = (over, amount) => {
+		volume.style.setProperty('--volume-over', `${over}px`)
+		volume.style.setProperty('--volume-line-over', `${over * VOLUME_FOLLOW.line}px`)
+		soundToggle.style.translate = over ? `${over * VOLUME_FOLLOW.toggle}px 0` : ''
+		ambience.setSpeed(1 + (app.params.sound.stretchRate - 1) * Math.max(amount, 0))
+	}
+	// Pulled to `pull` (of the track; past 1, past the end).
+	const pullVolume = (pull) => {
+		const reach = stretchReach()
+		if (pull <= 1 || reach <= 0) {
+			if (stretch.over !== 0) showStretch((stretch.over = 0), (stretch.amount = 0))
+			userVolume(pull)
+			return
+		}
+		userVolume(1)
+		stretch.over = (elasticZoomLevel(pull, reach) - 1) * VOLUME_TRACK
+		stretch.amount = stretch.over / (reach * VOLUME_TRACK)
+		showStretch(stretch.over, stretch.amount)
+	}
+	const springBack = () => {
+		const { over, amount } = stretch
+		if (over <= 0) return
+		const ease = (value) => {
+			stretch.over = value
+			stretch.amount = (amount * value) / over
+			showStretch(value, stretch.amount)
+		}
+		if (motionless.matches) return ease(0)
+		gsap.to(stretch, {
+			over: 0,
+			duration: SPRING_BACK,
+			ease: 'elastic.out(1, 0.75)',
+			onUpdate: () => ease(stretch.over),
+		})
+	}
 	const tapVolume = () => cue('tap', { control: 'volume', element: volume })
 	const volumeAt = (event) => (event.clientX - volume.getBoundingClientRect().left) / VOLUME_TRACK
 	const settle = () => remember(app.params.sound.volume)
@@ -651,9 +705,17 @@ if (urlParams.get('gui') !== '0') {
 		volume.setPointerCapture(event.pointerId)
 		volume.classList.add('dragging')
 		const at = volumeAt(event)
-		const grab = at - app.params.sound.volume
-		const onHandle = Math.abs(grab) * VOLUME_TRACK <= 6
-		volumeDrag = { id: event.pointerId, offset: onHandle ? grab : 0 }
+		// Grabbed while it springs back, it is held where it was grabbed: its
+		// offset counts the handle's run past the end.
+		const springing = gsap.isTweening(stretch)
+		gsap.killTweensOf(stretch)
+		const shown = app.params.sound.volume + stretch.over / VOLUME_TRACK
+		const onHandle = Math.abs(at - shown) * VOLUME_TRACK <= 6 || springing
+		const pull =
+			stretch.over > 0
+				? pullLevel(1 + stretch.over / VOLUME_TRACK, stretchReach())
+				: app.params.sound.volume
+		volumeDrag = { id: event.pointerId, offset: onHandle ? at - pull : 0 }
 		if (onHandle) gsap.killTweensOf(glide)
 		else glideVolume(at, VOLUME_GLIDE, userVolume, settle)
 	})
@@ -664,13 +726,14 @@ if (urlParams.get('gui') !== '0') {
 		// pressed.
 		if (gliding() && Math.abs(at - glide.to) * VOLUME_TRACK < 3) return
 		gsap.killTweensOf(glide)
-		userVolume(at)
+		pullVolume(at)
 	})
 	const releaseVolume = (event, tap) => {
 		if (volumeDrag?.id !== event.pointerId) return
 		volumeDrag = null
 		volume.classList.remove('dragging')
 		volume.blur()
+		springBack()
 		if (!gliding()) settle()
 		if (tap) tapVolume()
 	}

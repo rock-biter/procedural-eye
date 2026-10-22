@@ -4,7 +4,8 @@
 // (src/audio/soundscape.js); now and then (`sound.leadRate` a minute) a
 // louder one rises over them. It fades in slowly (`sound.fadeIn`) once the
 // sound starts at the first gesture, and again after a mute; the engine
-// pauses it with the rest.
+// pauses it with the rest. setSpeed() plays it faster, as a tape: every
+// glass higher, its beat and swell quicker.
 import { createRandom } from '../random'
 import { impulseResponse } from './impulse'
 import {
@@ -37,6 +38,7 @@ export default class Ambience {
 		this.quietAt = null
 		this.loudAt = null
 		this.wasMuted = engine.muted
+		this.rate = 1
 		this.random = createRandom(`glasses:${Math.random()}`)
 		engine.onReady((context) => this.build(context))
 	}
@@ -68,7 +70,20 @@ export default class Ambience {
 		this.friction.buffer = this.engine.buffer(noise(rate, 3, 'glasses'))
 		this.friction.loop = true
 		this.friction.start()
+		// The speed, in cents on every oscillator's and band's detune.
+		this.speed = context.createConstantSource()
+		this.speed.offset.value = 0
+		this.speed.start()
 		this.fadeIn()
+	}
+
+	// Plays the glasses `rate` times as fast (1 is their own speed): their
+	// pitch, beat and swell, eased over a few hundredths of a second.
+	setSpeed(rate) {
+		this.rate = rate
+		if (!this.speed) return
+		const cents = 1200 * Math.log2(Math.max(rate, 1e-3))
+		this.speed.offset.setTargetAtTime(cents, this.engine.context.currentTime, 0.03)
 	}
 
 	// The whole ambience from silence, over `sound.fadeIn` s; the first glass
@@ -161,6 +176,7 @@ export default class Ambience {
 			...GLASS_HARMONICS.map(([order, level]) => [fundamental * order, level * voice.brightness]),
 		]
 		const sources = [swellRate]
+		const sped = [swellRate.detune]
 		for (const [hz, level] of partials) {
 			if (hz > 0.9 * nyquist) continue
 			const oscillator = context.createOscillator()
@@ -169,6 +185,7 @@ export default class Ambience {
 			gain.gain.value = level
 			oscillator.connect(gain).connect(swell)
 			sources.push(oscillator)
+			sped.push(oscillator.detune)
 		}
 		// The friction: the shared noise through a narrow band on the note,
 		// only while the finger rubs.
@@ -181,6 +198,8 @@ export default class Ambience {
 		rub.gain.linearRampToValueAtTime(FRICTION * voice.brightness, time + voice.attack)
 		rub.gain.setTargetAtTime(0, lifts, 0.08)
 		this.friction.connect(band).connect(rub).connect(swell)
+		sped.push(band.detune)
+		for (const param of sped) this.speed.connect(param)
 
 		for (const source of sources) {
 			source.start(time)
@@ -188,6 +207,7 @@ export default class Ambience {
 		}
 		// Once the glass has died away, its nodes go.
 		sources[0].onended = () => {
+			for (const param of sped) this.speed.disconnect(param)
 			band.disconnect()
 			panner.disconnect()
 		}

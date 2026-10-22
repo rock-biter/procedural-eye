@@ -989,7 +989,9 @@ canvas {
    of it while the sound is off. The handle, white (the credit's opacity
    makes it the zoom marker's grey), takes the accent under the pointer, the
    keyboard's focus and a drag. Its box sits on the baseline as tall as the
-   capitals, the line through their middle; the hit area reaches past it. */
+   capitals, the line through their middle; the hit area reaches past it.
+   Pulled past the right end, main.js moves the handle --volume-over past it
+   and the line --volume-line-over after it. */
 .volume {
 	position: relative;
 	display: inline-block;
@@ -1014,6 +1016,7 @@ canvas {
 	position: absolute;
 	top: 4px;
 	left: -1px;
+	translate: var(--volume-line-over, 0px) 0;
 	width: calc(var(--volume-track) + 3px);
 	height: 1px;
 	background: linear-gradient(
@@ -1031,7 +1034,7 @@ canvas {
 .volume-handle {
 	position: absolute;
 	top: 4.5px;
-	left: calc(0.5px + var(--volume) * var(--volume-track));
+	left: calc(0.5px + var(--volume) * var(--volume-track) + var(--volume-over, 0px));
 	width: 8px;
 	height: 8px;
 	translate: -50% -50%;

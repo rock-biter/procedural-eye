@@ -70,6 +70,7 @@ The app itself emits no events; everything is read per frame.
 
 - **The tone**: the fundamental at 1 − `twin` and a twin `beat` Hz above it at `twin` (0.15–0.35), which beat together; the 2nd, 3rd and 4th harmonics at 0.07, 0.025 and 0.01 (`GLASS_HARMONICS`), none above 0.9 of the Nyquist frequency. While the finger rubs, a whisper of friction joins them: a looped white noise shared by every glass, through a band-pass on the note (Q 30), about 35 dB under the tone.
 - **The space**: 35% of the glasses ring dry, and all of them go through a convolution reverb whose impulse response is synthesized (`impulseResponse()`: two channels of seeded noise falling 60 dB in 7 s, their highs dying sooner, after a 12 ms predelay). The quiet glasses and the louder ones have their own volumes, `sound.volumes.glasses` and `.lead`.
+- **Speed**: `setSpeed(rate)` plays the glass harp `rate` times as fast, as a tape sped up: a constant source holds 1200·log₂ `rate` cents and feeds the detune of every glass's oscillators (the fundamentals, the twins, the harmonics and the swell) and of its friction band, so the glasses sound higher, beat and swell faster, eased with a time constant of 0.03 s. The volume slider pulled past its right end sets it, from 1 up to `sound.stretchRate` at the furthest the handle can run ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
 - **Fade in**: once the sound starts (the first press or key), the ambience rises from silence along a sin² curve over `sound.fadeIn` s (`fadeCurve()`), its first glass starting at once. It does so again when the sound is turned back on after a mute.
 
 ## Parameters
@@ -90,6 +91,8 @@ The `sound` group of [`src/params/paramSchema.js`](../src/params/paramSchema.js)
 | `leadRate` | 1.5 per minute | The louder glasses, on average; 0 for none. |
 | `glassKey` | `D` | The key the glasses are tuned to: `C`, `D`, `E`, `F`, `G` or `A`. |
 | `fadeIn` | 10 s | How slowly the glass harp fades in. |
+| `stretch` | 200 px | How far the volume slider's handle can run past its right end. |
+| `stretchRate` | 2× | The glass harp's speed with the handle at that limit. |
 
 ## Recordings
 
