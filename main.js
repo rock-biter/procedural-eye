@@ -720,12 +720,16 @@ if (urlParams.get('gui') !== '0') {
 	// with an elastic bounce, stronger the more they were compressed, the
 	// handle is thrown along the line to that level and the music speeds back
 	// up. At the limit the spring is armed and the handle trembles: let go, it
-	// shoots the handle at Snapshot, which takes a photo and recoils, and the
-	// handle bounces off it and tumbles out of the window, the volume going to
-	// full; a moment later a new handle pops up at the end of the line.
+	// shoots the handle at Snapshot (on a phone, where Snapshot is above it,
+	// off the window's right edge first), which takes a photo and recoils the
+	// way it was hit, and the handle bounces off it and tumbles out of the
+	// window, the volume going to full; a moment later a new handle pops up at
+	// the end of the line.
 	const SPRING_RELEASE = 0.8
 	const SQUEEZE_BULGE = 0.8
 	const SHOT_SPEED = 2200
+	const BANK_SPEED = 900
+	const SHOT_SPIN = 1080
 	const GRAVITY = 2600
 	const RESPAWN = 1.4
 	// The handle's run past the left end (px), its limit (px), the width the
@@ -801,9 +805,11 @@ if (urlParams.get('gui') !== '0') {
 			onComplete: settle,
 		})
 	}
-	// The handle shot at Snapshot from where it is: it flies there, Snapshot
-	// takes a photo and recoils, and the handle bounces off it, falls out of
-	// the window tumbling and comes back later at the end of the line.
+	// The handle shot at Snapshot from where it is: it flies there (SHOT_SPEED
+	// px/s; a bank shot BANK_SPEED, its legs short), spinning SHOT_SPIN
+	// degrees a second, Snapshot takes a photo and recoils, and the handle
+	// bounces off it, falls out of the window tumbling and comes back later at
+	// the end of the line.
 	const shoot = () => {
 		const from = volume.querySelector('.volume-handle').getBoundingClientRect()
 		const to = snapshot.getBoundingClientRect()
@@ -812,57 +818,95 @@ if (urlParams.get('gui') !== '0') {
 		showVolume()
 		const shot = document.createElement('div')
 		shot.className = 'volume-shot'
+		shot.addEventListener('animationend', () => shot.classList.remove('wall'))
 		document.body.append(shot)
 		const place = (x, y, turn) => {
 			shot.style.translate = `${x}px ${y}px`
 			shot.style.rotate = `${turn}deg`
 		}
-		const x0 = from.left + from.width / 2
-		const y0 = from.top + from.height / 2
-		const x1 = to.left + 4
-		const y1 = to.top + to.height / 2
-		const distance = Math.hypot(x1 - x0, y1 - y0)
-		const duration = Math.max(distance / SHOT_SPEED, 0.2)
-		const flight = { t: 0 }
-		place(x0, y0, 0)
-		gsap.to(flight, {
-			t: 1,
-			duration,
-			ease: 'none',
-			onUpdate: () => {
-				const { t } = flight
-				const arc = distance * 0.06 * 4 * t * (1 - t)
-				place(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - arc, 540 * t)
-			},
-			onComplete: () => {
-				snapshot.classList.remove('recoil')
-				void snapshot.offsetWidth
-				snapshot.classList.add('recoil')
-				cue('press', { control: 'snapshot', element: snapshot })
-				cue('snapshot', { element: snapshot })
-				// Bounced back a little, up, then falling, spinning; the photo is
-				// saved once it is out of the window, so its rendering does not
-				// hold the fall.
-				let x = x1
-				let y = y1
-				let vx = (-0.3 * distance) / duration
-				let vy = -380
-				let turn = 540
-				let last = performance.now()
-				const fall = (now) => {
-					const dt = Math.min((now - last) / 1000, 0.05)
-					last = now
-					vy += GRAVITY * dt
-					x += vx * dt
-					y += vy * dt
-					turn -= 900 * dt
-					place(x, y, turn)
-					if (y < window.innerHeight + 40) return requestAnimationFrame(fall)
-					shot.remove()
-					takePhoto()
-				}
-				requestAnimationFrame(fall)
-			},
+		const start = [from.left + from.width / 2, from.top + from.height / 2]
+		// Snapshot above the handle (a phone's footer, a column): a bank shot
+		// off the window's right edge, up into Snapshot's lower right quarter,
+		// which it knocks up, left and counterclockwise (--recoil-*, style.css).
+		// Else straight at its left side, knocking it right.
+		const bank = to.bottom < from.top
+		const hit = bank
+			? [to.right - to.width / 4, to.bottom - 2]
+			: [to.left + 4, to.top + to.height / 2]
+		const stops = bank
+			? [[window.innerWidth - 4, start[1] - 0.35 * (start[1] - hit[1])], hit]
+			: [hit]
+		const recoil = bank ? { x: '-3px', y: '-7px', turn: '-2deg' } : null
+		for (const axis of ['x', 'y', 'turn'])
+			if (recoil) snapshot.style.setProperty(`--recoil-${axis}`, recoil[axis])
+			else snapshot.style.removeProperty(`--recoil-${axis}`)
+		const speed = bank ? BANK_SPEED : SHOT_SPEED
+		const shortest = bank ? 0.15 : 0.2
+		// The legs, the first on a slight arc, spinning all the way; the
+		// velocity the last one ends with.
+		const timeline = gsap.timeline()
+		let turn = 0
+		let velocity = [0, 0]
+		stops.reduce((a, b, i) => {
+			const distance = Math.hypot(b[0] - a[0], b[1] - a[1])
+			const duration = Math.max(distance / speed, shortest)
+			const leg = { t: 0 }
+			const from = turn
+			const arc = i === 0 ? distance * 0.06 : 0
+			turn += SHOT_SPIN * duration
+			velocity = [(b[0] - a[0]) / duration, (b[1] - a[1]) / duration]
+			timeline.to(leg, {
+				t: 1,
+				duration,
+				ease: 'none',
+				onUpdate: () => {
+					const { t } = leg
+					place(
+						a[0] + (b[0] - a[0]) * t,
+						a[1] + (b[1] - a[1]) * t - arc * 4 * t * (1 - t),
+						from + SHOT_SPIN * duration * t,
+					)
+				},
+				// Off the window's edge: a light click and a squash.
+				onComplete:
+					i < stops.length - 1
+						? () => {
+								cue('tap', { control: 'volume', element: shot })
+								shot.classList.remove('wall')
+								void shot.offsetWidth
+								shot.classList.add('wall')
+							}
+						: undefined,
+			})
+			return b
+		}, start)
+		timeline.eventCallback('onComplete', () => {
+			snapshot.classList.remove('recoil')
+			void snapshot.offsetWidth
+			snapshot.classList.add('recoil')
+			cue('press', { control: 'snapshot', element: snapshot })
+			cue('snapshot', { element: snapshot })
+			// Bounced off Snapshot (back and up from its side; down from below,
+			// still drifting left), then falling, spinning; the photo is saved
+			// once it is out of the window, so its rendering does not hold the
+			// fall.
+			let [x, y] = hit
+			let vx = bank ? 0.5 * velocity[0] : -0.3 * velocity[0]
+			let vy = bank ? 250 : -380
+			let last = performance.now()
+			const fall = (now) => {
+				const dt = Math.min((now - last) / 1000, 0.05)
+				last = now
+				vy += GRAVITY * dt
+				x += vx * dt
+				y += vy * dt
+				turn -= 900 * dt
+				place(x, y, turn)
+				if (y < window.innerHeight + 40) return requestAnimationFrame(fall)
+				shot.remove()
+				takePhoto()
+			}
+			requestAnimationFrame(fall)
 		})
 		setTimeout(() => {
 			volume.classList.remove('fired')

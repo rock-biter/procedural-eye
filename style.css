@@ -1096,15 +1096,28 @@ canvas {
 	pointer-events: none;
 }
 
-/* Snapshot hit by the shot handle knocks back and settles. */
+/* Snapshot hit by the shot handle knocks back the way it was hit and
+   settles: right and a little up and clockwise, hit on its left side; main.js
+   sets --recoil-* for a bank shot from below (up, left, counterclockwise). */
 .snapshot.recoil {
 	animation: snapshot-recoil 0.5s var(--spring);
 }
 
 @keyframes snapshot-recoil {
 	18% {
-		translate: 8px -2px;
-		rotate: 2.5deg;
+		translate: var(--recoil-x, 8px) var(--recoil-y, -2px);
+		rotate: var(--recoil-turn, 2.5deg);
+	}
+}
+
+/* The shot handle off the window's edge: squashed against it a moment. */
+.volume-shot.wall {
+	animation: volume-shot-wall 0.12s ease-out;
+}
+
+@keyframes volume-shot-wall {
+	30% {
+		scale: 0.6 1.3;
 	}
 }
 
