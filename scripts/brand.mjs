@@ -1,7 +1,8 @@
 // The site's icons and social image, rendered by the app itself in headless
 // Chrome (docs/DEVELOPMENT.md): the default eye's iris seen from the front,
 // cut to a circle, as the favicon and the touch icon, and the opening desktop
-// scene as the Open Graph image. Writes into public/.
+// scene, with the frame and the HUD, as the Open Graph image. Writes into
+// public/.
 //
 // Usage: pnpm brand [--samples 128] [--no-build] [--chrome <path>]
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -49,15 +50,23 @@ const ICON = {
 		.join(';'),
 }
 // The Open Graph image: the opening scene of a desktop window of its shape,
-// rendered at twice its size.
-const OG = { width: 1200, height: 630, scale: 2 }
+// rendered at twice its size, with the interface's frame and HUD but without
+// its texts (the title and the line about the project, the credit line, the
+// frame rate, the HUD's readouts) and Snapshot.
+const OG = {
+	width: 1200,
+	height: 630,
+	scale: 2,
+	hidden: ['.masthead', '.more-info', '.info', '.footer', '.fps', '.hud-readout'],
+}
 
 const children = []
 const work = mkdtempSync(join(tmpdir(), 'eye-brand-'))
 
 // Renders `query` until the photo converges, after `setup` (code on `app`,
-// the EyeApp of ?debug); returns the PNG data URL.
-async function render(session, baseUrl, viewport, query, setup = '') {
+// the EyeApp of ?debug); returns the PNG data URL of the canvas, or of the
+// whole page, its interface included, if `page`.
+async function render(session, baseUrl, viewport, query, setup = '', page = false) {
 	await session.setViewport(viewport)
 	await session.navigate(`${baseUrl}?${new URLSearchParams(query)}&debug`)
 	await waitFor(async () => await session.evaluate('!!window.__EYE_APP__'), 'the app', 60000)
@@ -71,7 +80,9 @@ async function render(session, baseUrl, viewport, query, setup = '') {
 		600000,
 	)
 	if (session.errors.length > 0) throw new Error(session.errors.join('\n'))
-	return session.evaluate('window.__EYE__.capture()')
+	if (!page) return session.evaluate('window.__EYE__.capture()')
+	const shot = await session.send('Page.captureScreenshot', { format: 'png' })
+	return `data:image/png;base64,${shot.result.data}`
 }
 
 // The limbus on screen (pixels of the drawing buffer): its center and its
@@ -201,11 +212,14 @@ try {
 	writeFileSync(join(root, 'public/apple-touch-icon.png'), bytes(await icon(180, false)))
 
 	console.log('Rendering the opening scene...')
+	const hide = `${OG.hidden.join(', ')} { visibility: hidden !important }`
 	const scene = await render(
 		session,
 		baseUrl,
 		{ width: OG.width, height: OG.height, dpr: OG.scale },
-		{ gui: '0', photo, dpr: String(OG.scale) },
+		{ photo, dpr: String(OG.scale) },
+		`const style = document.createElement('style'); style.textContent = ${JSON.stringify(hide)}; document.head.append(style)`,
+		true,
 	)
 	const og = await resample(session, scene, {
 		width: OG.width,

@@ -15,7 +15,7 @@ The interface sounds like a camera. Every control of the HUD makes the mechanica
 - **Mute**: the master fades to 0 (time constant 0.08 s) and the context then suspends. A hidden page suspends it too, and a visible page resumes it unless muted.
 - **Stats**: `stats()` returns the context's state, whether the sounds are decoded, the mute and the play count of each sound, plus the peak and RMS of the master (dBFS) since the last call. The analyser is read once a frame, so a sound played while the main thread is blocked (`capture()` while Snapshot saves) can escape the peak while it still plays in full.
 
-The sound exists only with the interface: [`main.js`](../main.js) builds it inside the `?gui=0` check, so captures and `pnpm brand` never create a context.
+The sound exists only with the interface: [`main.js`](../main.js) builds it inside the `?gui=0` check, so captures never create a context. `pnpm brand` renders the Open Graph image with the interface, but presses nothing, so it never creates one either.
 
 [`main.js`](../main.js) wires it:
 - It creates `AudioEngine` and `CameraFoley`.
