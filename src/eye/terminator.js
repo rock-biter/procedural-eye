@@ -12,6 +12,7 @@ import {
 	GLITCH_JUMPS,
 	chargeReach,
 	chargeStep,
+	flashEnvelope,
 	glitchClock,
 	glitchEnvelope,
 	glitchJumps,
@@ -42,6 +43,9 @@ export default class Terminator {
 		this.time = null
 		this.still = false
 		this.seed = 0
+		// The red flash's clock (s), null when none runs: it outlives the
+		// glitch by its fade.
+		this.flashTime = null
 		// Whether the cannon is armed, and the progress of the hint.
 		this.charged = false
 		this.charge = 0
@@ -60,6 +64,7 @@ export default class Terminator {
 	// `still` (reduced motion): the pattern does not flicker.
 	trigger(still = false) {
 		this.time = 0
+		this.flashTime = 0
 		this.still = still
 		this.seed = Math.floor(Math.random() * 2 ** 32)
 		return new Promise((resolve) => this.waiting.push(resolve))
@@ -78,20 +83,27 @@ export default class Terminator {
 		const { amount, charge } = params.glitch
 		return (
 			this.time !== null ||
+			this.flashTime !== null ||
 			(charge > 0 && (this.charged || this.charge > 0)) ||
 			(amount > 0 && !frozen)
 		)
 	}
 
-	// Moves the glitch's time and the shot's clock on; true while the image
-	// must restart (the glitch moves, or a shot has just ended).
+	// Moves the glitch's time, the shot's and the flash's clocks and the hint
+	// on; true while the image must restart (the glitch moves, or a shot, its
+	// flash or the hint has just ended).
 	step(dt, params, frozen) {
-		const hinted = this.charge > 0
+		const ending = this.charge > 0 || this.flashTime !== null
+		if (this.flashTime !== null) {
+			this.flashTime += dt
+			const { duration, flashOut } = params.glitch
+			if (this.flashTime >= duration + flashOut) this.flashTime = null
+		}
 		this.charge = chargeStep(this.charge, this.charged, dt)
 		const moving = this.moving(params, frozen)
 		this.running = moving && !(this.still && (this.time !== null || this.charge > 0))
 		if (this.running) this.elapsed += dt
-		if (this.time === null) return moving || hinted
+		if (this.time === null) return moving || ending
 		this.time += dt
 		const { duration } = params.glitch
 		if (this.waiting.length > 0 && this.time >= glitchPeakTime(duration)) {
@@ -100,6 +112,14 @@ export default class Terminator {
 		}
 		if (this.time >= duration) this.time = null
 		return true
+	}
+
+	// How far the lights and the backdrop have turned red (0–1): only a shot
+	// flashes them.
+	flash(params) {
+		if (this.flashTime === null) return 0
+		const { duration, flashIn, flashOut } = params.glitch
+		return flashEnvelope(this.flashTime, duration, flashIn, flashOut)
 	}
 
 	// Per-sample uniforms; `white`: the radiance of a white diffuse surface

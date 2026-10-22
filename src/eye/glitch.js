@@ -78,3 +78,13 @@ export function chargeStep(progress, charged, dt) {
 
 // The front's reach at `progress`, `level` at the top.
 export const chargeReach = (progress, level) => level * smoothstep(0, 1, progress)
+
+// The red flash of the lights and the backdrop `t` seconds after a shot:
+// it rises over `rise` seconds, holds while the glitch lasts (`duration`),
+// and fades over `fade` seconds after it.
+export function flashEnvelope(t, duration, rise, fade) {
+	if (t <= 0 || t >= duration + fade) return 0
+	const up = rise > 0 ? smoothstep(0, rise, t) : 1
+	const down = fade > 0 ? 1 - smoothstep(duration, duration + fade, t) : t < duration ? 1 : 0
+	return Math.min(up, down)
+}

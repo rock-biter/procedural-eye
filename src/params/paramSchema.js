@@ -564,7 +564,11 @@ export const BASE_PARAM_SCHEMA = {
 	// flicker, blocks jump, and the front jumps, flips or flashes. While a
 	// shot runs, the band, the rows, the tears, the ripple, the split, the
 	// jumps and the flicker jump to random multiples of their values, each
-	// holding a few ticks (src/eye/glitch.js); `chaos` sets how far.
+	// holding a few ticks (src/eye/glitch.js); `chaos` sets how far. A shot
+	// also flashes the scene red: the lights turn `light`, their brightest
+	// channel `lightGain` times their luminance, and the backdrop `backdrop`,
+	// rising over `flashIn`, holding while the glitch lasts and fading over
+	// `flashOut` after it.
 	glitch: {
 		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview (front reach)'),
 		peak: num(0.65, 0, 1, 0.01, '', 'uniform', 'front reach at the photo'),
@@ -579,6 +583,11 @@ export const BASE_PARAM_SCHEMA = {
 		jump: num(1, 0, 4, 0.01, 'mm', 'uniform', 'block jumps'),
 		flicker: num(0.6, 0, 1, 0.01, '', 'uniform', 'flicker'),
 		chaos: num(0.8, 0, 1, 0.01, '', 'uniform', 'settings jumping'),
+		light: color('#ff1408', 'uniform', 'flash: light color'),
+		lightGain: num(1, 0, 6, 0.05, '×', 'uniform', 'flash: light gain'),
+		backdrop: color('#5c0a06', 'uniform', 'flash: backdrop color'),
+		flashIn: num(0.1, 0, 1, 0.01, 's', 'uniform', 'flash: rise'),
+		flashOut: num(0.5, 0, 3, 0.05, 's', 'uniform', 'flash: fade'),
 		speed: num(24, 1, 60, 1, 'per s', 'uniform', 'pattern ticks'),
 	},
 	// The T-800's eye under the glitch: its lens' glow (× a white surface

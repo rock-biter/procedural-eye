@@ -6,6 +6,7 @@ import {
 	GLITCH_JUMPS,
 	chargeReach,
 	chargeStep,
+	flashEnvelope,
 	glitchClock,
 	glitchEnvelope,
 	glitchJumps,
@@ -94,4 +95,20 @@ test('armed, a hint of the glitch rises to its level, and sinks back once let of
 	assert.equal(chargeStep(progress, false, CHARGE.fall), 0)
 	assert.ok(chargeStep(progress, false, CHARGE.fall / 2) > 0)
 	assert.equal(chargeReach(0, 0.07), 0)
+})
+
+test('the red flash rises, holds through the glitch, and fades after it', () => {
+	const [duration, rise, fade] = [0.25, 0.1, 0.5]
+	assert.equal(flashEnvelope(0, duration, rise, fade), 0)
+	assert.equal(flashEnvelope(rise, duration, rise, fade), 1)
+	assert.equal(flashEnvelope(duration, duration, rise, fade), 1)
+	assert.equal(flashEnvelope(duration + fade, duration, rise, fade), 0)
+	let last = 1
+	for (let t = duration; t < duration + fade; t += 0.01) {
+		const value = flashEnvelope(t, duration, rise, fade)
+		assert.ok(value <= last + 1e-12)
+		last = value
+	}
+	assert.ok(flashEnvelope(rise / 2, duration, rise, fade) > 0)
+	assert.equal(flashEnvelope(0.1, 0.25, 0, 0), 1)
 })

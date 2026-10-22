@@ -622,7 +622,12 @@ export default class EyeApp {
 		const size = this.setup.getDrawingBufferSize()
 		this.physicalCamera.update(this.params, this.eye, this.focusDepth, size, sample, this.framing)
 		this.eyeRig.updateMatrices()
-		this.lightRig.update(this.params.lighting, this.physicalCamera.camera, this.eyeRig.worldToEye)
+		this.lightRig.update(
+			this.params.lighting,
+			this.physicalCamera.camera,
+			this.eyeRig.worldToEye,
+			this.redFlash(),
+		)
 		this.setup.renderer.setClearColor(
 			this.backdropColor.setRGB(...this.backdropRadiance()),
 			FOCUS_AT_INFINITY,
@@ -694,9 +699,22 @@ export default class EyeApp {
 	// albedo, saturated as the subsurface shading saturates it), skin.backdrop
 	// as bright. It keeps that tone whatever skin.color becomes, so the page
 	// does not change with the skin tones.
+	// In the Terminator glitch's red flash it turns glitch.backdrop.
 	backdropRadiance() {
 		const light = this.lightRig.luminance * 0.05 * this.params.skin.backdrop
-		return hexToLinearRgb(BACKDROP_SKIN).map((c) => c ** 1.3 * light)
+		const skin = hexToLinearRgb(BACKDROP_SKIN).map((c) => c ** 1.3 * light)
+		const flash = this.terminator.flash(this.params)
+		if (flash <= 0) return skin
+		const red = hexToLinearRgb(this.params.glitch.backdrop).map((c) => c * light)
+		return skin.map((c, i) => c + (red[i] - c) * flash)
+	}
+
+	// The red flash of the lights during a shot's glitch, or null.
+	redFlash() {
+		const amount = this.terminator.flash(this.params)
+		if (amount <= 0) return null
+		const { light, lightGain } = this.params.glitch
+		return { color: hexToLinearRgb(light), gain: lightGain, amount }
 	}
 
 	// Approximate radiance of a diffuse surface of sRGB `hex` near the eye, lit

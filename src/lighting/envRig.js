@@ -275,6 +275,25 @@ export function packBackground(lighting) {
 	}
 }
 
+// The rig in a red flash (the Terminator glitch, src/eye/terminator.js):
+// each light and the room or sky turn `amount` (0–1) of the way to `color`
+// (linear rgb), their brightest channel `gain` times their luminance. In
+// place, on the emitters of buildEmitters() and the terms of packBackground().
+export function flashRig(list, background, color, gain, amount) {
+	if (amount <= 0) return
+	const peak = Math.max(...color, 1e-6)
+	const flash = (rgb) => {
+		const level = (luminance(rgb) * gain) / peak
+		return rgb.map((c, i) => c + (color[i] * level - c) * amount)
+	}
+	for (const item of list) {
+		item.radiance = flash(item.radiance)
+		if (item.type === EMITTER_TYPE.WINDOW) item.f = [...flash(item.f.slice(0, 3)), item.f[3]]
+	}
+	for (const key of Object.keys(background))
+		background[key] = [...flash(background[key].slice(0, 3)), background[key][3]]
+}
+
 // Approximate photometric illuminance at the eye from the rig and background
 // (relative units), the input of the pupil model. With a line of sight
 // `direction` (unit, world space), each emitter is weighed as the pupil weighs

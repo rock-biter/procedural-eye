@@ -6,7 +6,9 @@ import {
 	EMITTER_TYPE,
 	EMITTER_VEC4S,
 	facingAxes,
+	flashRig,
 	MAX_EMITTERS,
+	packBackground,
 	packEmitters,
 	sceneLuminance,
 	sphericalDirection,
@@ -88,4 +90,22 @@ test('the pupil weighs each light by its angle from the line of sight', () => {
 	assert.ok(toward <= full && toward > 0.8 * full, 'the key light at full weight')
 	assert.ok(sceneLuminance(params.lighting, list, away) < 0.3 * toward)
 	assert.ok(sceneLuminance(params.lighting, list, [0, 0, 1]) < toward)
+})
+
+test('a red flash turns the lights and the room red, as bright as asked', () => {
+	const lighting = createDefaults(BASE_PARAM_SCHEMA).lighting
+	const red = [1, 0.02, 0.01]
+	const list = buildEmitters(lighting, camera)
+	const background = packBackground(lighting)
+	const before = list.map((item) => luminance(item.radiance))
+	const room = luminance(background.uRoom.slice(0, 3))
+	flashRig(list, background, red, 2, 0)
+	assert.deepEqual(list, buildEmitters(lighting, camera))
+	flashRig(list, background, red, 2, 1)
+	list.forEach((item, i) => {
+		close(item.radiance[0], 2 * before[i], 1e-9, 'red channel')
+		assert.ok(item.radiance[1] < 0.03 * item.radiance[0] + 1e-12)
+	})
+	close(background.uRoom[0], 2 * room, 1e-9, 'room')
+	assert.equal(background.uRoom[3], packBackground(lighting).uRoom[3])
 })

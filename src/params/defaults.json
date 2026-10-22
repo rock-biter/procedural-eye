@@ -419,7 +419,7 @@
     "amount": 0,
     "peak": 0.65,
     "charge": 0.07,
-    "duration": 0.05,
+    "duration": 0.25,
     "band": 1.5,
     "cell": 0.3,
     "tear": 0.8,
@@ -429,6 +429,11 @@
     "jump": 1,
     "flicker": 0.24,
     "chaos": 0.8,
+    "light": "#ff1408",
+    "lightGain": 1,
+    "backdrop": "#5c0a06",
+    "flashIn": 0.1,
+    "flashOut": 0.5,
     "speed": 10
   },
   "terminator": {
