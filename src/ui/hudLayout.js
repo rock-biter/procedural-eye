@@ -615,6 +615,24 @@ export function zoomValueRadius(radius, hud = HUD, split = false) {
 	return (radius * (hud.spin.radiusRatio + hud.outer.radiusRatio)) / 2
 }
 
+// The radius (px) of each of the HUD's layers about its circle of `radius`
+// px, for the intro's wave from the center outward (src/ui/intro.js): the
+// tones' arcs, the inner zoom ring, the central circle, the zoom's (the wider
+// one of a split HUD), the aperture knob's track, the spinning circle, the
+// readouts and the outer zoom ring.
+export function hudLayerRadii(radius, hud = HUD, split = false) {
+	return {
+		arcs: radius * (split ? hud.split.arcs : hud.arcs).radiusRatio,
+		inner: radius * orbitShape('inner', split, hud).radiusRatio,
+		line: radius,
+		zoom: zoomRadius(radius, split, hud),
+		aperture: apertureRadius(radius, hud),
+		spin: radius * spinRatio(split, hud),
+		readouts: zoomValueRadius(radius, hud, split),
+		outer: radius * orbitShape('outer', split, hud).radiusRatio,
+	}
+}
+
 // The camera distance of a zoom level: the inverse of zoomLevel().
 export function zoomDistance(level, [near, far]) {
 	return far * (near / far) ** level

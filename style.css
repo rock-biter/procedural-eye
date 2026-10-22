@@ -275,6 +275,33 @@ canvas {
 	transform: scaleX(-1);
 }
 
+/* The intro (src/ui/intro.js). Until it starts, the interface waits hidden
+   over the black page (laid out, so the texts can be split into their lines
+   and the fonts load). A black mask covers the image, under the frame and
+   the HUD, until the intro's cut has crossed it (its clip-path). While the
+   intro runs, Snapshot's fade is the intro's, not its own transition's. */
+.intro-pending :is(.frame, .hud, .masthead, .more-info, .fps, .footer) {
+	visibility: hidden;
+}
+
+.intro-mask {
+	position: fixed;
+	inset: 0;
+	z-index: 4;
+	background: #000;
+	pointer-events: none;
+}
+
+.intro-running .snapshot {
+	transition: none;
+}
+
+/* A text split into its lines for the intro (src/ui/splitLines.js): each
+   line keeps to one line. */
+.split-line {
+	white-space: nowrap;
+}
+
 /* The HUD (src/ui/hud.js): a dashed circle (white at 30%) inside the frame,
    centered on the page, with every button on it; src/ui/hudLayout.js sets
    the circle and each button's center (left, top). The mask cuts the line
@@ -292,8 +319,11 @@ canvas {
 	pointer-events: none;
 }
 
+/* The groups of buttons, and the wrappers the intro turns the segmented
+   rings in (src/ui/hud.js), span the box. */
 .hud-ring,
-.hud-group {
+.hud-group,
+.hud-layer {
 	position: absolute;
 	inset: 0;
 }

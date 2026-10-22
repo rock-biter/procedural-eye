@@ -23,6 +23,10 @@ export default class PhysicalCamera {
 		this.pinhole = { matrixWorld: new Matrix4(), view: new Matrix4(), projection: new Matrix4() }
 		// { azimuth, elevation } in degrees, added to params.camera's.
 		this.orbitOffset = { azimuth: 0, elevation: 0 }
+		// A turn of the camera about its line of sight (degrees, the image
+		// clockwise on the screen), outside the params: the intro's
+		// (src/ui/intro.js).
+		this.roll = 0
 	}
 
 	// `focusDepth`: depth of the apparent iris behind the corneal apex (the
@@ -45,6 +49,8 @@ export default class PhysicalCamera {
 		camera.position.set(x, y, z).multiplyScalar(c.distance).add(this.target)
 		camera.up.set(0, 1, 0)
 		camera.lookAt(this.target)
+		// Turning the camera counterclockwise turns the image clockwise.
+		if (this.roll !== 0) camera.rotateZ(MathUtils.degToRad(this.roll))
 		this.focusDistance = c.distance
 		const fov = verticalFov(c.focalLength, c.distance, c.sensorHeight)
 		camera.fov = MathUtils.radToDeg(fov)

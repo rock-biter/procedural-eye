@@ -22,6 +22,7 @@ import { SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
+import { INTRO, createIntro } from './src/ui/intro'
 import {
 	apertureFNumber,
 	apertureProgress,
@@ -34,9 +35,9 @@ import {
 } from './src/ui/hudLayout'
 
 // The bootstrap: reads the URL (?preset=, ?state=, ?photo=, ?view=, ?gui=0, ?dpr=,
-// ?meshtree=1, #debug), creates the params, the renderer and the app, the HUD
-// unless ?gui=0, the panel while the URL ends in #debug, and the mesh tree
-// with ?meshtree=1.
+// ?meshtree=1, ?intro=, #debug), creates the params, the renderer and the app,
+// the HUD and its intro unless ?gui=0, the panel while the URL ends in #debug,
+// and the mesh tree with ?meshtree=1.
 const urlParams = new URLSearchParams(window.location.search)
 const presetName = PRESETS[urlParams.get('preset')] ? urlParams.get('preset') : 'default'
 const state = urlParams.get('state') ? decodeState(urlParams.get('state')) : null
@@ -253,6 +254,14 @@ let audition = null
 // Reads the params back into the panel, once it is built (the volume slider
 // sets sound.volume without a change that would restart the image).
 let refreshPanel = () => {}
+// The intro (src/ui/intro.js), with the interface, and whether it plays at
+// start-up: not with ?intro=0, not for a capture (?photo=), not with reduced
+// motion. ?intro=dev keeps its timeline and loads GSDevTools to scrub it.
+let intro = null
+const introPlays =
+	urlParams.get('intro') !== '0' &&
+	!urlParams.has('photo') &&
+	!window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // Downloads the current (accumulated) image with its state in a tEXt chunk,
 // to the sound of a focus beep and a shutter (from `element`, Snapshot, if
@@ -349,7 +358,8 @@ function frame() {
 
 if (urlParams.get('gui') !== '0') {
 	// The frame around the page; the rest of the interface stays inside it.
-	document.body.appendChild(frame())
+	const frameElement = frame()
+	document.body.appendChild(frameElement)
 
 	// The sound design (src/audio/, docs/AUDIO.md): the camera foley of the
 	// controls and the ambience, which start at the first press or key (the
@@ -1087,6 +1097,54 @@ if (urlParams.get('gui') !== '0') {
 	}
 	requestAnimationFrame(countFrame)
 
+	// The intro (src/ui/intro.js): the image opening under a diagonal cut, the
+	// camera pulling back and turning into its framing, the HUD, the frame and
+	// the texts coming in. Its camera starts `zoom` of the zoom knob's travel
+	// closer than its framing (as far as zoom in), its distance and sensor on
+	// the zoom's curve, and moves as the knob moves it (setZoomLevel());
+	// it turns about the line of sight outside the params, as the parallax
+	// turns it (PhysicalCamera.roll). Until it plays, the interface waits
+	// hidden and a black mask covers the image.
+	intro = createIntro({
+		hud,
+		frame: frameElement,
+		texts: [masthead.querySelector('h1'), masthead.querySelector('p'), credit],
+		lines: [moreInfo, viewport, fps],
+		snapshot,
+		camera: {
+			framing(zoom) {
+				const { distance, sensorHeight } = app.params.camera
+				const { sensorIn, sensorOut } = app.params.zoom
+				const level = zoomProgress(distance, zoomLimits())
+				const start = Math.min(level + zoom, Math.max(level, 1))
+				return {
+					from: {
+						distance: zoomDistance(start, zoomLimits()),
+						sensor: zoomSensor(start, [sensorIn, sensorOut]),
+					},
+					to: { distance, sensor: sensorHeight },
+				}
+			},
+			set({ distance, sensor }) {
+				setValue(PARAM_SCHEMA, app.params, 'camera.distance', distance)
+				setValue(PARAM_SCHEMA, app.params, 'camera.sensorHeight', sensor)
+				app.onParamChange('camera.distance')
+				app.onParamChange('camera.sensorHeight')
+				return app.params.camera.distance
+			},
+			distance: () => app.params.camera.distance,
+			turn(degrees) {
+				app.physicalCamera.roll = degrees
+				app.invalidate()
+			},
+		},
+		dev: urlParams.get('intro') === 'dev',
+	})
+	if (introPlays) intro.hold()
+	window.__EYE__.replayIntro = () => intro.replay()
+	window.__EYE__.getIntro = () => intro.timeline
+	window.__EYE__.getIntroConfig = () => INTRO
+
 	// The panel shows while the URL ends in #debug: built the first time, then
 	// hidden and shown again as the hash changes.
 	let panel = null
@@ -1165,4 +1223,16 @@ const updateSkinMode = () => app.setSkinBaked(window.location.hash !== '#debug')
 window.addEventListener('hashchange', updateSkinMode)
 updateSkinMode()
 
-app.start()
+// The intro plays on the first frames of the image, once the fonts it splits
+// the texts in have loaded; should the start fail, the interface still shows
+// and the error is not swallowed.
+const started = app.start()
+if (intro && introPlays) {
+	const play = () => intro.play()
+	document.fonts.ready
+		.then(() => started)
+		.then(play, (error) => {
+			play()
+			throw error
+		})
+}

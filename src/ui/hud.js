@@ -8,6 +8,7 @@ import {
 	apertureTrackArc,
 	apertureFollowTurn,
 	circleDashes,
+	hudLayerRadii,
 	hudLayout,
 	knobAngle,
 	knobLevel,
@@ -132,7 +133,8 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // segmented rings' sizes and turns, and showZoomValue(text), the zoom's
 // value by the knob; showApertureLevel(level), where the aperture knob goes
 // and the tones' arcs' size, and showApertureValue(text), the f-number by
-// the zoom's value. onCue(name, detail), if given, hears the controls for the
+// the zoom's value; introLayers(), its layers for the intro
+// (src/ui/intro.js). onCue(name, detail), if given, hears the controls for the
 // sound design (src/audio/cameraFoley.js): 'press' and 'hover' of a button
 // or knob, 'tap' of a knob and 'random'; `detail.element` is the control,
 // `detail.control` its name.
@@ -226,7 +228,20 @@ export function createHud({
 	// The spinning circle and its teeth sway together.
 	const spinGroup = svgElement('g')
 	spinGroup.append(spin, spinTeeth)
-	ring.append(mask, line, zoomLine, zoomTrackLine, apertureLine, spinGroup, ...arcs)
+	// The intro (src/ui/intro.js) brings the HUD in layer by layer: each in a
+	// group of its own (introLayers()), the segmented rings each in a wrapper
+	// across the box (below).
+	const layer = (...children) => {
+		const group = svgElement('g')
+		group.append(...children)
+		return group
+	}
+	const lineLayer = layer(line)
+	const zoomLayer = layer(zoomLine, zoomTrackLine)
+	const apertureLayer = layer(apertureLine)
+	const spinLayer = layer(spinGroup)
+	const arcsLayer = layer(...arcs)
+	ring.append(mask, lineLayer, zoomLayer, apertureLayer, spinLayer, arcsLayer)
 	const cut = () => {
 		const circle = svgElement('circle', { class: 'hud-cut' })
 		mask.append(circle)
@@ -408,8 +423,14 @@ export function createHud({
 		}, ACTIVE_HOLD[name])
 	}
 
+	const orbitLayers = orbitAssets.map(({ wrapper }) => {
+		const box = document.createElement('div')
+		box.className = 'hud-layer'
+		box.append(wrapper)
+		return box
+	})
 	element.append(
-		...orbitAssets.map(({ wrapper }) => wrapper),
+		...orbitLayers,
 		ring,
 		zoomReadout.element,
 		cameraAngles.element,
@@ -816,6 +837,33 @@ export function createHud({
 		showCameraAngles(text, orbiting) {
 			cameraAngles.show(text)
 			if (orbiting) activate('camera')
+		},
+		// The HUD's layers for the intro (src/ui/intro.js), each with its radius
+		// (px, hudLayerRadii()), its elements (the groups of the circle's parts,
+		// the wrappers of the segmented rings) and the buttons, knobs and
+		// readouts on it; `origin`, the circles' center in the HUD's box. Null
+		// before the first layout.
+		introLayers() {
+			if (!placed) return null
+			const radii = hudLayerRadii(placed.radius, HUD, placed.split)
+			const [innerRing, outerRing] = orbitLayers
+			return {
+				origin: [placed.cx, placed.cy],
+				layers: [
+					{ radius: radii.arcs, elements: [arcsLayer] },
+					{ radius: radii.inner, elements: [innerRing] },
+					{ radius: radii.line, elements: [lineLayer], buttons: [...toneButtons, random] },
+					{
+						radius: radii.zoom,
+						elements: [zoomLayer],
+						buttons: [zoomIn, knob.element, zoomOut],
+					},
+					{ radius: radii.aperture, elements: [apertureLayer], buttons: [apertureKnob.element] },
+					{ radius: radii.spin, elements: [spinLayer] },
+					{ radius: radii.readouts, readouts: [zoomReadout.element, cameraAngles.element] },
+					{ radius: radii.outer, elements: [outerRing] },
+				],
+			}
 		},
 		showZoomLevel(shown) {
 			knob.show(shown)
