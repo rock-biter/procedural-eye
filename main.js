@@ -447,7 +447,7 @@ if (urlParams.get('gui') !== '0') {
 	// buttons do. On phones the title drops its dash and breaks before "eyes",
 	// and the panel starts below it, at its height (--masthead-height,
 	// style.css).
-	const description = `<span class="title">Random-eyes</span>. The digital eye configurator.<br> Humanity may not be ready yet, but one day you'll configure your digital avatar, or your household robot. Might as well start with <span>the eyes</span>.`
+	const description = `<span class="title">Random-eyes</span> is the eye configurator nobody asked for: a procedural human eye, from iris crypts to lashes, rendered live in your browser. <span>Face sold separately</span>.`
 	const masthead = document.createElement('header')
 	masthead.className = 'masthead'
 	masthead.innerHTML = `<h1>Random<span class="title-dash">-</span><span class="title-eyes">eyes</span></h1><p>${description}</p>`
