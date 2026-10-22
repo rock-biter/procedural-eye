@@ -474,6 +474,32 @@ if (urlParams.get('gui') !== '0') {
 		document.documentElement.style.setProperty('--masthead-height', `${masthead.offsetHeight}px`)
 	}).observe(masthead)
 
+	// The tab's title while the page is hidden: a line of the eye left
+	// staring at the empty window, "I can see you…" the first time, then
+	// another one drawn each time (never the same twice in a row). Back,
+	// the page's own title.
+	const tabTitles = [
+		'I can see you…',
+		'I saw that.',
+		'Still watching…',
+		'Blink if you miss me',
+		"Come back, I'm drying out",
+		'Staring contest: you lost',
+	]
+	const pageTitle = document.title
+	let tabTitle = null
+	const showTabTitle = () => {
+		if (!document.hidden) {
+			document.title = pageTitle
+			return
+		}
+		const skip = 1 + Math.floor(Math.random() * (tabTitles.length - 1))
+		tabTitle = tabTitle === null ? 0 : (tabTitle + skip) % tabTitles.length
+		document.title = tabTitles[tabTitle]
+	}
+	document.addEventListener('visibilitychange', showTabTitle)
+	showTabTitle()
+
 	// Phones hide the line about the project under the title: More info, on
 	// the baseline of "eyes", opens it in a dropdown between the title and
 	// Snapshot (style.css). A second press, Escape or a press outside it

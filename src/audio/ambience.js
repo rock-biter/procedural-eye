@@ -3,9 +3,10 @@
 // once) keep singing in turn, each note chosen to sound well with the others
 // (src/audio/soundscape.js); now and then (`sound.leadRate` a minute) a
 // louder one rises over them. It fades in slowly (`sound.fadeIn`) once the
-// sound starts at the first gesture, and again after a mute; the engine
-// pauses it with the rest. setSpeed() plays it faster, as a tape: every
-// glass higher, its beat and swell quicker.
+// sound starts at the first gesture; the engine pauses it with the rest,
+// muted too, and after a mute it fades in again quickly (`sound.resumeFade`)
+// where it was. setSpeed() plays it faster, as a tape: every glass higher,
+// its beat and swell quicker.
 import { createRandom } from '../random'
 import { impulseResponse } from './impulse'
 import {
@@ -38,6 +39,8 @@ export default class Ambience {
 		this.quietAt = null
 		this.loudAt = null
 		this.wasMuted = engine.muted
+		// When the first fade in ends (context time).
+		this.fadeEnd = 0
 		this.rate = 1
 		this.random = createRandom(`glasses:${Math.random()}`)
 		engine.onReady((context) => this.build(context))
@@ -74,6 +77,9 @@ export default class Ambience {
 		this.speed = context.createConstantSource()
 		this.speed.offset.value = 0
 		this.speed.start()
+		// Built by the gesture that turned the sound on: the first fade in,
+		// not a resume.
+		this.wasMuted = this.engine.muted
 		this.fadeIn()
 	}
 
@@ -96,7 +102,22 @@ export default class Ambience {
 		const seconds = this.params.sound.fadeIn
 		if (seconds > 0) gain.setValueCurveAtTime(fadeCurve(), now, seconds)
 		else gain.setValueAtTime(1, now)
+		this.fadeEnd = now + seconds
 		this.quietAt = now
+	}
+
+	// Back from a mute, which suspended the context with every glass where
+	// it was: from silence over `sound.resumeFade` s, the glasses going on.
+	// A first fade in still under way goes on instead.
+	resume() {
+		const now = this.engine.context.currentTime
+		if (now < this.fadeEnd) return
+		const gain = this.output.gain
+		gain.cancelScheduledValues(now)
+		gain.setValueAtTime(0, now)
+		const seconds = this.params.sound.resumeFade
+		if (seconds > 0) gain.setValueCurveAtTime(fadeCurve(), now, seconds)
+		else gain.setValueAtTime(1, now)
 	}
 
 	// Once a frame: the volumes, a fade in after a mute, and the next glass
@@ -106,7 +127,7 @@ export default class Ambience {
 		if (!this.output || !context) return
 		const now = context.currentTime
 		const sound = this.params.sound
-		if (this.wasMuted && !this.engine.muted) this.fadeIn()
+		if (this.wasMuted && !this.engine.muted) this.resume()
 		this.wasMuted = this.engine.muted
 		this.quiet.gain.setTargetAtTime(sound.volumes.glasses, now, 0.1)
 		this.loud.gain.setTargetAtTime(sound.volumes.lead, now, 0.1)

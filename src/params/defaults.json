@@ -410,6 +410,7 @@
     "leadRate": 0.5,
     "glassKey": "D",
     "fadeIn": 10,
+    "resumeFade": 2,
     "stretch": 200,
     "stretchRate": 2,
     "squeeze": 0.5,

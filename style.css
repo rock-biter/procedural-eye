@@ -915,7 +915,9 @@ canvas {
 /* The credit's link and the sound toggle's label, underlined in the accent.
    Hovered or focused, the line leaves to the right as a new one comes in
    from the left; let go, the new one goes back to the left and the first
-   comes back from the right. */
+   comes back from the right. The toggle's label follows its button: only a
+   button's, as the credit line, the link's parent, also holds the volume,
+   whose hover leaves the link alone. */
 .swap-underline {
 	position: relative;
 	display: inline-block;
@@ -946,7 +948,7 @@ canvas {
 
 :is(
 	.swap-underline:is(:hover, :focus-visible),
-	:is(:hover, :focus-visible) > .swap-underline
+	button:is(:hover, :focus-visible) > .swap-underline
 )::before {
 	scale: 0 1;
 	transition-delay: 0s;
@@ -954,7 +956,7 @@ canvas {
 
 :is(
 	.swap-underline:is(:hover, :focus-visible),
-	:is(:hover, :focus-visible) > .swap-underline
+	button:is(:hover, :focus-visible) > .swap-underline
 )::after {
 	scale: 1;
 	transition-delay: 0.15s;

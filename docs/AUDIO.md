@@ -12,7 +12,7 @@ The interface sounds like a camera. Every control of the HUD makes the mechanica
   - Each play draws a take other than the last one, a rate within ±`sound.variation` cents and a gain within ±1.5 dB, both scaled by the sound's `vary`.
   - A sound may have at most `voices` copies playing at once. A sound asked for less than `gap` s after the last one plays no new voice; half its level is added to the last one's instead (detents passed in a single frame sound as one louder click).
   - Each decoded buffer starts 1 ms before its sound comes within 40 dB of its peak, past any silence a decoder put before it.
-- **Mute**: the master fades to 0 (time constant 0.08 s) and the context then suspends.
+- **Mute**: the master fades to 0 (time constant 0.08 s) and the context then suspends, so the ambience pauses where it is, as below; turned back on, it goes on from there ([fade in](#the-ambience)).
 - **Pause**: while the page is hidden (`visibilitychange`) or the window has lost the focus (`blur`), the master fades out the same way and the context suspends, so every sound stops where it is, the ambience included. Back (`focus`, the page shown again, or a press in it), the context resumes, unless muted, and the master fades in with a time constant of 0.3 s.
 - **Stats**: `stats()` returns the context's state, whether the sounds are decoded, the mute, the pause and the play count of each sound (with the glass harp's quiet `glass`es and louder `glass-lead`s), plus the peak and RMS of the master (dBFS) since the last call. The analyser is read once a frame, so a sound played while the main thread is blocked (`capture()` while Snapshot saves) can escape the peak while it still plays in full.
 
@@ -71,7 +71,7 @@ The app itself emits no events; everything is read per frame.
 - **The tone**: the fundamental at 1 − `twin` and a twin `beat` Hz above it at `twin` (0.15–0.35), which beat together; the 2nd, 3rd and 4th harmonics at 0.07, 0.025 and 0.01 (`GLASS_HARMONICS`), none above 0.9 of the Nyquist frequency. While the finger rubs, a whisper of friction joins them: a looped white noise shared by every glass, through a band-pass on the note (Q 30), about 35 dB under the tone.
 - **The space**: 35% of the glasses ring dry, and all of them go through a convolution reverb whose impulse response is synthesized (`impulseResponse()`: two channels of seeded noise falling 60 dB in 7 s, their highs dying sooner, after a 12 ms predelay). The quiet glasses and the louder ones have their own volumes, `sound.volumes.glasses` and `.lead`.
 - **Speed**: `setSpeed(rate)` plays the glass harp `rate` times as fast, as a tape sped up: a constant source holds 1200·log₂ `rate` cents and feeds the detune of every glass's oscillators (the fundamentals, the twins, the harmonics and the swell) and of its friction band, so the glasses sound higher, beat and swell faster, eased with a time constant of 0.03 s. The volume slider pulled past its right end sets it, from 1 up to `sound.stretchRate` at the furthest the handle can run, and pulled past its left end (a spring squeezing the credit line), from 1 down to `sound.squeezeRate` at the limit ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)).
-- **Fade in**: once the sound starts (the first press or key), the ambience rises from silence along a sin² curve over `sound.fadeIn` s (`fadeCurve()`), its first glass starting at once. It does so again when the sound is turned back on after a mute.
+- **Fade in**: once the sound starts (the first press or key), the ambience rises from silence along a sin² curve over `sound.fadeIn` s (`fadeCurve()`), its first glass starting at once. Only then: a mute (the sound toggle, M, or the volume slider down to zero) pauses it with the context, and turned back on it rises again along the same curve, but over `sound.resumeFade` s, its glasses going on where they were (`resume()`); a first fade in still under way goes on instead.
 
 ## Parameters
 
@@ -90,7 +90,8 @@ The `sound` group of [`src/params/paramSchema.js`](../src/params/paramSchema.js)
 | `glasses` | 3 | The quiet glasses singing at once; 0 for none. |
 | `leadRate` | 1.5 per minute | The louder glasses, on average; 0 for none. |
 | `glassKey` | `D` | The key the glasses are tuned to: `C`, `D`, `E`, `F`, `G` or `A`. |
-| `fadeIn` | 10 s | How slowly the glass harp fades in. |
+| `fadeIn` | 10 s | How slowly the glass harp fades in at the first gesture. |
+| `resumeFade` | 2 s | How quickly it fades back in where it was after a mute. |
 | `stretch` | 200 px | How far the volume slider's handle can run past its right end. |
 | `stretchRate` | 2× | The glass harp's speed with the handle at that limit. |
 | `squeeze` | 0.5 | How far the volume slider pulled past its left end squeezes the credit line, as a share of its width. |

@@ -513,8 +513,9 @@ export const BASE_PARAM_SCHEMA = {
 	// ticks (a bicycle freewheel's or synthesized fine ones), how Random eye
 	// advances the film (a lever or a motor), and the ambience, a glass harp:
 	// how many quiet glasses sing at once, how many louder ones a minute rise
-	// over them, the key they are tuned to and how slowly it fades in at the
-	// first gesture, and how far a drag can pull the volume slider's handle
+	// over them, the key they are tuned to, how slowly it fades in at the
+	// first gesture and how quickly where it was after a mute, which pauses
+	// it, and how far a drag can pull the volume slider's handle
 	// past its right end (resisted, as the HUD's knobs), the music playing up
 	// to `stretchRate` times as fast as it is pulled; pulled past its left end
 	// it squeezes the credit line as a spring, up to `squeeze` of its width,
@@ -545,6 +546,7 @@ export const BASE_PARAM_SCHEMA = {
 		leadRate: num(1.5, 0, 6, 0.1, 'per min', 'uniform', 'louder glasses per minute'),
 		glassKey: choice('D', ['C', 'D', 'E', 'F', 'G', 'A'], 'uniform', 'glasses key'),
 		fadeIn: num(10, 0, 30, 0.5, 's', 'uniform', 'music fade in'),
+		resumeFade: num(2, 0, 10, 0.1, 's', 'uniform', 'music fade in after a mute'),
 		stretch: num(200, 0, 400, 1, 'px', 'uniform', 'volume handle run past the end'),
 		stretchRate: num(2, 1, 4, 0.05, '×', 'uniform', 'music speed at full overshoot'),
 		squeeze: num(0.5, 0, 0.8, 0.01, '', 'uniform', 'credit squeeze at the spring limit'),
