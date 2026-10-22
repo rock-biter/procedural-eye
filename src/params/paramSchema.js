@@ -550,6 +550,56 @@ export const BASE_PARAM_SCHEMA = {
 		squeeze: num(0.5, 0, 0.8, 0.01, '', 'uniform', 'credit squeeze at the spring limit'),
 		squeezeRate: num(0.5, 0.25, 1, 0.05, '×', 'uniform', 'music speed at full squeeze'),
 	},
+	// The easter egg's glitch (src/eye/terminator.js, docs/RENDERING.md): the
+	// volume cannon's shot (main.js) sends a shockwave over the eye from its
+	// axis for `duration`, the T-800's eye behind its front. The front reaches
+	// `peak` of the globe's radius, holds there while the photo is taken, and
+	// draws back. While the cannon is armed, a hint of it shows, its front
+	// reaching `charge`. `amount` shows it for tuning (0 in use). On the front,
+	// a band `band` either side, the two glitch into each other: rows `cell`
+	// high torn sideways up to `tear`, the image pulled toward the front by
+	// `ripple`, red and blue seeing it `split` apart, in blocks as much as
+	// `blocks`, the pattern ticking on `speed` times a second; some blocks
+	// jump up to `jump`, and `flicker` sets how often rows drop out, blocks
+	// flicker, blocks jump, and the front jumps, flips or flashes. While a
+	// shot runs, the band, the rows, the tears, the ripple, the split, the
+	// jumps and the flicker jump to random multiples of their values, each
+	// holding a few ticks (src/eye/glitch.js); `chaos` sets how far. A shot
+	// also flashes the scene red: the lights turn `light`, their brightest
+	// channel `lightGain` times their luminance, and the backdrop `backdrop`,
+	// rising over `flashIn`, holding while the glitch lasts and fading over
+	// `flashOut` after it.
+	glitch: {
+		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview (front reach)'),
+		peak: num(0.65, 0, 1, 0.01, '', 'uniform', 'front reach at the photo'),
+		charge: num(0.07, 0, 0.5, 0.01, '', 'uniform', 'front reach while armed'),
+		duration: num(0.8, 0.1, 3, 0.05, 's', 'uniform', 'shot glitch duration'),
+		band: num(1.5, 0.2, 6, 0.05, 'mm', 'uniform', 'glitch band half-width'),
+		cell: num(0.3, 0.05, 3, 0.01, 'mm', 'uniform', 'row height'),
+		tear: num(0.8, 0, 4, 0.01, 'mm', 'uniform', 'row tear'),
+		ripple: num(0.4, 0, 2, 0.01, 'mm', 'uniform', 'ripple'),
+		split: num(0.6, 0, 3, 0.01, 'mm', 'uniform', 'color split'),
+		blocks: num(0.7, 0, 1, 0.01, '', 'uniform', 'blockiness'),
+		jump: num(1, 0, 4, 0.01, 'mm', 'uniform', 'block jumps'),
+		flicker: num(0.6, 0, 1, 0.01, '', 'uniform', 'flicker'),
+		chaos: num(0.8, 0, 1, 0.01, '', 'uniform', 'settings jumping'),
+		light: color('#ff1408', 'uniform', 'flash: light color'),
+		lightGain: num(1, 0, 6, 0.05, '×', 'uniform', 'flash: light gain'),
+		backdrop: color('#5c0a06', 'uniform', 'flash: backdrop color'),
+		flashIn: num(0.1, 0, 1, 0.01, 's', 'uniform', 'flash: rise'),
+		flashOut: num(0.5, 0, 3, 0.05, 's', 'uniform', 'flash: fade'),
+		speed: num(24, 1, 60, 1, 'per s', 'uniform', 'pattern ticks'),
+	},
+	// The T-800's eye under the glitch: its lens' glow (× a white surface
+	// under the rig), red and at its white-hot core, and the tint and
+	// roughness of its socket's chrome.
+	terminator: {
+		glow: num(1.2, 0, 10, 0.05, '×', 'uniform', 'lens glow'),
+		lensColor: color('#ff1a0a', 'uniform', 'lens color'),
+		coreColor: color('#ffd2a0', 'uniform', 'core color'),
+		chrome: color('#c9ced6', 'uniform', 'chrome tint'),
+		roughness: num(0.15, 0, 1, 0.01, '', 'uniform', 'chrome roughness'),
+	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),
 		grain: num(0.035, 0, 0.3, 0.001),

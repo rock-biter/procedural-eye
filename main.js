@@ -262,15 +262,14 @@ async function savePng(element) {
 	await takePhoto()
 }
 
-// The download of savePng(), without its sound. Rendering the PNG holds the
-// page for a moment.
+// The download of savePng(), without its sound. The PNG is encoded off the
+// main thread, so the page goes on meanwhile.
 async function takePhoto() {
 	const { insertPngText } = await import('./src/render/pngMetadata')
-	const dataUrl = window.__EYE__.capture()
-	const bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) =>
-		c.charCodeAt(0),
-	)
-	const tagged = insertPngText(bytes, 'eye-state', window.__EYE__.getState())
+	const state = window.__EYE__.getState()
+	const blob = await window.__EYE__.captureBlob()
+	const bytes = new Uint8Array(await blob.arrayBuffer())
+	const tagged = insertPngText(bytes, 'eye-state', state)
 	download(new Blob([tagged], { type: 'image/png' }), `eye-${Date.now()}.png`)
 }
 
@@ -721,10 +720,11 @@ if (urlParams.get('gui') !== '0') {
 	// handle is thrown along the line to that level and the music speeds back
 	// up. At the limit the spring is armed and the handle trembles: let go, it
 	// shoots the handle at Snapshot (on a phone, where Snapshot is above it,
-	// off the window's right edge first), which takes a photo and recoils the
-	// way it was hit, and the handle bounces off it and tumbles out of the
-	// window, the volume going to full; a moment later a new handle pops up at
-	// the end of the line.
+	// off the window's right edge first), which recoils the way it was hit,
+	// and the handle bounces off it and tumbles out of the window, the volume
+	// going to full; a moment later a new handle pops up at the end of the
+	// line. The hit glitches the eye, the T-800 showing through
+	// (src/eye/terminator.js), and the photo is taken at the glitch's peak.
 	const SPRING_RELEASE = 0.8
 	const SQUEEZE_BULGE = 0.8
 	const SHOT_SPEED = 2200
@@ -746,9 +746,11 @@ if (urlParams.get('gui') !== '0') {
 		credit.style.scale = under ? `${squeeze} ${bulge}` : ''
 		volume.style.scale = under ? `${1 / squeeze} ${1 / bulge}` : ''
 	}
+	// Armed, a hint of the Terminator glitch rises in the eye (src/eye/terminator.js).
 	const setArmed = (armed) => {
 		spring.armed = armed
 		volume.classList.toggle('armed', armed)
+		app.terminator.setCharged(armed, motionless.matches)
 	}
 	const slowed = (amount) => 1 - (1 - app.params.sound.squeezeRate) * Math.max(amount, 0)
 	// Compressed by a pointer `pushed` px past the left end.
@@ -886,10 +888,11 @@ if (urlParams.get('gui') !== '0') {
 			snapshot.classList.add('recoil')
 			cue('press', { control: 'snapshot', element: snapshot })
 			cue('snapshot', { element: snapshot })
+			// The easter egg: the photo catches the T-800. With reduced motion
+			// the glitch holds still.
+			app.terminator.trigger(motionless.matches).then(takePhoto)
 			// Bounced off Snapshot (back and up from its side; down from below,
-			// still drifting left), then falling, spinning; the photo is saved
-			// once it is out of the window, so its rendering does not hold the
-			// fall.
+			// still drifting left), then falling, spinning.
 			let [x, y] = hit
 			let vx = bank ? 0.5 * velocity[0] : -0.3 * velocity[0]
 			let vy = bank ? 250 : -380
@@ -904,7 +907,6 @@ if (urlParams.get('gui') !== '0') {
 				place(x, y, turn)
 				if (y < window.innerHeight + 40) return requestAnimationFrame(fall)
 				shot.remove()
-				takePhoto()
 			}
 			requestAnimationFrame(fall)
 		})

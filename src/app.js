@@ -31,6 +31,7 @@ import TearFilm from './adnexa/tearFilm'
 import Eyeball from './eye/eyeball'
 import { createEyeGeometry } from './eye/eyeProfile'
 import EyeRig from './eye/eyeRig'
+import Terminator from './eye/terminator'
 import IrisAtlas from './iris/irisAtlas'
 import IrisColorLut from './iris/irisColorLut'
 import { createIrisSpace } from './iris/irisSpace'
@@ -44,6 +45,7 @@ import { PARAM_SCHEMA } from './params/paramSchema'
 import { SKIN_TONES } from './params/skinTones'
 import { ParamTransition, TRANSITION } from './params/paramTransition'
 import Backdrop from './render/backdrop'
+import { encodePng } from './render/pngEncoder'
 import PostProcessing from './render/postProcessing'
 import { FOCUS_AT_INFINITY } from './renderSetup'
 import ScleraMaps from './sclera/scleraMaps'
@@ -102,6 +104,8 @@ export default class EyeApp {
 			...this.keyShadow.coverage.uniforms,
 			...this.shaftLight.coverage.uniforms,
 		}
+		// The easter egg: the volume cannon's glitch on the eye (main.js).
+		this.terminator = new Terminator()
 		this.scleraMaps = new ScleraMaps()
 		// The fissure map: r where the lids rest, g closed (the blink's,
 		// src/adnexa/lidBlink.js).
@@ -121,7 +125,7 @@ export default class EyeApp {
 				pigment: this.irisAtlas.pigmentTexture,
 				colorLut: this.irisColorLut.texture,
 			},
-			keyLight,
+			{ ...keyLight, ...this.terminator.uniforms },
 			{ texture: this.fissureMap, extent: [FISSURE_MAP.halfWidth, FISSURE_MAP.halfHeight] },
 			{ texture: this.scleraMaps.texture, psi: SCLERA_PSI },
 			params.debug.view,
@@ -511,6 +515,9 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
 		if (this.shaftsMove) this.invalidate()
+		// A shot's glitch runs in photo mode too, its preview does not.
+		const glitchDelta = Math.min(delta / 1000, 0.1)
+		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
 		if (this.converged) {
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
@@ -574,7 +581,10 @@ export default class EyeApp {
 
 	get restartsEveryFrame() {
 		return (
-			(this.params.animation.enabled && !this.frozen) || this.transition !== null || this.shaftsMove
+			(this.params.animation.enabled && !this.frozen) ||
+			this.transition !== null ||
+			this.shaftsMove ||
+			this.terminator.moving(this.params, this.frozen)
 		)
 	}
 
@@ -612,7 +622,12 @@ export default class EyeApp {
 		const size = this.setup.getDrawingBufferSize()
 		this.physicalCamera.update(this.params, this.eye, this.focusDepth, size, sample, this.framing)
 		this.eyeRig.updateMatrices()
-		this.lightRig.update(this.params.lighting, this.physicalCamera.camera, this.eyeRig.worldToEye)
+		this.lightRig.update(
+			this.params.lighting,
+			this.physicalCamera.camera,
+			this.eyeRig.worldToEye,
+			this.redFlash(),
+		)
 		this.setup.renderer.setClearColor(
 			this.backdropColor.setRGB(...this.backdropRadiance()),
 			FOCUS_AT_INFINITY,
@@ -647,6 +662,7 @@ export default class EyeApp {
 		const camera = this.physicalCamera.camera
 		const pixelAngle = (camera.fov * Math.PI) / 180 / size.height
 		this.pixelAngle = pixelAngle
+		this.terminator.update(this.params, this.lightRig.luminance * 0.05)
 		this.eyeball.update(
 			this.params,
 			this.pupilDiameter,
@@ -683,9 +699,22 @@ export default class EyeApp {
 	// albedo, saturated as the subsurface shading saturates it), skin.backdrop
 	// as bright. It keeps that tone whatever skin.color becomes, so the page
 	// does not change with the skin tones.
+	// In the Terminator glitch's red flash it turns glitch.backdrop.
 	backdropRadiance() {
 		const light = this.lightRig.luminance * 0.05 * this.params.skin.backdrop
-		return hexToLinearRgb(BACKDROP_SKIN).map((c) => c ** 1.3 * light)
+		const skin = hexToLinearRgb(BACKDROP_SKIN).map((c) => c ** 1.3 * light)
+		const flash = this.terminator.flash(this.params)
+		if (flash <= 0) return skin
+		const red = hexToLinearRgb(this.params.glitch.backdrop).map((c) => c * light)
+		return skin.map((c, i) => c + (red[i] - c) * flash)
+	}
+
+	// The red flash of the lights during a shot's glitch, or null.
+	redFlash() {
+		const amount = this.terminator.flash(this.params)
+		if (amount <= 0) return null
+		const { light, lightGain } = this.params.glitch
+		return { color: hexToLinearRgb(light), gain: lightGain, amount }
 	}
 
 	// Approximate radiance of a diffuse surface of sRGB `hex` near the eye, lit
@@ -699,16 +728,27 @@ export default class EyeApp {
 	// The current image as a PNG data URL: the accumulated mean, re-presented
 	// in the same task so the drawing buffer is still intact.
 	capture() {
+		return this.present((canvas) => canvas.toDataURL('image/png'))
+	}
+
+	// The same as a PNG blob, encoded off the main thread
+	// (src/render/pngEncoder.js): the page, and a glitch, go on meanwhile.
+	captureBlob() {
+		return this.present(encodePng)
+	}
+
+	// Re-presents the current image and reads the canvas with `read`.
+	present(read) {
 		const { renderPass, accumulation } = this.post
 		// A living eye keeps no frame: keep this one.
 		if (this.samples === 0) this.renderSample(null)
 		renderPass.enabled = false
 		accumulation.displayOnly = true
 		this.post.render()
-		const url = this.setup.renderer.domElement.toDataURL('image/png')
+		const result = read(this.setup.renderer.domElement)
 		renderPass.enabled = true
 		accumulation.displayOnly = false
-		return url
+		return result
 	}
 
 	// window.__EYE__: the hooks of the capture script and the console.
@@ -736,11 +776,15 @@ export default class EyeApp {
 				return unknown
 			},
 			capture: () => this.capture(),
+			captureBlob: () => this.captureBlob(),
 			toggleFrozen: () => this.toggleFrozen(),
 			isFrozen: () => this.frozen,
 			// Blinks now; false while the blink's frames are not built yet.
 			blink: () => this.blink(),
 			isBlinkReady: () => this.lidBlink.ready,
+			// The volume cannon's glitch, now; resolves at its peak.
+			glitch: () => this.terminator.trigger(),
+			isGlitching: () => this.terminator.active,
 			measure: (frames) => this.measure(frames),
 			measureSync: (frames) => this.measureSync(frames),
 			getCompileMs: () => this.compileMs,
