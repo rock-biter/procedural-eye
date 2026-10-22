@@ -1,4 +1,5 @@
 import './style.css'
+import { gsap } from 'gsap'
 import EyeApp from './src/app'
 import Ambience from './src/audio/ambience'
 import AudioEngine from './src/audio/audioEngine'
@@ -502,30 +503,52 @@ if (urlParams.get('gui') !== '0') {
 	const credit = document.createElement('p')
 	credit.className = 'credit'
 	credit.innerHTML =
-		'powered by <a href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
+		'powered by <a class="swap-underline" href="https://x.com/__rockbiter" target="_blank" rel="noopener">rockbiter</a>, made with three.js and Opus 5.5'
 	credit.querySelector('a').addEventListener('click', (event) => event.currentTarget.blur())
 	sounding(credit.querySelector('a'), 'credit', false)
 
 	// The sound toggle, at the end of the credit line, and M (while the page,
 	// not a control, has the focus, as Space): sound on or off, kept in the
-	// browser. It blurs itself after a click, as the HUD buttons do.
+	// browser. Off, the volume glides to zero and the sound stops; on, it
+	// glides back to the level it had. It blurs itself after a click, as the
+	// HUD buttons do; its label carries the animated underline (style.css).
 	const soundToggle = document.createElement('button')
 	soundToggle.type = 'button'
 	soundToggle.className = 'sound-toggle'
+	const soundLabel = document.createElement('span')
+	soundLabel.className = 'swap-underline'
+	soundToggle.append(soundLabel)
+	let soundMuted = readStored(MUTED_KEY) === '1'
 	const showSound = () => {
-		soundToggle.textContent = audio.muted ? 'sound off' : 'sound on'
-		soundToggle.setAttribute('aria-pressed', String(!audio.muted))
-		soundToggle.title = audio.muted ? 'Turn the sound on (M)' : 'Turn the sound off (M)'
+		soundLabel.textContent = soundMuted ? 'sound off' : 'sound on'
+		soundToggle.setAttribute('aria-pressed', String(!soundMuted))
+		soundToggle.title = soundMuted ? 'Turn the sound on (M)' : 'Turn the sound off (M)'
 	}
-	const setMuted = (muted) => {
-		audio.setMuted(muted)
-		if (!muted) audio.unlock()
+	// The toggle's state, kept in the browser; the engine's mute follows it
+	// (at once when turned on, once the volume is down when turned off).
+	const markMuted = (muted) => {
+		soundMuted = muted
 		writeStored(MUTED_KEY, muted ? '1' : '0')
 		showSound()
 		volume.classList.toggle('muted', muted)
 	}
+	const unmute = () => {
+		markMuted(false)
+		audio.setMuted(false)
+		audio.unlock()
+	}
+	const setMuted = (muted) => {
+		if (muted) {
+			remember(app.params.sound.volume)
+			markMuted(true)
+			glideVolume(0, MUTE_GLIDE, putVolume, () => audio.setMuted(true))
+		} else {
+			unmute()
+			glideVolume(remembered, MUTE_GLIDE)
+		}
+	}
 	const toggleSound = () => {
-		setMuted(!audio.muted)
+		setMuted(!soundMuted)
 		cue('press', { control: 'sound', element: soundToggle })
 	}
 	soundToggle.addEventListener('click', () => {
@@ -542,13 +565,18 @@ if (urlParams.get('gui') !== '0') {
 
 	// The volume, beside the sound toggle: the master (sound.volume, the
 	// panel's master volume too) on a dashed line VOLUME_TRACK px long, in the
-	// accent up to its square handle (style.css), kept in the browser. A
-	// press sets it where it lands (on the handle, it holds the handle where
-	// it was grabbed), a drag carries it, the arrow keys step it, and a tap
-	// sounds at its new level as it is let go. Moving it turns the sound on.
-	// It sets the params without a change, which would restart the image.
+	// accent up to its square handle (style.css). A press on the handle holds
+	// it where it was grabbed and a drag carries it; a press elsewhere glides
+	// the volume there in VOLUME_GLIDE s (a drag takes over); the arrow keys
+	// step it; a tap sounds at its new level as it is let go. Down to zero it
+	// turns the sound off, up from zero on again; the toggle brings back the
+	// last level above zero it settled on, kept in the browser. It sets the
+	// params without a change, which would restart the image.
 	const VOLUME_TRACK = 80
 	const VOLUME_STEP = 0.05
+	const VOLUME_GLIDE = 0.35
+	const MUTE_GLIDE = 0.5
+	const motionless = window.matchMedia('(prefers-reduced-motion: reduce)')
 	const volume = document.createElement('div')
 	volume.className = 'volume'
 	volume.tabIndex = 0
@@ -571,19 +599,52 @@ if (urlParams.get('gui') !== '0') {
 		showVolume()
 		refreshPanel()
 	}
-	const setVolume = (level) => {
-		putVolume(level)
-		writeStored(VOLUME_KEY, String(app.params.sound.volume))
-		if (audio.muted) setMuted(false)
-	}
+	// The level the toggle brings back.
 	const stored = Number.parseFloat(readStored(VOLUME_KEY))
-	if (Number.isFinite(stored)) putVolume(stored)
-	showVolume()
+	let remembered = Number.isFinite(stored) && stored > 0 ? stored : app.params.sound.volume || 0.5
+	const remember = (level) => {
+		if (level <= 0) return
+		remembered = level
+		writeStored(VOLUME_KEY, String(level))
+	}
+	// The viewer's own level: at zero the sound turns off, above it on.
+	const userVolume = (level) => {
+		putVolume(level)
+		if (app.params.sound.volume > 0) {
+			if (soundMuted) unmute()
+			return
+		}
+		if (!soundMuted) markMuted(true)
+		if (!audio.muted) audio.setMuted(true)
+	}
+	const glide = { level: 0, to: 0 }
+	const gliding = () => gsap.isTweening(glide)
+	// The volume to `to` over `duration` s, set through `apply` (eased out;
+	// at once with reduced motion), then `done`.
+	const glideVolume = (to, duration, apply = putVolume, done = () => {}) => {
+		gsap.killTweensOf(glide)
+		glide.level = app.params.sound.volume
+		glide.to = to
+		if (motionless.matches) {
+			apply(to)
+			done()
+			return
+		}
+		gsap.to(glide, {
+			level: to,
+			duration,
+			ease: 'power2.out',
+			onUpdate: () => apply(glide.level),
+			onComplete: done,
+		})
+	}
+	putVolume(soundMuted ? 0 : remembered)
 	app.listeners.add((path) => {
 		if (path === '*' || path === 'sound.volume') showVolume()
 	})
 	const tapVolume = () => cue('tap', { control: 'volume', element: volume })
 	const volumeAt = (event) => (event.clientX - volume.getBoundingClientRect().left) / VOLUME_TRACK
+	const settle = () => remember(app.params.sound.volume)
 	let volumeDrag = null
 	volume.addEventListener('pointerdown', (event) => {
 		if (event.button !== 0 || volumeDrag) return
@@ -591,18 +652,26 @@ if (urlParams.get('gui') !== '0') {
 		volume.classList.add('dragging')
 		const at = volumeAt(event)
 		const grab = at - app.params.sound.volume
-		const offset = Math.abs(grab) * VOLUME_TRACK <= 6 ? grab : 0
-		volumeDrag = { id: event.pointerId, offset }
-		setVolume(at - offset)
+		const onHandle = Math.abs(grab) * VOLUME_TRACK <= 6
+		volumeDrag = { id: event.pointerId, offset: onHandle ? grab : 0 }
+		if (onHandle) gsap.killTweensOf(glide)
+		else glideVolume(at, VOLUME_GLIDE, userVolume, settle)
 	})
 	volume.addEventListener('pointermove', (event) => {
-		if (volumeDrag?.id === event.pointerId) setVolume(volumeAt(event) - volumeDrag.offset)
+		if (volumeDrag?.id !== event.pointerId) return
+		const at = volumeAt(event) - volumeDrag.offset
+		// A drag takes over from the glide once the pointer leaves where it
+		// pressed.
+		if (gliding() && Math.abs(at - glide.to) * VOLUME_TRACK < 3) return
+		gsap.killTweensOf(glide)
+		userVolume(at)
 	})
 	const releaseVolume = (event, tap) => {
 		if (volumeDrag?.id !== event.pointerId) return
 		volumeDrag = null
 		volume.classList.remove('dragging')
 		volume.blur()
+		if (!gliding()) settle()
 		if (tap) tapVolume()
 	}
 	volume.addEventListener('pointerup', (event) => releaseVolume(event, true))
@@ -619,12 +688,14 @@ if (urlParams.get('gui') !== '0') {
 					: steps[event.key] && level + steps[event.key] * VOLUME_STEP
 		if (to === undefined) return
 		event.preventDefault()
-		setVolume(to)
+		gsap.killTweensOf(glide)
+		userVolume(to)
+		settle()
 		tapVolume()
 	})
 	sounding(volume, 'volume', false)
 	showSound()
-	volume.classList.toggle('muted', audio.muted)
+	volume.classList.toggle('muted', soundMuted)
 
 	// The toggle and the volume keep to one line as the credit wraps, the
 	// middle dot before them with the line above.

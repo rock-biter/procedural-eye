@@ -908,10 +908,56 @@ canvas {
 
 .credit a {
 	color: inherit;
-	text-decoration: underline;
-	text-underline-offset: 2px;
 	pointer-events: auto;
 	color: #ffb700;
+}
+
+/* The credit's link and the sound toggle's label, underlined in the accent.
+   Hovered or focused, the line leaves to the right as a new one comes in
+   from the left; let go, the new one goes back to the left and the first
+   comes back from the right. */
+.swap-underline {
+	position: relative;
+	display: inline-block;
+	text-decoration: none;
+}
+
+.swap-underline::before,
+.swap-underline::after {
+	content: '';
+	position: absolute;
+	right: 0;
+	bottom: var(--underline-bottom, 1px);
+	left: 0;
+	height: 1px;
+	background: currentColor;
+	transition: scale 0.3s cubic-bezier(0.65, 0, 0.35, 1) 0.15s;
+}
+
+.swap-underline::before {
+	transform-origin: right;
+}
+
+.swap-underline::after {
+	scale: 0 1;
+	transform-origin: left;
+	transition-delay: 0s;
+}
+
+:is(
+	.swap-underline:is(:hover, :focus-visible),
+	:is(:hover, :focus-visible) > .swap-underline
+)::before {
+	scale: 0 1;
+	transition-delay: 0s;
+}
+
+:is(
+	.swap-underline:is(:hover, :focus-visible),
+	:is(:hover, :focus-visible) > .swap-underline
+)::after {
+	scale: 1;
+	transition-delay: 0.15s;
 }
 
 /* The sound toggle at the end of the credit line, in its type, in the
@@ -927,8 +973,6 @@ canvas {
 	letter-spacing: inherit;
 	text-align: left;
 	text-transform: inherit;
-	text-decoration: underline;
-	text-underline-offset: 2px;
 	pointer-events: auto;
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
@@ -951,7 +995,7 @@ canvas {
 	display: inline-block;
 	width: var(--volume-track);
 	height: 9px;
-	margin-left: 8px;
+	margin-left: 12px;
 	vertical-align: baseline;
 	outline: none;
 	pointer-events: auto;
@@ -992,12 +1036,24 @@ canvas {
 	height: 8px;
 	translate: -50% -50%;
 	background: #fff;
-	transition: background 0.2s;
+	transition:
+		background 0.2s,
+		scale 0.2s;
 	pointer-events: none;
 }
 
+/* Hovered, focused or dragged it grows, as the zoom's marker does. */
 .volume:is(:hover, :focus-visible, .dragging) .volume-handle {
 	background: var(--accent);
+	scale: 1.3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.swap-underline::before,
+	.swap-underline::after,
+	.volume-handle {
+		transition: none;
+	}
 }
 
 .fps {
