@@ -514,8 +514,9 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
 		if (this.shaftsMove) this.invalidate()
-		// The glitch runs in photo mode too.
-		if (this.terminator.step(Math.min(delta / 1000, 0.1), this.params)) this.invalidate()
+		// A shot's glitch runs in photo mode too, its preview does not.
+		const glitchDelta = Math.min(delta / 1000, 0.1)
+		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
 		if (this.converged) {
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
@@ -582,7 +583,7 @@ export default class EyeApp {
 			(this.params.animation.enabled && !this.frozen) ||
 			this.transition !== null ||
 			this.shaftsMove ||
-			this.terminator.active
+			this.terminator.moving(this.params, this.frozen)
 		)
 	}
 

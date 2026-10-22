@@ -560,7 +560,10 @@ export const BASE_PARAM_SCHEMA = {
 	// `ripple`, red and blue seeing it `split` apart, in blocks as much as
 	// `blocks`, the pattern ticking on `speed` times a second; some blocks
 	// jump up to `jump`, and `flicker` sets how often rows drop out, blocks
-	// flicker, blocks jump, and the front jumps, flips or flashes.
+	// flicker, blocks jump, and the front jumps, flips or flashes. While a
+	// shot runs, the band, the rows, the tears, the ripple, the split, the
+	// jumps and the flicker jump to random multiples of their values, each
+	// holding a few ticks (src/eye/glitch.js); `chaos` sets how far.
 	glitch: {
 		amount: num(0, 0, 1, 0.01, '', 'uniform', 'still preview (front reach)'),
 		peak: num(0.65, 0, 1, 0.01, '', 'uniform', 'front reach at the photo'),
@@ -573,6 +576,7 @@ export const BASE_PARAM_SCHEMA = {
 		blocks: num(0.7, 0, 1, 0.01, '', 'uniform', 'blockiness'),
 		jump: num(1, 0, 4, 0.01, 'mm', 'uniform', 'block jumps'),
 		flicker: num(0.6, 0, 1, 0.01, '', 'uniform', 'flicker'),
+		chaos: num(0.8, 0, 1, 0.01, '', 'uniform', 'settings jumping'),
 		speed: num(24, 1, 60, 1, 'per s', 'uniform', 'pattern ticks'),
 	},
 	// The T-800's eye under the glitch: its lens' glow (× a white surface

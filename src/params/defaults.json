@@ -426,7 +426,8 @@
     "split": 0.6,
     "blocks": 0.7,
     "jump": 1,
-    "flicker": 0.6,
+    "flicker": 0.24,
+    "chaos": 0.8,
     "speed": 24
   },
   "terminator": {

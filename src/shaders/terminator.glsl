@@ -29,12 +29,15 @@ struct Glitch {
 // tinted magenta or cyan, and pulled toward the front as by a lens; in each
 // row, blocks of either, more of the T-800's further in. Red, green and blue
 // see the front uGlitchShape.y mm apart, and split the blocks as much.
-// The clock (uGlitch.w) ticks the pattern on, but not evenly: each stretch
-// of rows keeps its own pace, some stuttering, some racing; a few blocks
-// flicker every frame, and a few jump, showing what lies elsewhere, above or
-// below too; now and then a row drops to either side, and a tick moves the
-// whole front, flips the band or flashes it (uGlitchMotion.y: how often).
-// While the glitch is on (a reach above 0), its band shows.
+// The clock (uGlitch.w, the glitch's time in ticks) ticks the pattern on,
+// but not evenly: each stretch of rows keeps its own pace, some stuttering,
+// some racing; a few blocks flicker every frame, and a few jump, showing
+// what lies elsewhere, above or below too; now and then a row drops to
+// either side, and a tick moves the whole front, flips the band or flashes
+// it (uGlitchMotion.y: how often). Between the ticks it moves on: the front
+// breathes, the rows roll up or down at a pace that changes every eight
+// ticks, and each row creeps sideways until its pattern ticks on. While the
+// glitch is on (a reach above 0), its band shows.
 Glitch glitchAt(vec3 p) {
 	Glitch g;
 	g.weight = vec3(0.0);
@@ -46,7 +49,8 @@ Glitch glitchAt(vec3 p) {
 	float flicker = uGlitchMotion.y;
 	float halfWidth = uGlitch.y;
 	vec4 tick = hashBytes(pcgHash(uint(clock) * 7919u + 3u));
-	float front = uGlitch.x * uGlobe.x;
+	vec4 phase = hashBytes(pcgHash(uint(0.125 * clock) * 2654435u + 5u));
+	float front = uGlitch.x * uGlobe.x + 0.25 * halfWidth * sin(0.35 * clock);
 	if (tick.x < 0.3 * flicker) front += (tick.y - 0.5) * 2.0 * halfWidth;
 	float r = length(p.xy);
 	float x = (r - front) / halfWidth;
@@ -59,16 +63,18 @@ Glitch glitchAt(vec3 p) {
 	float window = sq(1.0 - sq(min(abs(x), 1.0)));
 	// Every four rows, one thick row or four thin ones, at the stretch's pace.
 	float cell = uGlitch.z;
-	float y = p.y / cell;
+	float y = p.y / cell + (phase.x - 0.5) * 3.0 * clock;
 	uint stretch = uint(int(floor(0.25 * y)) + 65536);
 	vec4 pace = hashBytes(pcgHash(stretch * 2654435u + 17u));
-	uint pattern = uint(clock * mix(0.3, 2.0, pace.x) + 8.0 * pace.y);
+	float paced = clock * mix(0.3, 2.0, pace.x) + 8.0 * pace.y;
+	uint pattern = uint(paced);
 	vec4 h = hashBytes(pcgHash(stretch * 977u + pattern * 7919u + 13u));
 	uint row = h.x < 0.35 ? pcgHash(stretch) : uint(int(floor(y)) + 262144);
 	vec4 k = hashBytes(pcgHash(row * 977u + pattern * 7919u + 29u));
 	vec4 m = hashBytes(pcgHash(row * 31u + pattern * 131u + 7u));
 	vec2 radial = p.xy / max(r, 1e-6);
-	float tear = (k.x - 0.5) * 2.0 * uGlitchShape.x * (m.x < 0.2 ? 2.5 : 1.0);
+	vec4 c = hashBytes(pcgHash(row * 613u + pattern * 37u + 101u));
+	float tear = ((k.x - 0.5) * (m.x < 0.2 ? 2.5 : 1.0) + (c.x - 0.5) * fract(paced)) * 2.0 * uGlitchShape.x;
 	vec2 shift = vec2(tear, 0.0) - uGlitchShape.z * x * radial;
 	float width = cell * (2.0 + floor(k.z * 6.0));
 	uint column = uint(int(floor((p.x + window * shift.x) / width)) + 65536);

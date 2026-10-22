@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { GLITCH, glitchClock, glitchEnvelope, glitchPeakTime } from '../src/eye/glitch'
+import {
+	GLITCH,
+	GLITCH_JUMPS,
+	glitchClock,
+	glitchEnvelope,
+	glitchJumps,
+	glitchPeakTime,
+} from '../src/eye/glitch'
 
 test('the front runs out to its peak, holds, and draws back to the axis', () => {
 	const duration = 0.6
@@ -42,4 +49,30 @@ test('the pattern ticks on `speed` times a second', () => {
 	assert.equal(glitchClock(-1, 24), 0)
 	assert.equal(glitchClock(0.5, 24), 12)
 	assert.ok(Math.floor(glitchClock(1 / 24 - 1e-9, 24)) === 0)
+})
+
+test('the settings jump apart, within their ranges, holding a few ticks', () => {
+	const seed = 12345
+	for (const factor of Object.values(glitchJumps(7.3, seed, 0))) assert.equal(factor, 1)
+	assert.deepEqual(glitchJumps(5.5, seed, 1), glitchJumps(5.5, seed, 1))
+	const names = Object.keys(GLITCH_JUMPS)
+	const changes = Object.fromEntries(names.map((name) => [name, []]))
+	let last = glitchJumps(0, seed, 1)
+	for (let tick = 0.05; tick < 64; tick += 0.05) {
+		const now = glitchJumps(tick, seed, 1)
+		for (const name of names) {
+			const [low, high] = GLITCH_JUMPS[name]
+			assert.ok(now[name] >= low - 1e-12 && now[name] <= high + 1e-12, name)
+			if (now[name] !== last[name]) changes[name].push(tick)
+		}
+		last = now
+	}
+	for (const name of names) {
+		// 64 ticks, each value held 1 to 8 of them.
+		assert.ok(changes[name].length >= 7 && changes[name].length <= 64, name)
+		const holds = changes[name].slice(1).map((t, i) => t - changes[name][i])
+		assert.ok(Math.min(...holds) > 1 - 0.1 && Math.max(...holds) < 8 + 0.1, name)
+	}
+	// Not in step with one another.
+	assert.notDeepEqual(changes.tear, changes.split)
 })
