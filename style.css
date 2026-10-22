@@ -1046,10 +1046,11 @@ canvas {
 }
 
 /* The spring (main.js): pulled past the left end the credit squeezes toward
-   its left edge and the volume, scaled back, keeps its size. Armed at the
+   its left edge, growing a little taller about the middle of the slider's
+   line (main.js sets its transform-origin), and the volume, scaled back,
+   keeps its size. Armed at the
    limit, the handle trembles; shot at Snapshot (.volume-shot) it is gone
    until it pops up again. */
-.credit,
 .volume {
 	transform-origin: left center;
 }

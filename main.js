@@ -724,6 +724,7 @@ if (urlParams.get('gui') !== '0') {
 	// handle bounces off it and tumbles out of the window, the volume going to
 	// full; a moment later a new handle pops up at the end of the line.
 	const SPRING_RELEASE = 0.8
+	const SQUEEZE_BULGE = 0.3
 	const SHOT_SPEED = 2200
 	const GRAVITY = 2600
 	const RESPAWN = 1.4
@@ -731,10 +732,15 @@ if (urlParams.get('gui') !== '0') {
 	// text squeezes (px), the pointer's run to the limit (px), whether the
 	// spring is armed, and the level the handle is shown at.
 	const spring = { under: 0, reach: 0, width: 0, travel: 0, armed: false, shown: 0 }
+	// Squeezed, the text also grows a little taller (its width to the power
+	// −SQUEEZE_BULGE) about the middle of the slider's line, and stretched past
+	// its width in the bounce a little lower; the slider is scaled back both
+	// ways, keeping its size.
 	const showSpring = (under) => {
 		const squeeze = Math.max((spring.width - under) / spring.width, 0.05)
-		credit.style.scale = under ? `${squeeze} 1` : ''
-		volume.style.scale = under ? `${1 / squeeze} 1` : ''
+		const bulge = squeeze ** -SQUEEZE_BULGE
+		credit.style.scale = under ? `${squeeze} ${bulge}` : ''
+		volume.style.scale = under ? `${1 / squeeze} ${1 / bulge}` : ''
 	}
 	const setArmed = (armed) => {
 		spring.armed = armed
@@ -877,9 +883,12 @@ if (urlParams.get('gui') !== '0') {
 		if (gsap.isTweening(spring) || volume.classList.contains('fired')) return
 		volume.setPointerCapture(event.pointerId)
 		volume.classList.add('dragging')
-		// The spring: the text left of the line, measured at rest.
-		const left = volume.getBoundingClientRect().left
-		spring.width = left - credit.getBoundingClientRect().left
+		// The spring: the text left of the line, measured at rest, squeezing
+		// about the middle of the slider's line, which stays put.
+		const { left, top, height } = volume.getBoundingClientRect()
+		const box = credit.getBoundingClientRect()
+		spring.width = left - box.left
+		credit.style.transformOrigin = `left ${top + height / 2 - box.top}px`
 		spring.reach = app.params.sound.squeeze * spring.width
 		spring.travel = Math.max(Math.min(2 * spring.reach, left - 8), 1)
 		const at = (event.clientX - left) / VOLUME_TRACK
