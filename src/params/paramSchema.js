@@ -507,12 +507,16 @@ export const BASE_PARAM_SCHEMA = {
 		inertia: num(0.2, 0, 1, 0.01, 's', 'uniform', 'orbit inertia'),
 	},
 	// The sound design (src/audio/, docs/AUDIO.md): the master volume, the
-	// volume of each sound of the camera foley, how far a sound's pitch varies
-	// from one play to the next, the zoom ring's detents across the knob's
-	// track and the aperture ring's per stop, the aperture's ticks (a bicycle
-	// freewheel's or synthesized fine ones) and how Random eye advances the
-	// film (a lever or a motor). The mute is the viewer's, kept by the
-	// browser, not a parameter.
+	// volume of each sound of the camera foley and of the ambience, how far a
+	// sound's pitch varies from one play to the next, the zoom ring's detents
+	// across the knob's track and the aperture ring's per stop, the aperture's
+	// ticks (a bicycle freewheel's or synthesized fine ones), how Random eye
+	// advances the film (a lever or a motor), and the ambience, a glass harp:
+	// how many quiet glasses sing at once, how many louder ones a minute rise
+	// over them, the key they are tuned to and how slowly it fades in at the
+	// first gesture. The mute is the viewer's, kept by the
+	// browser, not a parameter; the volume slider by the sound toggle sets
+	// the master volume (main.js), which the browser keeps too.
 	sound: {
 		volume: num(0.64, 0, 1, 0.01, '', 'uniform', 'master volume'),
 		volumes: {
@@ -525,12 +529,18 @@ export const BASE_PARAM_SCHEMA = {
 			shutter: num(0.56, 0, 1, 0.01, '', 'uniform', 'shutter (Snapshot)'),
 			mirror: num(0.35, 0, 1, 0.01, '', 'uniform', 'mirror (photo mode)'),
 			beep: num(0.08, 0, 1, 0.01, '', 'uniform', 'focus beep'),
+			glasses: num(0.22, 0, 1, 0.01, '', 'uniform', 'music: quiet glasses'),
+			lead: num(0.3, 0, 1, 0.01, '', 'uniform', 'music: louder glasses'),
 		},
 		variation: num(60, 0, 200, 1, 'cents', 'uniform', 'pitch variation'),
 		zoomDetents: num(16, 2, 60, 1, '', 'uniform', 'zoom detents across the track'),
 		detents: num(6, 1, 16, 1, 'per stop', 'uniform', 'aperture detents per stop'),
 		apertureTicks: choice('freewheel', ['freewheel', 'fine'], 'uniform', 'aperture ticks'),
 		film: choice('lever', ['lever', 'motor'], 'uniform', 'Random eye film advance'),
+		glasses: num(3, 0, 6, 1, '', 'uniform', 'quiet glasses at once'),
+		leadRate: num(1.5, 0, 6, 0.1, 'per min', 'uniform', 'louder glasses per minute'),
+		glassKey: choice('D', ['C', 'D', 'E', 'F', 'G', 'A'], 'uniform', 'glasses key'),
+		fadeIn: num(10, 0, 30, 0.5, 's', 'uniform', 'music fade in'),
 	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),

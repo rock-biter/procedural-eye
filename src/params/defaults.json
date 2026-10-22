@@ -389,21 +389,27 @@
   "sound": {
     "volume": 0.64,
     "volumes": {
-      "press": 0.35,
+      "press": 0.45,
       "hover": 0.5,
-      "zoom": 0.1,
-      "aperture": 0.05,
+      "zoom": 0.08,
+      "aperture": 0.04,
       "strain": 0.35,
       "advance": 0.42,
       "shutter": 0.56,
       "mirror": 0.35,
-      "beep": 0.08
+      "beep": 0.08,
+      "glasses": 0.03,
+      "lead": 0.07
     },
     "variation": 60,
     "zoomDetents": 16,
     "detents": 6,
     "apertureTicks": "freewheel",
-    "film": "lever"
+    "film": "lever",
+    "glasses": 4,
+    "leadRate": 0.5,
+    "glassKey": "D",
+    "fadeIn": 10
   },
   "post": {
     "toneMapping": "agx",

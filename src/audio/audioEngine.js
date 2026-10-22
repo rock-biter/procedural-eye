@@ -2,22 +2,28 @@
 // lets a page make sound only after a gesture, so the context is created at
 // the first press or key (the recordings are fetched before, decoded then);
 // a sound asked for while they decode plays if they arrive within LATE s.
-// The controls' bus feeds the master (`sound.volume`), which a limiter keeps
-// under 0 dBFS. Muted, the master fades out and the context suspends; a
-// hidden page suspends it too.
+// The controls' bus and the ambience's feed the master (`sound.volume`),
+// which a limiter keeps under 0 dBFS. Muted, the master fades out and the
+// context suspends. So does every sound while the page is hidden or the
+// window has lost the focus; back, it fades in again where it was.
 import { SOUNDS, SOUND_FILES, takesOf } from './soundBank'
 import { beep, fineTick, tick } from './synth'
 
 const SYNTHS = { tick, beep, fine: fineTick }
 const LATE = 0.15
-// The master's time constant (s) toward a new volume or mute.
+// The master's time constant (s) toward a new volume or mute, and back
+// from a pause.
 const FADE = 0.08
+const RESUME_FADE = 0.3
 
 export default class AudioEngine {
 	// `params`: the live params, whose `sound` group sets the levels.
 	constructor({ params, muted = false }) {
 		this.params = params
 		this.muted = muted
+		// Hidden or out of focus (a press or a key brings the focus back).
+		this.paused = false
+		this.resumed = -Infinity
 		this.context = null
 		this.decoded = false
 		this.buffers = new Map()
@@ -43,11 +49,32 @@ export default class AudioEngine {
 		}
 		window.addEventListener('pointerdown', this.onGesture, true)
 		window.addEventListener('keydown', this.onGesture, true)
-		document.addEventListener('visibilitychange', () => {
-			if (!this.context) return
-			if (document.hidden) this.context.suspend()
-			else if (!this.muted) this.context.resume()
-		})
+		document.addEventListener('visibilitychange', () => this.pause(document.hidden))
+		window.addEventListener('blur', () => this.pause(true))
+		window.addEventListener('focus', () => this.pause(document.hidden))
+		window.addEventListener('pointerdown', () => this.pause(false), true)
+	}
+
+	// Every sound stops while `paused` (the page hidden or out of focus): the
+	// master fades out, then the context suspends; back, it resumes and the
+	// master fades in.
+	pause(paused) {
+		if (paused === this.paused) return
+		this.paused = paused
+		if (!this.context) return
+		if (paused) {
+			this.update()
+			setTimeout(
+				() => {
+					if (this.paused) this.context.suspend()
+				},
+				6 * FADE * 1000,
+			)
+		} else if (!this.muted) {
+			this.context.resume()
+			this.resumed = this.context.currentTime
+			this.update()
+		}
 	}
 
 	get ready() {
@@ -63,7 +90,7 @@ export default class AudioEngine {
 	// Creates (or resumes) the context; call it from a gesture.
 	unlock() {
 		if (this.context) {
-			if (!this.muted && this.context.state !== 'running') this.context.resume()
+			if (!this.muted && !this.paused && this.context.state !== 'running') this.context.resume()
 			return
 		}
 		window.removeEventListener('pointerdown', this.onGesture, true)
@@ -82,8 +109,8 @@ export default class AudioEngine {
 		this.analyser.fftSize = 2048
 		this.samples = new Float32Array(this.analyser.fftSize)
 		this.master.connect(limiter).connect(this.analyser).connect(context.destination)
-		this.buses = { controls: context.createGain() }
-		this.buses.controls.connect(this.master)
+		this.buses = { controls: context.createGain(), ambience: context.createGain() }
+		for (const bus of Object.values(this.buses)) bus.connect(this.master)
 		for (const sound of Object.values(SOUNDS)) {
 			if (!sound.synth) continue
 			for (const key of takesOf(sound)) {
@@ -182,7 +209,7 @@ export default class AudioEngine {
 	setMuted(muted) {
 		this.muted = muted
 		if (!this.context) return
-		if (!muted) this.context.resume()
+		if (!muted && !this.paused) this.context.resume()
 		this.update()
 		if (muted)
 			setTimeout(
@@ -193,12 +220,15 @@ export default class AudioEngine {
 			)
 	}
 
-	// Once a frame: the master volume from the params, and the loudest sample
-	// and the power of the master since the last stats().
+	// Once a frame: the master volume from the params (none muted or
+	// paused), and the loudest sample and the power of the master since the
+	// last stats().
 	update() {
 		if (!this.context) return
 		const now = this.context.currentTime
-		this.master.gain.setTargetAtTime(this.muted ? 0 : this.params.sound.volume, now, FADE)
+		const silent = this.muted || this.paused
+		const lag = !silent && now - this.resumed < 1 ? RESUME_FADE : FADE
+		this.master.gain.setTargetAtTime(silent ? 0 : this.params.sound.volume, now, lag)
 		this.analyser.getFloatTimeDomainData(this.samples)
 		for (const sample of this.samples) {
 			this.peak = Math.max(this.peak, Math.abs(sample))
@@ -207,15 +237,16 @@ export default class AudioEngine {
 		this.power.count += this.samples.length
 	}
 
-	// The context's state, the mute, how often each sound played, and the
-	// peak and the RMS level of the master (dBFS, sampled once a frame) since
-	// the last call.
+	// The context's state, the mute and the pause, how often each sound
+	// played, and the peak and the RMS level of the master (dBFS, sampled once
+	// a frame) since the last call.
 	stats() {
 		const decibels = (amplitude) => (amplitude > 0 ? 20 * Math.log10(amplitude) : -Infinity)
 		const stats = {
 			state: this.context?.state ?? 'none',
 			ready: this.ready,
 			muted: this.muted,
+			paused: this.paused,
 			played: { ...this.played },
 			peak: decibels(this.peak),
 			rms: decibels(Math.sqrt(this.power.sum / Math.max(this.power.count, 1))),

@@ -915,20 +915,89 @@ canvas {
 }
 
 /* The sound toggle at the end of the credit line, in its type, in the
-   accent as the link. */
+   accent as the link, as wide as "sound off", so the volume beside it stays
+   put as it switches. */
 .sound-toggle {
+	min-width: calc(9ch + 9 * 0.02em);
 	padding: 0;
 	border: 0;
 	background: none;
 	color: #ffb700;
 	font: inherit;
 	letter-spacing: inherit;
+	text-align: left;
 	text-transform: inherit;
 	text-decoration: underline;
 	text-underline-offset: 2px;
 	pointer-events: auto;
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
+}
+
+/* The toggle and the volume keep to one line. */
+.sound-controls {
+	white-space: nowrap;
+}
+
+/* The volume (main.js): a line dashed as the HUD's and the frame's (3px
+   every 8px, one centered on each end of its --volume-track, the handle's
+   run), in the accent up to its square handle and white at 30% past it, all
+   of it while the sound is off. The handle, white (the credit's opacity
+   makes it the zoom marker's grey), takes the accent under the pointer, the
+   keyboard's focus and a drag. Its box sits on the baseline as tall as the
+   capitals, the line through their middle; the hit area reaches past it. */
+.volume {
+	position: relative;
+	display: inline-block;
+	width: var(--volume-track);
+	height: 9px;
+	margin-left: 8px;
+	vertical-align: baseline;
+	outline: none;
+	pointer-events: auto;
+	cursor: pointer;
+	touch-action: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.volume::before {
+	content: '';
+	position: absolute;
+	inset: -8px -6px;
+}
+
+.volume-line {
+	position: absolute;
+	top: 4px;
+	left: -1px;
+	width: calc(var(--volume-track) + 3px);
+	height: 1px;
+	background: linear-gradient(
+		to right,
+		var(--accent) calc(1.5px + var(--volume) * var(--volume-track)),
+		#ffffff4d 0
+	);
+	mask: repeating-linear-gradient(to right, #000 0 3px, transparent 3px 8px);
+}
+
+.volume.muted .volume-line {
+	background: #ffffff4d;
+}
+
+.volume-handle {
+	position: absolute;
+	top: 4.5px;
+	left: calc(0.5px + var(--volume) * var(--volume-track));
+	width: 8px;
+	height: 8px;
+	translate: -50% -50%;
+	background: #fff;
+	transition: background 0.2s;
+	pointer-events: none;
+}
+
+.volume:is(:hover, :focus-visible, .dragging) .volume-handle {
+	background: var(--accent);
 }
 
 .fps {

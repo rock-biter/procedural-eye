@@ -9,7 +9,7 @@
 - **Air**: dust fibers and flakes at their real size, blurred by the thin lens, a light haze that grows with the distance and a few soft light shafts give the space around the eye its depth; the patch casts a soft shadow on an unseen floor.
 - **Animation**: the eye lives (pupil light reflex with hippus, saccades, microsaccades, drift, lids following the gaze, blinks) until photo mode freezes it.
 - **Photo mode**: a physical thin-lens camera and progressive accumulation give true macro depth of field.
-- **Sound**: the controls sound like a camera: CC0 recordings of real ones (buttons, the detents of the zoom and aperture rings, the film advance, the shutter) and a few synthesized sounds ([`docs/AUDIO.md`](docs/AUDIO.md)). There is no background sound for now.
+- **Sound**: the controls sound like a camera: CC0 recordings of real ones (buttons, the detents of the zoom and aperture rings, the film advance, the shutter) and a few synthesized sounds, over a soft glass harp (synthesized wine glasses rubbed with a wet finger) that fades in at the first gesture ([`docs/AUDIO.md`](docs/AUDIO.md)). Every sound pauses while the page is hidden or out of focus.
 
 [`README.md`](README.md) is the short human-facing introduction. This file is the entry point for coding agents and routes detailed work to the owning guide.
 
@@ -24,7 +24,7 @@
 | The iris model (structure, raymarching, shading, color, dilation) | [`docs/IRIS.md`](docs/IRIS.md) |
 | Eyelids, skin, lashes, tear film, or the scleral vessels | [`docs/ADNEXA.md`](docs/ADNEXA.md) |
 | Pupil dynamics, eye movements, lid follow, blinks, or photo mode | [`docs/ANIMATION.md`](docs/ANIMATION.md) |
-| The sound design: the camera foley of the controls, the recordings and `pnpm sounds` | [`docs/AUDIO.md`](docs/AUDIO.md) |
+| The sound design: the camera foley of the controls, the ambience, the recordings and `pnpm sounds` | [`docs/AUDIO.md`](docs/AUDIO.md) |
 | Anatomical and optical data, parameter ranges, and references | [`docs/RESEARCH.md`](docs/RESEARCH.md) |
 | Checks, the capture script, visual verification, or performance measurement | [`docs/QUALITY.md`](docs/QUALITY.md) |
 | Phases, known gaps, and future work | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
@@ -65,7 +65,7 @@ pnpm sounds
 - [`src/camera/`](src/camera/): thin-lens optics and sampling, the physical camera and the pointer controls.
 - [`src/atmosphere/`](src/atmosphere/): the dust field (seeded motes in a cube around the eye), the lights the haze scatters and the light shafts (seeded beams and their cookie).
 - [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field, the dust pass, the backdrop with the floor shadow and PNG metadata.
-- [`src/audio/`](src/audio/): the audio engine and the camera foley, with their pure parts (the foley's arithmetic, the sound bank, the synthesized buffers) and the recorded sounds in `sounds/`.
+- [`src/audio/`](src/audio/): the audio engine, the camera foley and the ambience, with their pure parts (the foley's arithmetic, the sound bank, the synthesized buffers, the glass harp's tuning and voices, the reverb's impulse response) and the recorded sounds in `sounds/`.
 - [`src/debug/`](src/debug/) holds the panel, the mesh tree (`?meshtree=1`) and the debug view numbering; [`src/ui/`](src/ui/) the HUD around the eye, its layout and its SVG assets; [`src/shaders/`](src/shaders/) holds every GLSL file.
 - _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
 - [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/compare.mjs`](scripts/compare.mjs) measures captures against a baseline; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/); [`scripts/sounds.mjs`](scripts/sounds.mjs) cuts the recorded sounds from their CC0 sources (`scripts/sounds.json`).

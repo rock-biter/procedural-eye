@@ -1,5 +1,6 @@
 import './style.css'
 import EyeApp from './src/app'
+import Ambience from './src/audio/ambience'
 import AudioEngine from './src/audio/audioEngine'
 import CameraFoley from './src/audio/cameraFoley'
 import { SOUNDS } from './src/audio/soundBank'
@@ -115,10 +116,13 @@ const panelState = { ancestry: 'european', transition: TRANSITION.duration }
 // The lashes and the skin are not among them: a random eye keeps them.
 const RANDOM_EYE_GROUPS = ['eye', 'iris', 'irisColor', 'irisStructure', 'sclera']
 
-// Glides to the preset `name`: its overrides on the defaults.
+// Glides to the preset `name`: its overrides on the defaults, the viewer's
+// volume kept (sound.volume, the slider by the sound toggle).
 function loadPreset(name, duration = panelState.transition) {
 	if (!PRESETS[name]) return false
-	app.transitionTo(fitScreen(createParams(PARAM_SCHEMA, PRESETS[name].params)), duration)
+	const target = fitScreen(createParams(PARAM_SCHEMA, PRESETS[name].params))
+	setValue(PARAM_SCHEMA, target, 'sound.volume', app.targetParams.sound.volume)
+	app.transitionTo(target, duration)
 	return true
 }
 
@@ -245,6 +249,9 @@ window.__EYE__ = {
 let cue = () => {}
 // Plays a sound of src/audio/soundBank.js by its name, for the panel.
 let audition = null
+// Reads the params back into the panel, once it is built (the volume slider
+// sets sound.volume without a change that would restart the image).
+let refreshPanel = () => {}
 
 // Downloads the current (accumulated) image with its state in a tEXt chunk,
 // to the sound of a focus beep and a shutter (from `element`, Snapshot, if
@@ -260,18 +267,20 @@ async function savePng(element) {
 	download(new Blob([tagged], { type: 'image/png' }), `eye-${Date.now()}.png`)
 }
 
-// The viewer's mute, kept in the browser (none in a private window: on).
+// The viewer's mute and volume (sound.volume, the master), kept in the
+// browser (none in a private window: on, at the default volume).
 const MUTED_KEY = 'random-eyes:muted'
-function readMuted() {
+const VOLUME_KEY = 'random-eyes:volume'
+function readStored(key) {
 	try {
-		return window.localStorage.getItem(MUTED_KEY) === '1'
+		return window.localStorage.getItem(key)
 	} catch {
-		return false
+		return null
 	}
 }
-function writeMuted(muted) {
+function writeStored(key, value) {
 	try {
-		window.localStorage.setItem(MUTED_KEY, muted ? '1' : '0')
+		window.localStorage.setItem(key, value)
 	} catch {
 		// The choice holds for this page only.
 	}
@@ -337,10 +346,12 @@ if (urlParams.get('gui') !== '0') {
 	document.body.appendChild(frame())
 
 	// The sound design (src/audio/, docs/AUDIO.md): the camera foley of the
-	// controls, which starts at the first press or key. The viewer's mute (the
-	// sound toggle, M) is kept in the browser.
-	const audio = new AudioEngine({ params: app.params, muted: readMuted() })
+	// controls and the ambience, which start at the first press or key (the
+	// ambience fading in slowly) and pause while the page is hidden or out of
+	// focus. The viewer's mute (the sound toggle, M) is kept in the browser.
+	const audio = new AudioEngine({ params: app.params, muted: readStored(MUTED_KEY) === '1' })
 	const foley = new CameraFoley(audio)
+	const ambience = new Ambience(audio)
 	cue = (name, detail) => foley.cue(name, detail)
 	window.__EYE__.getSoundStats = () => audio.stats()
 	audition = (name) => {
@@ -373,6 +384,7 @@ if (urlParams.get('gui') !== '0') {
 		soundTime = time
 		const { camera, zoom, aperture } = app.params
 		audio.update()
+		ambience.update()
 		foley.update(dt, {
 			zoom: zoomProgress(camera.distance, zoomLimits()),
 			aperture: apertureProgress(camera.fNumber, apertureLimits()),
@@ -505,15 +517,17 @@ if (urlParams.get('gui') !== '0') {
 		soundToggle.setAttribute('aria-pressed', String(!audio.muted))
 		soundToggle.title = audio.muted ? 'Turn the sound on (M)' : 'Turn the sound off (M)'
 	}
-	const toggleSound = () => {
-		const muted = !audio.muted
+	const setMuted = (muted) => {
 		audio.setMuted(muted)
 		if (!muted) audio.unlock()
-		writeMuted(muted)
+		writeStored(MUTED_KEY, muted ? '1' : '0')
 		showSound()
+		volume.classList.toggle('muted', muted)
+	}
+	const toggleSound = () => {
+		setMuted(!audio.muted)
 		cue('press', { control: 'sound', element: soundToggle })
 	}
-	showSound()
 	soundToggle.addEventListener('click', () => {
 		soundToggle.blur()
 		toggleSound()
@@ -525,7 +539,99 @@ if (urlParams.get('gui') !== '0') {
 		if (event.metaKey || event.ctrlKey || event.altKey) return
 		toggleSound()
 	})
-	credit.append(' · ', soundToggle)
+
+	// The volume, beside the sound toggle: the master (sound.volume, the
+	// panel's master volume too) on a dashed line VOLUME_TRACK px long, in the
+	// accent up to its square handle (style.css), kept in the browser. A
+	// press sets it where it lands (on the handle, it holds the handle where
+	// it was grabbed), a drag carries it, the arrow keys step it, and a tap
+	// sounds at its new level as it is let go. Moving it turns the sound on.
+	// It sets the params without a change, which would restart the image.
+	const VOLUME_TRACK = 80
+	const VOLUME_STEP = 0.05
+	const volume = document.createElement('div')
+	volume.className = 'volume'
+	volume.tabIndex = 0
+	volume.title = 'Volume'
+	volume.setAttribute('role', 'slider')
+	volume.setAttribute('aria-label', 'Volume')
+	volume.setAttribute('aria-valuemin', '0')
+	volume.setAttribute('aria-valuemax', '100')
+	volume.style.setProperty('--volume-track', `${VOLUME_TRACK}px`)
+	volume.innerHTML = '<span class="volume-line"></span><span class="volume-handle"></span>'
+	const showVolume = () => {
+		const level = app.params.sound.volume
+		volume.style.setProperty('--volume', level)
+		volume.setAttribute('aria-valuenow', String(Math.round(level * 100)))
+	}
+	const putVolume = (level) => {
+		const rounded = Math.round(Math.min(Math.max(level, 0), 1) * 100) / 100
+		for (const values of new Set([app.params, app.targetParams]))
+			setValue(PARAM_SCHEMA, values, 'sound.volume', rounded)
+		showVolume()
+		refreshPanel()
+	}
+	const setVolume = (level) => {
+		putVolume(level)
+		writeStored(VOLUME_KEY, String(app.params.sound.volume))
+		if (audio.muted) setMuted(false)
+	}
+	const stored = Number.parseFloat(readStored(VOLUME_KEY))
+	if (Number.isFinite(stored)) putVolume(stored)
+	showVolume()
+	app.listeners.add((path) => {
+		if (path === '*' || path === 'sound.volume') showVolume()
+	})
+	const tapVolume = () => cue('tap', { control: 'volume', element: volume })
+	const volumeAt = (event) => (event.clientX - volume.getBoundingClientRect().left) / VOLUME_TRACK
+	let volumeDrag = null
+	volume.addEventListener('pointerdown', (event) => {
+		if (event.button !== 0 || volumeDrag) return
+		volume.setPointerCapture(event.pointerId)
+		volume.classList.add('dragging')
+		const at = volumeAt(event)
+		const grab = at - app.params.sound.volume
+		const offset = Math.abs(grab) * VOLUME_TRACK <= 6 ? grab : 0
+		volumeDrag = { id: event.pointerId, offset }
+		setVolume(at - offset)
+	})
+	volume.addEventListener('pointermove', (event) => {
+		if (volumeDrag?.id === event.pointerId) setVolume(volumeAt(event) - volumeDrag.offset)
+	})
+	const releaseVolume = (event, tap) => {
+		if (volumeDrag?.id !== event.pointerId) return
+		volumeDrag = null
+		volume.classList.remove('dragging')
+		volume.blur()
+		if (tap) tapVolume()
+	}
+	volume.addEventListener('pointerup', (event) => releaseVolume(event, true))
+	volume.addEventListener('pointercancel', (event) => releaseVolume(event, false))
+	volume.addEventListener('lostpointercapture', (event) => releaseVolume(event, false))
+	volume.addEventListener('keydown', (event) => {
+		const level = app.params.sound.volume
+		const steps = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }
+		const to =
+			event.key === 'Home'
+				? 0
+				: event.key === 'End'
+					? 1
+					: steps[event.key] && level + steps[event.key] * VOLUME_STEP
+		if (to === undefined) return
+		event.preventDefault()
+		setVolume(to)
+		tapVolume()
+	})
+	sounding(volume, 'volume', false)
+	showSound()
+	volume.classList.toggle('muted', audio.muted)
+
+	// The toggle and the volume keep to one line as the credit wraps, the
+	// middle dot before them with the line above.
+	const soundControls = document.createElement('span')
+	soundControls.className = 'sound-controls'
+	soundControls.append(soundToggle, volume)
+	credit.append(' · ', soundControls)
 
 	// Snapshot, bottom right: saves the image as the panel's Save PNG does
 	// (the state in a tEXt chunk). The word inside the HUD's reticle corners
@@ -653,6 +759,7 @@ async function createPanel() {
 	app.listeners.add((path) => {
 		if (path === 'camera' || path === '*') gui.refresh()
 	})
+	refreshPanel = () => gui.refresh()
 	return gui
 }
 

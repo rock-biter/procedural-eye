@@ -8,7 +8,7 @@ An exploratory demo of a digital eye configurator: a hyper-realistic, fully proc
 - **Light and life**: an analytic light rig gives exact reflections; the pupil reacts to light, the eye moves like a living one and blinks now and then.
 - **Air**: tiny fibers and flakes of dust drift very slowly around the eye, sharp near the focus and soft away from it, over a light haze that deepens with distance; a few soft shafts of light cross it, and the skin patch casts a soft shadow below.
 - **Photo mode**: a thin-lens camera with progressive accumulation renders real macro depth of field.
-- **Sound**: every control sounds like a camera: the clicks of the zoom and aperture rings, the buttons, the film advance, and a focus beep before the shutter.
+- **Sound**: every control sounds like a camera: the clicks of the zoom and aperture rings, the buttons, the film advance, and a focus beep before the shutter. Under them, a soft glass harp (wine glasses rubbed with a wet finger, a few singing quietly in turn, now and then a louder one) fades in at your first click, and every sound pauses while the tab is in the background.
 
 Every structure and color is a parameter.
 

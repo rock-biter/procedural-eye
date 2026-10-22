@@ -1,7 +1,14 @@
-// The synthesized sounds of the foley (docs/AUDIO.md), as mono sample
-// buffers at `rate` Hz that src/audio/audioEngine.js wraps in AudioBuffers:
-// seeded, so every load sounds the same.
+// The synthesized sounds of the foley and the glass harp's friction
+// (docs/AUDIO.md), as mono sample buffers at `rate` Hz that
+// src/audio/audioEngine.js wraps in AudioBuffers: seeded, so every load sounds
+// the same.
 import { createRandom } from '../random'
+
+// White noise, `seconds` long: the glasses' friction (src/audio/ambience.js).
+export function noise(rate, seconds, seed = 'noise') {
+	const random = createRandom(seed)
+	return Float32Array.from({ length: Math.round(rate * seconds) }, () => random() * 2 - 1)
+}
 
 // The hover's tick: a 4 ms burst of high noise, decaying fast.
 export function tick(rate, seed = 'tick') {
