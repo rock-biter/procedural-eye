@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { hexToLinearRgb } from '../src/lighting/colorTemperature'
 import { getLeaf, sanitizeValue } from '../src/params/params'
 import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
-import { SKIN_TONES } from '../src/params/skinTones'
+import { SECRET_TONE, SKIN_TONES } from '../src/params/skinTones'
 
 test('the skin tones are skin colors, named once, from light to deep', () => {
 	const leaf = getLeaf(BASE_PARAM_SCHEMA, 'skin.color')
@@ -16,4 +16,13 @@ test('the skin tones are skin colors, named once, from light to deep', () => {
 		assert.equal(sanitizeValue(leaf, tone.color), tone.color, tone.name)
 		if (i > 0) assert.ok(luminance(tone.color) < luminance(SKIN_TONES[i - 1].color), tone.name)
 	}
+})
+
+test('the hidden tone is a color of its own, red above all', () => {
+	const leaf = getLeaf(BASE_PARAM_SCHEMA, 'skin.color')
+	assert.equal(sanitizeValue(leaf, SECRET_TONE.color), SECRET_TONE.color)
+	assert.ok(SKIN_TONES.every((tone) => tone.name !== SECRET_TONE.name))
+	assert.ok(SKIN_TONES.every((tone) => tone.color !== SECRET_TONE.color))
+	const [r, g, b] = hexToLinearRgb(SECRET_TONE.color)
+	assert.ok(r > 4 * g && r > 4 * b)
 })

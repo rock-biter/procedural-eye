@@ -118,7 +118,11 @@ function place(element, cut, angle, { cx, cy, radius }) {
 	cut?.setAttribute('cy', y)
 }
 
-// `tones`: [{ name, label, color }]; onTone(name), onZoom('in' | 'out',
+// `tones`: [{ name, label, color }], and `secretTone`, if given, one more
+// (desktop only, main.js): its button one spacing past the deepest, turning
+// with them, never seen, pressed or not, without a cut in the circle, and
+// pressable only once unlockSecret(true); a split HUD leaves it out.
+// onTone(name), onZoom('in' | 'out',
 // duration), onZoomLevel(level, including elastic overshoot),
 // onZoomWheel(deltaY) (the wheel over the knob) and onRandom() run the
 // controls; getZoomElasticity() reads the current drag extension.
@@ -134,12 +138,14 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // value by the knob; showApertureLevel(level), where the aperture knob goes
 // and the tones' arcs' size, and showApertureValue(text), the f-number by
 // the zoom's value; introLayers(), its layers for the intro
-// (src/ui/intro.js). onCue(name, detail), if given, hears the controls for the
+// (src/ui/intro.js); circle(), its circle in the window ({ x, y, radius,
+// split }, px; null before the first layout). onCue(name, detail), if given, hears the controls for the
 // sound design (src/audio/cameraFoley.js): 'press' and 'hover' of a button
 // or knob, 'tap' of a knob and 'random'; `detail.element` is the control,
 // `detail.control` its name.
 export function createHud({
 	tones,
+	secretTone = null,
 	onTone,
 	onZoom,
 	onZoomLevel,
@@ -273,6 +279,17 @@ export function createHud({
 		return button
 	})
 	toneGroup.append(...toneButtons)
+	// The hidden tone: out of the keyboard's way and of assistive technology,
+	// but a mouse over it, once unlocked, hears its tick (style.css hides it).
+	const secretButton =
+		secretTone &&
+		hudButton('skin skin-secret', `${secretTone.label} skin`, '', () => onTone(secretTone.name))
+	if (secretButton) {
+		secretButton.tabIndex = -1
+		secretButton.setAttribute('aria-hidden', 'true')
+		sounding(secretButton, 'tone')
+		toneGroup.append(secretButton)
+	}
 
 	const zoomGroup = group('Zoom')
 	const zoomIn = hudButton(
@@ -443,23 +460,34 @@ export function createHud({
 	// Each button with its angle on the circle and its cut in the line.
 	// The tones' angles are their group's, turned (`toneShift`); the zoom's
 	// buttons lie on the zoom's circle (`zoom`).
+	const toneItems = [...toneButtons, ...(secretButton ? [secretButton] : [])].map((button, i) => ({
+		button,
+		angle: (angles, toned) => toned[i],
+	}))
 	const items = [
-		...toneButtons.map((button, i) => ({ button, angle: (angles, toned) => toned[i] })),
+		...toneItems,
 		{ button: zoomIn, angle: (angles) => angles.zoomIn, zoom: true, follow: 'zoom' },
 		{ button: zoomOut, angle: (angles) => angles.zoomOut, zoom: true, follow: 'zoom' },
 		{ button: random, angle: (angles) => angles.random, follow: 'random' },
 	]
-	const toneItems = items.slice(0, toneButtons.length)
 
 	// The tone group turns along the circle to bring the pressed tone to its
 	// center, on the horizontal (toneSteps()), gliding there with an elastic
 	// settle (GSAP). The first press, and any with reduced motion, sets it.
 	const toneShift = { steps: 0 }
+	// The tones' angles turned `toneShift`, the hidden tone's one spacing
+	// past the deepest.
+	const turnedTones = (angles, radius) => {
+		const slots = secretButton
+			? [...angles.tones, angles.tones.at(-1) - HUD.tones.spacing / radius]
+			: angles.tones
+		return turnTones(slots, radius, toneShift.steps)
+	}
 	let toneTarget = null
 	let placedAngles = null
 	const placeTones = () => {
 		if (!placed || !placedAngles) return
-		const toned = turnTones(placedAngles.tones, placed.radius, toneShift.steps)
+		const toned = turnedTones(placedAngles, placed.radius)
 		for (const item of toneItems)
 			place(item.button, item.cut, item.angle(placedAngles, toned), placed)
 	}
@@ -483,8 +511,9 @@ export function createHud({
 			onUpdate: placeTones,
 		})
 	}
-	for (const item of items) item.cut = cut()
+	for (const item of items) item.cut = item.button === secretButton ? null : cut()
 	const cutRadius = (item) => {
+		if (!item.cut) return
 		const pressed = item.button.getAttribute('aria-pressed') === 'true'
 		const tone = item.button.classList.contains('skin')
 		const scale = tone && !pressed ? HUD.toneScale : 1
@@ -736,7 +765,7 @@ export function createHud({
 			element.setAttribute('cx', circle.cx)
 			element.setAttribute('cy', circle.cy)
 		}
-		const toned = turnTones(angles.tones, radius, toneShift.steps)
+		const toned = turnedTones(angles, radius)
 		for (const item of items) {
 			place(item.button, item.cut, item.angle(angles, toned), item.zoom ? zoomCircle : circle)
 			cutRadius(item)
@@ -797,6 +826,12 @@ export function createHud({
 				button.setAttribute('aria-pressed', String(tones[i].color === color)),
 			)
 			for (const item of items) cutRadius(item)
+			// The hidden tone turns the group to bring its empty slot to the
+			// center; the arcs light up where they are.
+			if (secretButton && color === secretTone.color) {
+				turnToTone(tones.length)
+				return
+			}
 			// A color of no tone leaves the tones and the arcs where they are.
 			const tone = tones.findIndex((candidate) => candidate.color === color)
 			if (tone < 0) return
@@ -804,6 +839,17 @@ export function createHud({
 			if (tone === arcTone) return
 			arcTone = tone
 			placeArcs()
+		},
+		// Whether the hidden tone can be pressed (main.js: once every other
+		// tone has been worn).
+		unlockSecret(unlocked) {
+			secretButton?.classList.toggle('unlocked', unlocked)
+		},
+		circle() {
+			if (!placed) return null
+			const box = element.getBoundingClientRect()
+			const { cx, cy, radius, split } = placed
+			return { x: box.left + cx, y: box.top + cy, radius, split }
 		},
 		// The zoom's value as text (main.js formats it).
 		showZoomValue: (text) => zoomValue.show(text),

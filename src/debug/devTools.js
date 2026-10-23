@@ -16,7 +16,7 @@ import FrameStats from './frameStats'
 // `context` (main.js): { app, urlParams, panelState, fitScreen, actions, ui,
 // hooks }. `actions` holds main.js's own glides (randomEye, zoom, zoom and
 // aperture levels, skinTone), savePng and download; `ui`, with the interface
-// only, { audio, ambience, intro, INTRO }; `hooks`, the calls main.js makes
+// only, { audio, ambience, intro, INTRO, checklist }; `hooks`, the calls main.js makes
 // into the tools (refreshPanel, onRandomEye), set here.
 export function installDevTools(context) {
 	const { app, urlParams, panelState, fitScreen, actions, ui, hooks } = context
@@ -90,13 +90,18 @@ export function installDevTools(context) {
 	hooks.onRandomEye = (ancestry, features) => console.log('Random eye', ancestry, features)
 
 	if (ui) {
-		const { audio, ambience, intro, INTRO } = ui
+		const { audio, ambience, intro, INTRO, checklist } = ui
 		ui.audio.enableMeter()
 		Object.assign(window.__EYE__, {
 			getSoundStats: () => ({ ...audio.stats(), musicSpeed: ambience.rate }),
 			replayIntro: () => intro.replay(),
 			getIntro: () => intro.timeline,
 			getIntroConfig: () => INTRO,
+			// The checklist (desktop only): its progress, the task shown done,
+			// or everything forgotten (a reload).
+			getChecklist: () => checklist.state(),
+			completeTask: () => checklist.complete(),
+			resetChecklist: () => checklist.reset(),
 		})
 		// The panel shows while the URL ends in #debug: built the first time,
 		// then hidden and shown again as the hash changes.

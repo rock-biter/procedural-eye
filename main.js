@@ -16,13 +16,16 @@ import {
 } from './src/params/params'
 import { TRANSITION } from './src/params/paramTransition'
 import { randomEye, randomIrises } from './src/params/populationPriors'
-import { SKIN_TONES } from './src/params/skinTones'
+import { SECRET_TONE, SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
-import { createShotLog, terminatorLog } from './src/ui/consoleArt'
+import { CHECKLIST, createChecklist } from './src/ui/checklist'
+import { TASKS, createProgress } from './src/ui/checklistTasks'
+import { SHOTS, createShotLog, terminatorLog } from './src/ui/consoleArt'
 import { INTRO, createIntro } from './src/ui/intro'
 import {
+	HUD,
 	apertureFNumber,
 	apertureProgress,
 	elasticZoomLevel,
@@ -217,11 +220,11 @@ app.controls.sideDrag = {
 	},
 }
 
-// Glides `skin.color` to the tone `name` (src/params/skinTones.js), as the
-// skin buttons do. The rest keeps the values a running transition is heading
-// for.
+// Glides `skin.color` to the tone `name` (src/params/skinTones.js, the
+// hidden one too), as the skin buttons do. The rest keeps the values a
+// running transition is heading for.
 function skinTone(name, duration = panelState.transition) {
-	const tone = SKIN_TONES.find((candidate) => candidate.name === name)
+	const tone = [...SKIN_TONES, SECRET_TONE].find((candidate) => candidate.name === name)
 	if (!tone) return false
 	if (app.targetParams.skin.color === tone.color) return true
 	const target = cloneParams(app.targetParams)
@@ -270,6 +273,8 @@ async function takePhoto() {
 // browser (none in a private window: on, at the default volume).
 const MUTED_KEY = 'random-eyes:muted'
 const VOLUME_KEY = 'random-eyes:volume'
+// The checklist's progress and the skin tones worn (desktop only).
+const CHECKLIST_KEY = 'random-eyes:checklist'
 function readStored(key) {
 	try {
 		return window.localStorage.getItem(key)
@@ -284,6 +289,17 @@ function writeStored(key, value) {
 		// The choice holds for this page only.
 	}
 }
+
+// The tab's title while the page is hidden, with the interface: a line of the
+// eye left staring at the empty window (main.js's showTabTitle()).
+const TAB_TITLES = [
+	'I can see you…',
+	'I saw that.',
+	'Still watching…',
+	'Blink if you miss me',
+	"Come back, I'm drying out",
+	'Staring contest: you lost',
+]
 
 function download(blob, filename) {
 	const link = document.createElement('a')
@@ -358,7 +374,9 @@ if (urlParams.get('gui') !== '0') {
 		})
 	}
 	app.listeners.add((path) => {
-		if (path === 'frozen') cue('frozen', { frozen: app.frozen })
+		if (path !== 'frozen') return
+		cue('frozen', { frozen: app.frozen })
+		if (app.frozen) report('photo')
 	})
 	// Once a frame, what the sounds follow: the knobs' levels (past their
 	// ends while dragged), the f-number and the photo.
@@ -386,10 +404,19 @@ if (urlParams.get('gui') !== '0') {
 	// aperture (desktop only) and Random eye on a dashed circle. The tone of
 	// the color the params are heading for is pressed, also after the panel or
 	// a preset changes it; the zoom and aperture knobs follow the camera every
-	// frame, gliding or not.
+	// frame, gliding or not. A desktop's (a fine pointer) also has the hidden
+	// tone, which the checklist unlocks (below).
+	const desktop = window.matchMedia('(pointer: fine)').matches
 	const hud = createHud({
 		tones: SKIN_TONES,
-		onTone: (name) => skinTone(name),
+		secretTone: desktop ? SECRET_TONE : null,
+		onTone: (name) => {
+			const color = app.targetParams.skin.color
+			wearTone(name)
+			skinTone(name)
+			if (app.targetParams.skin.color !== color)
+				report(name === SECRET_TONE.name ? 'secret' : 'tone')
+		},
 		onZoom: (direction, duration) => zoom(direction, duration),
 		onZoomLevel: (level) => setZoomLevel(level),
 		// The wheel over the knob zooms as over the canvas, smoothly.
@@ -403,6 +430,7 @@ if (urlParams.get('gui') !== '0') {
 		onRandom: () => {
 			const features = loadRandomEye()
 			hooks.onRandomEye?.(panelState.ancestry, features)
+			report('iris')
 		},
 		onCue: (name, detail) => cue(name, detail),
 	})
@@ -456,18 +484,87 @@ if (urlParams.get('gui') !== '0') {
 		document.documentElement.style.setProperty('--masthead-height', `${masthead.offsetHeight}px`)
 	}).observe(masthead)
 
-	// The tab's title while the page is hidden: a line of the eye left
-	// staring at the empty window, "I can see you…" the first time, then
-	// another one drawn each time (never the same twice in a row). Back,
-	// the page's own title.
-	const tabTitles = [
-		'I can see you…',
-		'I saw that.',
-		'Still watching…',
-		'Blink if you miss me',
-		"Come back, I'm drying out",
-		'Staring contest: you lost',
-	]
+	// The checklist under it, on desktops only (src/ui/checklist.js): as wide
+	// as the room left of the HUD's circle, short of the skin tones, and down
+	// to above the camera's angles, by the circle's middle (hidden where it is
+	// too narrow or too short, as on a split HUD), shown once the intro ends.
+	// The controls report what is done; only the task shown counts
+	// (src/ui/checklistTasks.js). The hidden tone (SECRET_TONE) can be
+	// pressed once its task shows and every tone has been worn since (a press
+	// that brings the task in is not one of them), and from then on. The
+	// progress is kept in the browser, with those tones.
+	const readChecklist = () => {
+		try {
+			return JSON.parse(readStored(CHECKLIST_KEY)) ?? {}
+		} catch {
+			return {}
+		}
+	}
+	const saved = readChecklist()
+	const progress = createProgress(TASKS, {
+		counts: { titles: TAB_TITLES.length, shots: SHOTS.length },
+		saved,
+	})
+	const worn = new Set(Array.isArray(saved.tones) ? saved.tones : [])
+	const keepChecklist = () =>
+		writeStored(CHECKLIST_KEY, JSON.stringify({ ...progress.state(), tones: [...worn] }))
+	const secretShown = () => progress.current()?.id === 'secret'
+	const unlockSecret = () => {
+		const found = progress.done().some((task) => task.id === 'secret')
+		const allWorn = SKIN_TONES.every((tone) => worn.has(tone.name))
+		hud.unlockSecret(found || (secretShown() && allWorn))
+	}
+	const checklist = desktop
+		? createChecklist({
+				tasks: TASKS,
+				progress,
+				onChange: () => {
+					keepChecklist()
+					unlockSecret()
+				},
+			})
+		: null
+	const report = (id, key) => checklist?.report(id, key)
+	const wearTone = (name) => {
+		if (!checklist?.counting() || !secretShown() || worn.has(name)) return
+		if (!SKIN_TONES.some((tone) => tone.name === name)) return
+		worn.add(name)
+		keepChecklist()
+		unlockSecret()
+	}
+	if (checklist) {
+		document.body.appendChild(checklist.element)
+		unlockSecret()
+		// Its room, measured once the HUD has laid out (its own observer, made
+		// first, runs first).
+		new ResizeObserver(() => {
+			const circle = hud.circle()
+			const { left, top } = checklist.element.getBoundingClientRect()
+			if (!circle || circle.split) return checklist.fit(0, 0)
+			const tones = circle.x - circle.radius - HUD.button / 2
+			const angles = circle.y - CHECKLIST.readout
+			checklist.fit(tones - CHECKLIST.gap - left, angles - CHECKLIST.gap - top)
+		}).observe(hud.element)
+		// Once a frame, the framing (the camera's distance or orbit: the zoom's
+		// controls, the wheel, a drag) and the focus (the f-number: the
+		// aperture knob, the wheel over it, a right-drag) moving.
+		let camera = null
+		const watchCamera = () => {
+			requestAnimationFrame(watchCamera)
+			const { distance, azimuth, elevation, fNumber } = app.params.camera
+			if (camera) {
+				const { distance: d, azimuth: a, elevation: e, fNumber: f } = camera
+				if (distance !== d || azimuth !== a || elevation !== e) report('framing')
+				if (fNumber !== f) report('focus')
+			}
+			camera = { distance, azimuth, elevation, fNumber }
+		}
+		requestAnimationFrame(watchCamera)
+	}
+
+	// The tab's title while the page is hidden (TAB_TITLES), "I can see you…"
+	// the first time, then another one drawn each time (never the same twice
+	// in a row). Back, the page's own title.
 	const pageTitle = document.title
 	let tabTitle = null
 	const showTabTitle = () => {
@@ -475,9 +572,10 @@ if (urlParams.get('gui') !== '0') {
 			document.title = pageTitle
 			return
 		}
-		const skip = 1 + Math.floor(Math.random() * (tabTitles.length - 1))
-		tabTitle = tabTitle === null ? 0 : (tabTitle + skip) % tabTitles.length
-		document.title = tabTitles[tabTitle]
+		const skip = 1 + Math.floor(Math.random() * (TAB_TITLES.length - 1))
+		tabTitle = tabTitle === null ? 0 : (tabTitle + skip) % TAB_TITLES.length
+		document.title = TAB_TITLES[tabTitle]
+		report('titles', tabTitle)
 	}
 	document.addEventListener('visibilitychange', showTabTitle)
 	showTabTitle()
@@ -662,9 +760,11 @@ if (urlParams.get('gui') !== '0') {
 	// their shares of its run (VOLUME_FOLLOW), and the glass harp playing
 	// faster the further it is pulled, up to `sound.stretchRate` times at the
 	// limit. Let go, they spring back with an elastic ease in SPRING_BACK s,
-	// the music slowing back to its own speed with them.
+	// the music slowing back to its own speed with them. Pulled ELEVEN of the
+	// furthest it can run, the volume goes to eleven (the checklist's).
 	const VOLUME_FOLLOW = { line: 0.3, toggle: 0.15 }
 	const SPRING_BACK = 0.9
+	const ELEVEN = 0.5
 	// The handle's run past the end (px) and its share of the furthest it can
 	// run (0 to 1), which sets the music's speed.
 	const stretch = { over: 0, amount: 0 }
@@ -697,6 +797,7 @@ if (urlParams.get('gui') !== '0') {
 		stretch.over = (elasticZoomLevel(pull, reach) - 1) * VOLUME_TRACK
 		stretch.amount = stretch.over / (reach * VOLUME_TRACK)
 		showStretch(stretch.over, stretch.amount)
+		if (stretch.amount >= ELEVEN) report('eleven')
 	}
 	const springBack = () => {
 		const { over, amount } = stretch
@@ -829,6 +930,7 @@ if (urlParams.get('gui') !== '0') {
 	const shoot = () => {
 		const from = volume.querySelector('.volume-handle').getBoundingClientRect()
 		const to = snapshot.getBoundingClientRect()
+		report('cannon')
 		volume.classList.add('fired')
 		userVolume(1)
 		showVolume()
@@ -906,6 +1008,7 @@ if (urlParams.get('gui') !== '0') {
 			// the glitch holds still. The T-800 reports the hit in the console.
 			app.terminator.trigger(motionless.matches).then(takePhoto)
 			console.log(...shotLog.next())
+			if (SHOTS.includes(shotLog.line)) report('shots', shotLog.line)
 			// Bounced off Snapshot (back and up from its side; down from below,
 			// still drifting left), then falling, spinning.
 			let [x, y] = hit
@@ -942,7 +1045,10 @@ if (urlParams.get('gui') !== '0') {
 	const tapVolume = () => cue('tap', { control: 'volume', element: volume })
 	const volumeAt = (event) =>
 		(event.clientX - (volumeDrag?.left ?? volume.getBoundingClientRect().left)) / VOLUME_TRACK
-	const settle = () => remember(app.params.sound.volume)
+	const settle = () => {
+		remember(app.params.sound.volume)
+		report('volume')
+	}
 	let volumeDrag = null
 	volume.addEventListener('pointerdown', (event) => {
 		if (event.button !== 0 || volumeDrag) return
@@ -1034,6 +1140,7 @@ if (urlParams.get('gui') !== '0') {
 	snapshot.addEventListener('click', () => {
 		snapshot.blur()
 		savePng(snapshot)
+		report('snapshot')
 	})
 	sounding(snapshot, 'snapshot', false)
 
@@ -1155,9 +1262,21 @@ if (urlParams.get('gui') !== '0') {
 		},
 		blinks: { hold: () => app.holdBlinks(true), first: firstBlink },
 		dev: urlParams.get('intro') === 'dev',
+		onEnd: () => checklist?.show(),
 	})
 	if (introPlays) intro.hold()
-	ui = { audio, ambience, intro, INTRO }
+	else checklist?.show()
+	// The checklist for the console: complete() does the task shown, reset()
+	// forgets the progress (and the tones worn) and reloads.
+	const checklistTools = {
+		complete: () => checklist?.complete(),
+		reset() {
+			writeStored(CHECKLIST_KEY, '{}')
+			window.location.reload()
+		},
+		state: () => ({ ...progress.state(), tones: [...worn] }),
+	}
+	ui = { audio, ambience, intro, INTRO, checklist: checklistTools }
 
 	// For whoever opens the console: the T-800's eye, with its warnings about
 	// the volume (src/ui/consoleArt.js); each shot that hits Snapshot adds a

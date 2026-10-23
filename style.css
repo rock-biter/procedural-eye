@@ -688,6 +688,21 @@ canvas {
 	opacity: 0.8;
 }
 
+/* The hidden tone (main.js) is never seen, pressed or not; it takes the
+   pointer only once unlocked, and a split HUD leaves it out. */
+.skin-secret {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.skin-secret.unlocked {
+	pointer-events: auto;
+}
+
+.hud.split .skin-secret {
+	display: none;
+}
+
 .zoom-in .hud-glyph,
 .zoom-out .hud-glyph {
 	transform: scale(1.5);
@@ -924,6 +939,118 @@ canvas {
 	span {
 		color: #ffb700;
 	}
+}
+
+/* The checklist (desktop only, main.js), under the line about the project
+   and in its type: as wide as the room left of the HUD's circle
+   (--checklist-room, main.js), 40 characters at most. Its title in the
+   accent; each task after a square, outlined in the accent while it is to
+   do, filled in white and dimmed once done; under the task to do, a dot for
+   each one after it. Down to --checklist-height (main.js): past it, the
+   tasks done first leave at the top, which fades (.clipped). Hidden until it
+   shows (after the intro), and while it has no room (.cramped). */
+.checklist {
+	position: fixed;
+	display: flex;
+	flex-direction: column;
+	max-height: var(--checklist-height, none);
+	top: calc(var(--ui-inset-y) + env(safe-area-inset-top) + var(--masthead-height, 56px) + 24px);
+	left: calc(var(--ui-inset) + env(safe-area-inset-left));
+	z-index: 10;
+	max-width: min(40ch, var(--checklist-room, 40ch));
+	color: var(--ui-color);
+	font:
+		400 12px/1.4 'JetBrains Mono',
+		ui-monospace,
+		monospace;
+	letter-spacing: 0.02em;
+	pointer-events: none;
+	opacity: 0.8;
+	visibility: hidden;
+}
+
+.checklist.shown {
+	visibility: visible;
+}
+
+.checklist.cramped {
+	visibility: hidden;
+}
+
+.checklist-title {
+	flex: none;
+	margin: 0 0 6px;
+	font: inherit;
+	color: var(--accent);
+}
+
+.checklist-tasks {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	list-style: none;
+}
+
+.checklist-tasks.clipped {
+	-webkit-mask-image: linear-gradient(transparent, #000 40px);
+	mask-image: linear-gradient(transparent, #000 40px);
+}
+
+.checklist-task {
+	position: relative;
+	flex: none;
+	padding-left: 16px;
+	transition: opacity 0.4s;
+}
+
+.checklist-task + .checklist-task {
+	margin-top: 2px;
+}
+
+.checklist-task::before {
+	content: '';
+	position: absolute;
+	top: calc(0.7em - 3px);
+	left: 1px;
+	box-sizing: border-box;
+	width: 6px;
+	height: 6px;
+	border: 1px solid var(--accent);
+	transition:
+		background 0.3s,
+		border-color 0.3s;
+}
+
+.checklist-task.done {
+	opacity: 0.4;
+}
+
+.checklist-task.done::before {
+	border-color: #fff;
+	background: #fff;
+}
+
+.checklist-count {
+	margin-left: 1ch;
+	color: var(--accent);
+}
+
+.checklist-dots {
+	display: flex;
+	flex: none;
+	flex-wrap: wrap;
+	gap: 5px;
+	margin: 8px 0 0 3px;
+}
+
+.checklist-dots span {
+	width: 2px;
+	height: 2px;
+	background: currentColor;
 }
 
 /* On narrow screens the credit wraps, aligned left, clear of Snapshot

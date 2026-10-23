@@ -115,7 +115,8 @@ export const INTRO = {
 // token(), the token of the eye the page heads for; `blinks` (main.js), if
 // given: hold(), which keeps the eye from blinking, and first(), which lets
 // it blink again, with a blink now. `dev` keeps the timeline
-// once it ends and loads GSDevTools to scrub it. Returns hold(), which hides
+// once it ends and loads GSDevTools to scrub it. onEnd(), if given, hears its
+// end (also skipped, or kept with `dev`). Returns hold(), which hides
 // the interface and covers the image until play() (at load), play(), which
 // builds the timeline and plays it, replay(), which builds it again from the
 // page as it is and plays it, and `timeline`.
@@ -129,6 +130,7 @@ export function createIntro({
 	irises = null,
 	blinks = null,
 	dev = false,
+	onEnd = () => {},
 }) {
 	const root = document.documentElement
 	const mask = document.createElement('div')
@@ -410,7 +412,11 @@ export function createIntro({
 		blinks?.hold()
 		parts.call(() => blinks?.first(), [], parts.duration() + INTRO.blink.delay)
 		parts.timeScale(1 / INTRO.scale)
-		return gsap.timeline({ id: 'intro', paused: true, onComplete: () => dev || end() }).add(parts)
+		const complete = () => {
+			if (!dev) end()
+			onEnd()
+		}
+		return gsap.timeline({ id: 'intro', paused: true, onComplete: complete }).add(parts)
 	}
 
 	const start = async () => {

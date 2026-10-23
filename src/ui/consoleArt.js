@@ -160,11 +160,13 @@ export function terminatorLog(eye = EYE) {
 }
 
 // The T-800's reports of the shots at Snapshot: next() gives the
-// console.log() arguments of the next one, numbered, in the readout's red.
+// console.log() arguments of the next one, numbered, in the readout's red;
+// `line`, the line of the last one (null before the first).
 export function createShotLog(random = Math.random) {
 	let count = 0
 	let turn = []
 	let last = null
+	let line = null
 	const draw = () => {
 		if (turn.length === 0) {
 			turn = [...SHOTS]
@@ -180,8 +182,11 @@ export function createShotLog(random = Math.random) {
 	return {
 		next() {
 			count++
-			const line = count === 1 ? FIRST_SHOT : draw()
+			line = count === 1 ? FIRST_SHOT : draw()
 			return [`%c  > SHOT ${count} · ${line}  `, CELL + PARTS.readout[1]]
+		},
+		get line() {
+			return line
 		},
 	}
 }
