@@ -1335,6 +1335,11 @@ canvas {
 	white-space: nowrap;
 }
 
+/* Photo mode on, in the accent. */
+.photo-mode.on {
+	color: var(--accent);
+}
+
 /* The viewport size keeps its lowercase x (the page is uppercase). */
 .viewport-size {
 	text-transform: none;

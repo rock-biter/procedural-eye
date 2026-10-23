@@ -18,6 +18,7 @@ export const TASKS = Object.freeze(
 		{ id: 'cannon', text: 'Do what you were told not to', achievement: true },
 		{ id: 'shots', text: 'Make it run out of words', achievement: true, counted: true },
 		{ id: 'secret', text: 'Wear every skin.... every!', achievement: true },
+		{ id: 'blink', text: 'Catch it not looking', achievement: true },
 	].map((task) => Object.freeze(task)),
 )
 

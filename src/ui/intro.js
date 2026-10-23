@@ -103,8 +103,8 @@ export const INTRO = {
 // The intro over the page main.js builds: `hud` (createHud()), `frame` (the
 // frame's element), `texts` (the texts at the corners split into their
 // lines: the title, the line about the project, the credit line), `lines`
-// (those of a line each: More info, the viewport size, the frame rate, which
-// change their text), `snapshot`, and `camera` (main.js): framing(zoom), the
+// (those of a line each: More info, the viewport size, the frame rate,
+// photo mode's state, which change their text), `snapshot`, and `camera` (main.js): framing(zoom), the
 // framing the camera ends on and the one `zoom` of the zoom knob's travel
 // closer it starts from ({ from, to }, each { distance, sensor }), set(framing),
 // which moves the camera there and returns the distance it took, distance(),

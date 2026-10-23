@@ -259,13 +259,13 @@ async function savePng(element) {
 }
 
 // The download of savePng(), without its sound, as `name`.png (the time by
-// default). The PNG is encoded off the main thread, so the page goes on
-// meanwhile.
+// default). The image is the one of the call, caught before the PNG's tools
+// load; it is encoded off the main thread, so the page goes on meanwhile.
 async function takePhoto(name = `eye-${Date.now()}`) {
-	const { insertPngText } = await import('./src/render/pngMetadata')
 	const state = app.getState()
-	const blob = await app.captureBlob()
-	const bytes = new Uint8Array(await blob.arrayBuffer())
+	const captured = app.captureBlob()
+	const { insertPngText } = await import('./src/render/pngMetadata')
+	const bytes = new Uint8Array(await (await captured).arrayBuffer())
 	const tagged = insertPngText(bytes, 'eye-state', state)
 	download(new Blob([tagged], { type: 'image/png' }), `${name}.png`)
 }
@@ -1021,7 +1021,12 @@ if (urlParams.get('gui') !== '0') {
 			console.log(...shotLog.next())
 			report('shots', shotLog.line)
 			const name = shotLog.name
-			app.terminator.trigger(motionless.matches).then(() => takePhoto(name))
+			app.terminator
+				.trigger(motionless.matches)
+				.then(() => {
+					catchShut()
+					return takePhoto(name)
+				})
 			// Bounced off Snapshot (back and up from its side; down from below,
 			// still drifting left), then falling, spinning.
 			let [x, y] = hit
@@ -1141,6 +1146,14 @@ if (urlParams.get('gui') !== '0') {
 	soundControls.append(soundToggle, volume)
 	credit.append(' · ', soundControls)
 
+	// A photo (Snapshot's or the volume cannon's, the image of the moment it
+	// is taken) of the eye at least EYE_SHUT shut (the pose's blink, 0 open to
+	// 1 shut) catches it not looking (the checklist's).
+	const EYE_SHUT = 0.5
+	const catchShut = () => {
+		if ((app.lastPose?.blink ?? 0) >= EYE_SHUT) report('blink')
+	}
+
 	// Snapshot, bottom right: saves the image as the panel's Save PNG does
 	// (the state in a tEXt chunk). The word inside the HUD's reticle corners
 	// (style.css); it blurs itself after a click, as the HUD buttons do (Space
@@ -1153,6 +1166,7 @@ if (urlParams.get('gui') !== '0') {
 	snapshot.addEventListener('click', () => {
 		snapshot.blur()
 		savePng(snapshot)
+		catchShut()
 		report('snapshot')
 	})
 	sounding(snapshot, 'snapshot', false)
@@ -1173,7 +1187,9 @@ if (urlParams.get('gui') !== '0') {
 	// The frame rate, top right, styled as the credit line: the frames the page
 	// shows per second, counted over half a second. A gap longer than a second
 	// is a hidden tab, not a slow frame, and is not shown. Above it, the
-	// viewport's size in CSS pixels, updated as the window resizes.
+	// viewport's size in CSS pixels, updated as the window resizes; under it,
+	// on desktops, whether photo mode (Space) is on, in the accent while it
+	// is.
 	const stats = document.createElement('div')
 	stats.className = 'fps'
 	const viewport = document.createElement('div')
@@ -1186,6 +1202,19 @@ if (urlParams.get('gui') !== '0') {
 	const fps = document.createElement('div')
 	fps.textContent = '-- fps'
 	stats.append(viewport, fps)
+	const photoMode = desktop ? document.createElement('div') : null
+	if (photoMode) {
+		photoMode.className = 'photo-mode'
+		const showPhotoMode = () => {
+			photoMode.textContent = `photo mode ${app.frozen ? 'on' : 'off'}`
+			photoMode.classList.toggle('on', app.frozen)
+		}
+		showPhotoMode()
+		app.listeners.add((path) => {
+			if (path === 'frozen') showPhotoMode()
+		})
+		stats.append(photoMode)
+	}
 	document.body.appendChild(stats)
 	let frames = 0
 	let since = null
@@ -1235,7 +1264,7 @@ if (urlParams.get('gui') !== '0') {
 		hud,
 		frame: frameElement,
 		texts: [masthead.querySelector('h1'), masthead.querySelector('p'), credit],
-		lines: [moreInfo, viewport, fps],
+		lines: [moreInfo, viewport, fps, ...(photoMode ? [photoMode] : [])],
 		snapshot,
 		camera: {
 			framing(zoom) {
