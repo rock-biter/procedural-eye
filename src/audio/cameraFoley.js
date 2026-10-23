@@ -1,6 +1,6 @@
 // The camera foley of the interface (docs/AUDIO.md): the HUD's cues (a
 // press, a hover, a tap on a knob, Random eye, Snapshot, photo mode), the
-// checklist's (an achievement, the Sharingan's awakening) and,
+// checklist's (a task done, the Sharingan's awakening) and,
 // once a frame, the sounds that follow the camera itself, whatever moves it:
 // the zoom ring's and the aperture ring's detents, the creak of a knob pulled
 // past its end and the autofocus beep once a photo has converged. Sounds pan
@@ -70,8 +70,8 @@ export default class CameraFoley {
 			case 'sharingan':
 				this.engine.play(this.params.sound.film === 'motor' ? 'wind' : 'advance', { pan })
 				break
-			// An achievement of the checklist, and the Sharingan's awakening,
-			// in the glass harp's key.
+			// A task of the checklist done, and the Sharingan's awakening, in
+			// the glass harp's key.
 			case 'achievement':
 				this.engine.play('unlock', { pan, rate: keyRate(this.params.sound.glassKey) })
 				break

@@ -535,7 +535,7 @@ export const BASE_PARAM_SCHEMA = {
 			shutter: num(0.56, 0, 1, 0.01, '', 'uniform', 'shutter (Snapshot)'),
 			mirror: num(0.35, 0, 1, 0.01, '', 'uniform', 'mirror (photo mode)'),
 			beep: num(0.08, 0, 1, 0.01, '', 'uniform', 'focus beep'),
-			unlock: num(0.3, 0, 1, 0.01, '', 'uniform', 'achievement'),
+			unlock: num(0.3, 0, 1, 0.01, '', 'uniform', 'checklist task done'),
 			gong: num(0.5, 0, 1, 0.01, '', 'uniform', 'Sharingan awakening'),
 			glasses: num(0.22, 0, 1, 0.01, '', 'uniform', 'music: quiet glasses'),
 			lead: num(0.3, 0, 1, 0.01, '', 'uniform', 'music: louder glasses'),

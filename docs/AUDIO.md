@@ -1,6 +1,6 @@
 # Audio
 
-The interface sounds like a camera. Every control of the HUD makes the mechanical noise of the part it stands for: the zoom and the aperture click through the detents of their rings, the buttons click, Random eye advances the film, and Snapshot beeps for focus and fires a shutter. The recorded sounds are real cameras (CC0 recordings from Freesound); the hover's tick, the focus beep, the creak of a knob pulled past its end, one choice of the aperture's ticks, the checklist's achievement chime and the singing bowl of the Sharingan's awakening are synthesized with Web Audio. Under them plays a soft glass harp, wine glasses rubbed with a wet finger far off in a long reverb, synthesized too: a few quiet glasses singing in turn, now and then a louder one, fading in slowly at the first gesture. There is no audio library. Every sound pauses while the page is hidden or the window has lost the focus.
+The interface sounds like a camera. Every control of the HUD makes the mechanical noise of the part it stands for: the zoom and the aperture click through the detents of their rings, the buttons click, Random eye advances the film, and Snapshot beeps for focus and fires a shutter. The recorded sounds are real cameras (CC0 recordings from Freesound); the hover's tick, the focus beep, the creak of a knob pulled past its end, one choice of the aperture's ticks, the checklist's chime and the singing bowl of the Sharingan's awakening are synthesized with Web Audio. Under them plays a soft glass harp, wine glasses rubbed with a wet finger far off in a long reverb, synthesized too: a few quiet glasses singing in turn, now and then a louder one, fading in slowly at the first gesture. There is no audio library. Every sound pauses while the page is hidden or the window has lost the focus.
 
 ## Engine
 
@@ -43,8 +43,8 @@ The app itself emits no events; everything is read per frame.
 | Snapshot (and the panel's Save PNG) | `savePng()` | `beep`, then 0.22 s later `shutter`: a Minolta XE-7 firing |
 | Photo mode on and off | the `'frozen'` notification | `mirrorUp` and `mirrorDown`: the first and the last part of the same shot |
 | The photo converging | `app.converged` turning true while frozen, at most once a second | `beep`: two 2.8 kHz blips of 55 ms, 45 ms apart, the autofocus confirmation (synthesized) |
-| An achievement of the checklist done (`achievement` cue, from its list at the left) | `main.js`, when a task done is an achievement | `unlock` (synthesized, `chime`): a latch springing open (two small metal knocks 40 ms apart, ringing three modes near 2.3, 3.7 and 5.6 kHz), then a glass struck twice a fifth up, D6 then A6, with a glass's inharmonic overtones (2.32 and 4.25 times), dying in 1.1 s; 2.6 s, in the glass harp's key (`keyRate()`), a third of it into the reverb |
-| The Sharingan's awakening (`awaken` cue), the achievement that unlocks it | `main.js`, instead of the achievement's | `gong` (synthesized, `bowl`): a large singing bowl struck once, its fundamental D3: its five lowest modes as a thin bowl's (1, 2.83, 5.42, 8.77, 12.87), each a pair beating slowly (0.8 to 3.4 Hz), the higher ones fainter and shorter; a sub-octave blooming in over a third of a second, as a gong's body; a shimmer of six high partials swelling for half a second; the mallet's soft thump; 9 s, in the glass harp's key, 0.6 of it into the reverb |
+| A task of the checklist done, a control's or an achievement (`achievement` cue, from its list at the left) | `main.js`, when its progress has a task more done | `unlock` (synthesized, `chime`): a latch springing open (two small metal knocks 40 ms apart, ringing three modes near 2.3, 3.7 and 5.6 kHz), then a glass struck twice a fifth up, D6 then A6, with a glass's inharmonic overtones (2.32 and 4.25 times), dying in 1.1 s; 2.6 s, in the glass harp's key (`keyRate()`), a third of it into the reverb |
+| The Sharingan's awakening (`awaken` cue), the task that unlocks it | `main.js`, instead of the task's chime | `gong` (synthesized, `bowl`): a large singing bowl struck once, its fundamental D3: its five lowest modes as a thin bowl's (1, 2.83, 5.42, 8.77, 12.87), each a pair beating slowly (0.8 to 3.4 Hz), the higher ones fainter and shorter; a sub-octave blooming in over a third of a second, as a gong's body; a shimmer of six high partials swelling for half a second; the mallet's soft thump; 9 s, in the glass harp's key, 0.6 of it into the reverb |
 
 - **Detents**: `crossings(from, to, step)` counts a detent when it is reached, not when it is left, signed with the move. A move that starts on a detent does not count it again. The detents a frame crossed (at most 8) play spread evenly over the next frame's time (`delay`), so a fast turn keeps its density at any frame rate; clicks closer than a sound's `gap` (12 ms for the zoom, 8 ms for the aperture) merge. The zoom's detents follow the camera, whatever moves it, so a glide of + or − runs through them as a quick ratchet.
 - **Key**: the chime and the bowl are tuned to D, and play at the rate that moves D to the glasses' key (`keyRate()` of [`src/audio/soundscape.js`](../src/audio/soundscape.js): 0.67 to 1.19, as the glasses' tonic moves), so they sound with the music.
@@ -85,7 +85,7 @@ The `sound` group of [`src/params/paramSchema.js`](../src/params/paramSchema.js)
 | --- | --- | --- |
 | `volume` | 0.64 | The master volume, over every sound; the volume slider sets it. |
 | `volumes.press`, `.hover`, `.zoom`, `.aperture`, `.strain`, `.advance`, `.shutter`, `.mirror`, `.beep` | 0.35, 0.3, 0.2, 0.15, 0.35, 0.42, 0.56, 0.35, 0.08 | Each sound's own volume, under the master (`advance` also sets `wind`, `aperture` both kinds of ticks, `beep` both beeps). |
-| `volumes.unlock`, `.gong` | 0.3, 0.5 | The checklist's achievement chime and the Sharingan's awakening bowl. |
+| `volumes.unlock`, `.gong` | 0.3, 0.5 | The checklist's chime (a task done) and the Sharingan's awakening bowl. |
 | `volumes.glasses`, `.lead` | 0.22, 0.3 | The glass harp's quiet glasses and its louder ones. |
 | `variation` | 60 cents | How far a sound's pitch varies from one play to the next. |
 | `zoomDetents` | 16 | The zoom ring's detents across the knob's track. |
@@ -126,7 +126,7 @@ The cuts were chosen from measurements (onsets, transients, spectral flatness an
 
 ## Tuning and Checking
 
-- **By ear**: with `#debug`, the panel's `sound` folder holds the master volume, a `volumes` folder with each sound's volume, then **listen to** (a list of the bank's sounds) and **Play sound** ([`src/debug/panel.js`](../src/debug/panel.js)), then the rest of the group; the `achievements` folder plays the achievement chime and the awakening again. **Export defaults JSON** writes them into `defaults.json`.
+- **By ear**: with `#debug`, the panel's `sound` folder holds the master volume, a `volumes` folder with each sound's volume, then **listen to** (a list of the bank's sounds) and **Play sound** ([`src/debug/panel.js`](../src/debug/panel.js)), then the rest of the group; the `achievements` folder plays the checklist's chime and the awakening again. **Export defaults JSON** writes them into `defaults.json`.
 - **By numbers**: `__EYE__.getSoundStats()` (with the interface only). The measured levels in headless Chrome at 1600 × 1000 with the defaults (dBFS) are:
 
   | Sound | Peak |
@@ -135,7 +135,7 @@ The cuts were chosen from measurements (onsets, transients, spectral flatness an
   | The hover's tick | −17 |
   | The zoom's detents | −15 to −21 |
   | The aperture's ticks (either kind) | −16 to −23 |
-  | The achievement chime | −17.5 |
+  | The checklist's chime | −17.5 |
   | The awakening's bowl | −11 |
 
   The glass harp alone, measured as RMS over 15 s windows: its quiet glasses rise to −44 dBFS about 12 s after the first press with the 10 s fade (−86, −58, −46 and −44 dBFS at 3, 6, 9 and 12 s), then sing at −41 to −46 dBFS, peaking at −32 to −35; the louder glasses peak at −27 dBFS.

@@ -122,7 +122,7 @@ function addAchievements(gui, checklist, app) {
 		['Play the awakening again', () => checklist.replayAwakening()],
 		['Shockwave', () => checklist.shockwave()],
 		["Rinnegan's hint", () => checklist.hint()],
-		['Achievement sound', () => checklist.achievementSound()],
+		['Task done sound', () => checklist.achievementSound()],
 	])
 		folder.addButton({ title }).on('click', run)
 	for (const key of ACHIEVEMENT_GROUPS)

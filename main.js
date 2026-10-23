@@ -575,8 +575,9 @@ if (urlParams.get('gui') !== '0') {
 		if (!done) app.sharingan.hide(app.params)
 		return awakens
 	}
-	// Each achievement done sounds as something unlocking (by the list, at
-	// the left); the one that awakens the Sharingan sounds its bowl instead.
+	// Each task done sounds as something unlocking (by the list, at the
+	// left), the controls' as the achievements'; the one that awakens the
+	// Sharingan sounds its bowl instead.
 	// The panel of #debug hears every change too.
 	let doneCount = progress.done().length
 	const checklistListeners = new Set()
@@ -590,8 +591,7 @@ if (urlParams.get('gui') !== '0') {
 			const newly = progress.done().slice(doneCount)
 			doneCount = progress.done().length
 			const awakens = unlockSharingan(true)
-			if (!awakens && newly.some((task) => task.achievement))
-				cue('achievement', { element: checklist.element })
+			if (!awakens && newly.length > 0) cue('achievement', { element: checklist.element })
 			countFirstShot()
 			for (const listener of checklistListeners) listener()
 		},

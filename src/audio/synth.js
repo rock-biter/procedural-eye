@@ -128,7 +128,7 @@ function knock(out, rate, start, random, amplitude) {
 	)
 }
 
-// A task of the checklist's achievements done (the foley's `unlock`): a
+// A task of the checklist done (the foley's `unlock`): a
 // latch springing open, two small metal knocks 40 ms apart, then a glass
 // struck twice, a fifth up: D6 then A6 (the glass harp's key D, which the
 // foley's rate moves to the key played), each with the inharmonic overtones

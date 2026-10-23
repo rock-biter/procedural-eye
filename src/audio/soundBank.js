@@ -61,10 +61,10 @@ export const SOUNDS = {
 	// Snapshot's shutter, and once a photo has converged).
 	tick: { synth: 'tick', gain: 'hover', vary: 1, voices: 2, gap: 0.04 },
 	beep: { synth: 'beep', gain: 'beep', vary: 0, voices: 1, gap: 0.5 },
-	// Synthesized, in the glass harp's key (the foley's rate): an achievement
-	// of the checklist (a latch springs open, a glass rings twice a fifth up),
+	// Synthesized, in the glass harp's key (the foley's rate): a task of the
+	// checklist done (a latch springs open, a glass rings twice a fifth up),
 	// and the awakening of the Sharingan (a large singing bowl struck once).
-	unlock: { synth: 'chime', gain: 'unlock', vary: 0, voices: 2, gap: 0.3, reverb: 0.35 },
+	unlock: { synth: 'chime', gain: 'unlock', vary: 0, voices: 4, gap: 0.3, reverb: 0.35 },
 	gong: { synth: 'bowl', lazy: true, gain: 'gong', vary: 0, voices: 2, gap: 1, reverb: 0.6 },
 }
 
