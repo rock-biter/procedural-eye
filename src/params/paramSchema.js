@@ -17,6 +17,7 @@
 
 import PROJECT_DEFAULTS from './defaults.json' with { type: 'json' }
 import { withDefaults } from './params'
+import { PATTERN_NAMES } from '../eye/sharinganPatterns'
 
 const num = (value, min, max, step, unit, kind = 'uniform', label) => ({
 	default: value,
@@ -604,6 +605,32 @@ export const BASE_PARAM_SCHEMA = {
 		coreColor: color('#ffd2a0', 'uniform', 'core color'),
 		chrome: color('#c9ced6', 'uniform', 'chrome tint'),
 		roughness: num(0.15, 0, 1, 0.01, '', 'uniform', 'chrome roughness'),
+	},
+	// The Sharingan easter egg (src/eye/sharingan.js, docs/IRIS.md#sharingan):
+	// once the checklist is done, the HUD's tomoe button puts one of the
+	// Uchiha's eyes on the iris, or with odds `rinnegan` the Rinnegan. Its
+	// pigment is `red` and `ink` (the Rinnegan's `lavender` and `violet`) over
+	// the tissue, which still shades it by `tissue`; it glows `glow` times a
+	// white surface under the rig, and the pupil narrows to `pupil`. It spins
+	// `turns` turns into place over `duration`; the Rinnegan's lavender
+	// spreads over the sclera in `spread`, ringed every `ringSpacing` along
+	// the globe, `ringWidth` either side. `preview` shows a pattern still, for
+	// tuning ('off' in use).
+	sharingan: {
+		preview: choice('off', ['off', ...PATTERN_NAMES], 'uniform', 'still preview'),
+		red: color('#9e0b08', 'uniform', 'red'),
+		ink: color('#0b0505', 'uniform', 'ink'),
+		lavender: color('#9b74d6', 'uniform', 'Rinnegan lavender'),
+		violet: color('#6d43b5', 'uniform', 'Rinnegan violet'),
+		tissue: num(0.6, 0, 1, 0.01, '', 'uniform', 'tissue showing through'),
+		glow: num(0.08, 0, 4, 0.01, '×', 'uniform', 'glow'),
+		pupil: num(2.2, 1.5, 8, 0.05, 'mm', 'uniform', 'pupil diameter'),
+		duration: num(1.2, 0.2, 4, 0.05, 's', 'uniform', 'spin duration'),
+		turns: num(1.5, 0, 6, 0.05, '', 'uniform', 'spin turns'),
+		spread: num(1.4, 0.2, 5, 0.05, 's', 'uniform', 'Rinnegan spread'),
+		rinnegan: num(0.02, 0, 1, 0.005, '', 'uniform', 'Rinnegan odds'),
+		ringSpacing: num(1.05, 0.3, 3, 0.01, 'mm', 'uniform', 'Rinnegan ring spacing'),
+		ringWidth: num(0.045, 0, 0.3, 0.005, 'mm', 'uniform', 'Rinnegan ring half-width'),
 	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),

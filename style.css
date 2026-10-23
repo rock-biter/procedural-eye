@@ -511,6 +511,10 @@ canvas {
 	transition: r 0.35s var(--spring);
 }
 
+.hud-cut.instant {
+	transition: none;
+}
+
 /* Invisible hit areas stay large while the drawn controls remain fine. */
 .hud-button {
 	position: absolute;
@@ -662,6 +666,22 @@ canvas {
 /* Random eye stays in full white, or it would not show over the skin. */
 .random-eye .hud-reticle {
 	opacity: 1;
+}
+
+/* The Sharingan's tomoe, as Random eye's icon; the button shows once the
+   checklist is done (main.js). */
+.sharingan .icon {
+	width: 24px;
+	height: 24px;
+}
+
+.sharingan .hud-reticle {
+	opacity: 1;
+}
+
+.sharingan:not(.unlocked) {
+	visibility: hidden;
+	pointer-events: none;
 }
 
 .skin .tone-fill {

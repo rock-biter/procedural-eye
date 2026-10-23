@@ -3,7 +3,8 @@
 // down, so π/2 is the bottom). The skin tones keep their spacing in pixels
 // along the circle, so on a small circle (a phone) they spread over a wider
 // angle about their center; the zoom keeps its angle, and a length in pixels
-// at least, for its knob to slide; Random eye moves down, clear of the zoom.
+// at least, for its knob to slide; Random eye moves down, clear of the zoom,
+// and the Sharingan (a desktop's, once the checklist is done) below it.
 // A portrait box (a phone held upright) splits the HUD over two circles
 // about the same center (HUD.split).
 
@@ -76,6 +77,8 @@ export const HUD = Object.freeze({
 	}),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
 	random: Object.freeze({ angle: 33 * DEGREE, spacing: 60 }),
+	// The Sharingan `spacing` px past Random eye, lower down the circle.
+	sharingan: Object.freeze({ spacing: 60 }),
 	// A portrait box splits the HUD. The circle keeps the skin tones, the
 	// pressed one at `tones.center` (the middle of the bottom left quarter),
 	// and Random eye at `random.angle` (the right, on the horizontal); their
@@ -188,7 +191,8 @@ export function zoomRadius(radius, split, hud = HUD) {
 // The angle of every button on a circle of `radius` px, with `toneCount`
 // skin tones, and the knob's track: [the angle at zoom in, at zoom out],
 // those of the two buttons. `split`: the zoom on its own, wider circle
-// (zoomRadius()), the tones and Random eye placed as HUD.split says.
+// (zoomRadius()), the tones and Random eye placed as HUD.split says; the
+// Sharingan follows Random eye either way.
 export function hudAngles(radius, toneCount, hud = HUD, split = false) {
 	const arc = (length) => length / radius
 	const minArc = split ? hud.split.zoom.minArc : hud.zoom.minArc
@@ -204,7 +208,8 @@ export function hudAngles(radius, toneCount, hud = HUD, split = false) {
 		{ length: toneCount },
 		(_, i) => toneCenter + ((toneCount - 1) / 2 - i) * arc(hud.tones.spacing),
 	)
-	return { tones, zoomIn, zoomOut, track: [zoomIn, zoomOut], random }
+	const sharingan = random + arc(hud.sharingan.spacing)
+	return { tones, zoomIn, zoomOut, track: [zoomIn, zoomOut], random, sharingan }
 }
 
 // How many spacings the tone group turns (clockwise) to bring the tone at
@@ -346,14 +351,15 @@ function arcPath({ cx, cy }, ring, from, to) {
 // their group turns, their hit areas up to `overhang` px past it. The
 // zoom's buttons and knob lie on a circle of `zoom` px, above `floor` px
 // from the box's top; the aperture knob, if `aperture` ({ radius, length,
-// track }), on its own.
-function fits(radius, zoom, angles, width, height, floor, overhang, aperture, hud) {
+// track }), on its own; the Sharingan, if `sharingan`.
+function fits(radius, zoom, angles, width, height, floor, overhang, aperture, sharingan, hud) {
 	const inside = (angle, half, ring = radius, bottom = height) => {
 		const x = width / 2 + ring * Math.cos(angle)
 		const y = height / 2 + ring * Math.sin(angle)
 		return x >= half && x <= width - half && y >= half && y <= bottom - half
 	}
 	const buttons = [...toneReach(angles, radius, hud), angles.random]
+	if (sharingan) buttons.push(angles.sharingan)
 	if (!buttons.every((angle) => inside(angle, hud.button / 2 - overhang))) return false
 	const ends = [angles.zoomIn, angles.zoomOut]
 	if (!ends.every((angle) => inside(angle, hud.button / 2, zoom, floor))) return false
@@ -377,7 +383,9 @@ function fits(radius, zoom, angles, width, height, floor, overhang, aperture, hu
 // circle keeps `bottom` px at the box's bottom free, and HUD.split's
 // clearance above them. `aperture`: the HUD has the aperture knob, unless it
 // is split (a desktop's), `{ elasticity }` its drag's (aperture.elasticity),
-// or null. `{ radius, zoomRadius, aperture, split, angles }`,
+// or null. `sharingan`: the HUD has the Sharingan's button (a desktop's),
+// whether it shows yet or not, so its circle keeps its size when it does.
+// `{ radius, zoomRadius, aperture, split, angles }`,
 // `aperture` the knob's circle, line and track, `{ radius, length, track }`,
 // or null without it; or null for a box too small.
 export function hudLayout(
@@ -385,7 +393,7 @@ export function hudLayout(
 	height,
 	toneCount,
 	hud = HUD,
-	{ bottom = 0, aperture = null } = {},
+	{ bottom = 0, aperture = null, sharingan = false } = {},
 ) {
 	const split = height > width
 	const floor = split && bottom > 0 ? height - bottom - hud.split.zoom.clearance : height
@@ -399,7 +407,7 @@ export function hudLayout(
 			length: apertureLength(radius, hud),
 			track: apertureTrack(angles.track, ring, aperture.elasticity, hud),
 		}
-		if (fits(radius, zoom, angles, width, height, floor, overhang, knob, hud))
+		if (fits(radius, zoom, angles, width, height, floor, overhang, knob, sharingan, hud))
 			return { radius, zoomRadius: zoom, aperture: knob, split, angles }
 	}
 	return null

@@ -65,6 +65,7 @@ export default class CameraFoley {
 				this.engine.play('press', { pan, gain: 0.6 })
 				break
 			case 'random':
+			case 'sharingan':
 				this.engine.play(this.params.sound.film === 'motor' ? 'wind' : 'advance', { pan })
 				break
 			case 'snapshot':

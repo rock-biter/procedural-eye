@@ -18,6 +18,7 @@ import { TRANSITION } from './src/params/paramTransition'
 import { randomEye, randomIrises } from './src/params/populationPriors'
 import { SECRET_TONE, SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
+import { PATTERN_NAMES, patternIndex, pickPattern } from './src/eye/sharinganPatterns'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
 import { CHECKLIST, createChecklist } from './src/ui/checklist'
@@ -405,9 +406,10 @@ if (urlParams.get('gui') !== '0') {
 	// aperture (desktop only) and Random eye on a dashed circle. The tone of
 	// the color the params are heading for is pressed, also after the panel or
 	// a preset changes it; the zoom and aperture knobs follow the camera every
-	// frame, gliding or not. It also has the hidden tone, which the checklist
-	// unlocks (below). `desktop` (a fine pointer) tells a desktop's checklist
-	// and photo mode's line from a phone's or a tablet's.
+	// frame, gliding or not. It also has the hidden tone and, on desktops, the
+	// Sharingan, which the checklist unlocks (below). `desktop` (a fine
+	// pointer) tells a desktop's checklist and photo mode's line from a
+	// phone's or a tablet's.
 	const desktop = window.matchMedia('(pointer: fine)').matches
 	const hud = createHud({
 		tones: SKIN_TONES,
@@ -430,10 +432,22 @@ if (urlParams.get('gui') !== '0') {
 		onApertureWheel: (deltaY) => app.controls.apertureWheel(deltaY),
 		getApertureElasticity: () => app.params.aperture.elasticity,
 		onRandom: () => {
+			// A new eye is a human one again.
+			app.sharingan.hide(app.params, motionless.matches)
 			const features = loadRandomEye()
 			hooks.onRandomEye?.(panelState.ancestry, features)
 			report('iris')
 		},
+		// Once the checklist is done (below), a desktop's Sharingan: another
+		// pattern at each press, now and then the Rinnegan
+		// (src/eye/sharingan.js).
+		onSharingan: desktop
+			? () => {
+					const current = patternIndex(app.sharingan.name)
+					const next = pickPattern(current, Math.random, app.params.sharingan.rinnegan)
+					app.sharingan.show(PATTERN_NAMES[next], app.params, motionless.matches)
+				}
+			: null,
 		onCue: (name, detail) => cue(name, detail),
 	})
 	document.body.appendChild(hud.element)
@@ -520,6 +534,14 @@ if (urlParams.get('gui') !== '0') {
 		const allWorn = SKIN_TONES.every((tone) => worn.has(tone.name))
 		hud.unlockSecret(found || (secretShown() && allWorn))
 	}
+	// A desktop's checklist done unlocks the Sharingan (the HUD's tomoe);
+	// Reset locks it again and takes it off the eye. `reveal`: it has just
+	// been done, the button comes in.
+	const unlockSharingan = (reveal) => {
+		const done = desktop && progress.current() === null
+		hud.unlockSharingan(done, reveal)
+		if (!done) app.sharingan.hide(app.params)
+	}
 	const checklist = createChecklist({
 		tasks,
 		progress,
@@ -527,6 +549,7 @@ if (urlParams.get('gui') !== '0') {
 		onChange: () => {
 			keepChecklist()
 			unlockSecret()
+			unlockSharingan(true)
 			countFirstShot()
 		},
 		// Reset forgets the tones worn too: the hidden tone locks again.
@@ -548,6 +571,7 @@ if (urlParams.get('gui') !== '0') {
 	document.body.appendChild(checklist.element)
 	sounding(checklist.resetButton, 'reset')
 	unlockSecret()
+	unlockSharingan(false)
 	// Its room, measured once the HUD has laid out (its own observer, made
 	// first, runs first).
 	new ResizeObserver(() => {

@@ -32,6 +32,7 @@ import Eyeball from './eye/eyeball'
 import { createEyeGeometry } from './eye/eyeProfile'
 import EyeRig from './eye/eyeRig'
 import Terminator from './eye/terminator'
+import Sharingan from './eye/sharingan'
 import IrisAtlas from './iris/irisAtlas'
 import IrisColorLut from './iris/irisColorLut'
 import { createIrisSpace } from './iris/irisSpace'
@@ -115,6 +116,8 @@ export default class EyeApp {
 		}
 		// The easter egg: the volume cannon's glitch on the eye (main.js).
 		this.terminator = new Terminator()
+		// The other: the checklist's Sharingan (main.js).
+		this.sharingan = new Sharingan()
 		this.scleraMaps = new ScleraMaps()
 		// The fissure map: r where the lids rest, g closed (the blink's,
 		// src/adnexa/lidBlink.js).
@@ -134,7 +137,7 @@ export default class EyeApp {
 				pigment: this.irisAtlas.pigmentTexture,
 				colorLut: this.irisColorLut.texture,
 			},
-			{ ...keyLight, ...this.terminator.uniforms },
+			{ ...keyLight, ...this.terminator.uniforms, ...this.sharingan.uniforms },
 			{ texture: this.fissureMap, extent: [FISSURE_MAP.halfWidth, FISSURE_MAP.halfHeight] },
 			{ texture: this.scleraMaps.texture, psi: SCLERA_PSI },
 			params.debug.view,
@@ -587,9 +590,11 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
 		if (this.shaftsMove) this.invalidate()
-		// A shot's glitch runs in photo mode too, its preview does not.
+		// A shot's glitch runs in photo mode too, its preview does not; the
+		// Sharingan's spin too.
 		const glitchDelta = Math.min(delta / 1000, 0.1)
 		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
+		if (this.sharingan.step(glitchDelta)) this.invalidate()
 		if (this.converged) {
 			this.lastFresh = false
 			this.lastAccumulating = false
@@ -710,7 +715,8 @@ export default class EyeApp {
 			(this.params.animation.enabled && !this.frozen) ||
 			this.transition !== null ||
 			this.shaftsMove ||
-			this.terminator.moving(this.params, this.frozen)
+			this.terminator.moving(this.params, this.frozen) ||
+			this.sharingan.moving()
 		)
 	}
 
@@ -781,9 +787,10 @@ export default class EyeApp {
 		const pixelAngle = (camera.fov * Math.PI) / 180 / size.height
 		this.pixelAngle = pixelAngle
 		this.terminator.update(this.params, this.lightRig.luminance * 0.05)
+		this.sharingan.update(this.params, this.lightRig.luminance * 0.05)
 		this.eyeball.update(
 			this.params,
-			this.pupilDiameter,
+			this.sharingan.pupil(this.pupilDiameter, this.params),
 			this.eye,
 			this.irisSpace,
 			this.cameraEye,

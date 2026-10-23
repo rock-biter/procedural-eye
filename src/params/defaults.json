@@ -445,6 +445,22 @@
     "chrome": "#c9ced6",
     "roughness": 0.15
   },
+  "sharingan": {
+    "preview": "off",
+    "red": "#9e0b08",
+    "ink": "#0b0505",
+    "lavender": "#9b74d6",
+    "violet": "#6d43b5",
+    "tissue": 0.6,
+    "glow": 0.08,
+    "pupil": 2.2,
+    "duration": 1.2,
+    "turns": 1.5,
+    "spread": 1.4,
+    "rinnegan": 0.02,
+    "ringSpacing": 1.05,
+    "ringWidth": 0.045
+  },
   "post": {
     "toneMapping": "agx",
     "grain": 0.035,

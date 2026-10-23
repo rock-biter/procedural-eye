@@ -3,7 +3,8 @@
 // the Fresnel transmission there; the strongest emitter also casts the soft
 // self-shadows of the relief. Ambient light from the background is occluded
 // by the relief (AO). The albedo comes from the Kubelka–Munk lookup of the
-// layered iris (src/iris/irisColor.js) and the pigment atlas.
+// layered iris (src/iris/irisColor.js) and the pigment atlas, or the
+// Sharingan's pigment (sharingan.glsl).
 #ifndef IRIS_SHADE_GLSL
 #define IRIS_SHADE_GLSL
 
@@ -61,7 +62,9 @@ vec3 irisColorLookup(float melanin, float eumelanin, float stroma) {
 // Albedo of each component: the stroma with its ABL (less inside a crypt,
 // where the ABL is missing), the radial vessels with `fiberAbl` of it, the
 // deeper collagen arcs with most of it, the ruff the dark pigment epithelium,
-// nodules paler.
+// nodules paler. The Sharingan's pigment covers it all but the ruff, the
+// tissue still showing through (uSharinganLevel.z): darker down the crypts,
+// a little lighter on the fibers.
 vec3 irisAlbedo(IrisParts parts, vec4 weights) {
 #if DEBUG_VIEW == DEBUG_IRIS_CLAY
 	return vec3(0.45);
@@ -77,6 +80,14 @@ vec3 irisAlbedo(IrisParts parts, vec4 weights) {
 	vec3 ruffColor = vec3(0.028, 0.016, 0.011);
 	vec3 albedo = weights.x * stromaColor + weights.y * radialColor + weights.z * arcColor + weights.w * ruffColor;
 	albedo = max(mix(vec3(luma(albedo)), albedo, uIrisColorMisc.y), 0.0) * uIrisTint;
+	if (uSharinganLevel.x > 0.0) {
+		float rhoFootprint = gIrisFootprint / max(uIrisRest.y - uPupil.z, 0.5);
+		vec3 painted = sharinganIris(parts.rho, parts.theta, rhoFootprint);
+		float tissue = uSharinganLevel.z;
+		painted *= (1.0 - 0.55 * tissue * inCrypt) * (1.0 + 0.2 * tissue * (weights.y + weights.z));
+		painted = mix(painted, ruffColor, weights.w);
+		albedo = mix(albedo, painted, uSharinganLevel.x);
+	}
 	return albedo;
 #endif
 }
@@ -98,8 +109,8 @@ vec3 shadeIris(IrisHit hit) {
 	// The ambient light reaching the iris comes through the cornea, under the lids.
 	float lidAmbient = lidOcclusion((uEyeToWorld * vec4(pEye, 1.0)).xyz);
 	vec3 radiance = albedo * INV_PI * backgroundIrradiance(n) * ao * 0.6 * mix(0.4, 1.0, lidAmbient);
-	// Its own light (irisColor.glow), neither shadowed nor occluded.
-	radiance += albedo * uIrisColorMisc.w;
+	// Its own light (irisColor.glow, or the Sharingan's), neither shadowed nor occluded.
+	radiance += albedo * mix(uIrisColorMisc.w, uSharinganLevel.w, uSharinganLevel.x);
 	for (int i = ZERO; i < uEmitterCount; i++) {
 		int base = i * EMITTER_VEC4S;
 		vec4 A = uEmitters[base];

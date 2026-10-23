@@ -99,6 +99,7 @@ Cap shadeCap(vec3 p, vec3 dir, bool terminator) {
 void main() {
 	vec3 dir = normalize(vEyePos - uCameraEye);
 	vec3 p = refineOnSurface(uCameraEye, dir, vEyePos);
+	gSharinganFootprint = length(p - uCameraEye) * uPixelAngle;
 	// On the glitch's front the point slides along the surface, and the eye
 	// and the T-800 are blended per channel; elsewhere one of them shows. A
 	// loop, so the iris' trace is compiled once.

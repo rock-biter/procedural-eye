@@ -11,6 +11,7 @@
 import { cloneParams, createParams, setValue } from '../params/params'
 import { PARAM_SCHEMA } from '../params/paramSchema'
 import { PRESETS } from '../params/presets'
+import { PATTERN_NAMES, patternIndex, pickPattern } from '../eye/sharinganPatterns'
 import FrameStats from './frameStats'
 
 // `context` (main.js): { app, urlParams, panelState, fitScreen, actions, ui,
@@ -69,6 +70,20 @@ export function installDevTools(context) {
 		// The volume cannon's glitch, now; resolves at its peak.
 		glitch: () => app.terminator.trigger(),
 		isGlitching: () => app.terminator.active,
+		// The Sharingan (src/eye/sharingan.js), locked or not: the pattern
+		// `name`, or the next the HUD's button would pick; off; the one shown
+		// (null for none); the names; whether it moves.
+		sharingan: (name) => {
+			const current = patternIndex(app.sharingan.name)
+			const next =
+				name ?? PATTERN_NAMES[pickPattern(current, Math.random, app.params.sharingan.rinnegan)]
+			app.sharingan.show(next, app.params)
+			return next
+		},
+		sharinganOff: () => app.sharingan.hide(app.params),
+		getSharingan: () => app.sharingan.name,
+		getSharinganNames: () => [...PATTERN_NAMES],
+		isSharinganMoving: () => app.sharingan.moving(),
 		measure: (frames) => measure(app, stats, getRenderStats, frames),
 		measureSync: (frames) => measureSync(app, frames),
 		getCompileMs: () => app.compileMs,
