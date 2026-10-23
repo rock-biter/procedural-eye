@@ -17,7 +17,7 @@ import {
 } from 'three'
 import { apertureRadius } from '../camera/cameraOptics'
 import { debugViewDefine } from '../debug/debugViews'
-import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
+import { EMITTER_VEC4S, LIT_EMITTERS, MAX_EMITTERS } from '../lighting/envRig'
 import { DRAW_ORDER } from '../render/drawOrder'
 import fragmentShader from '../shaders/skin-fragment.glsl'
 import vertexShader from '../shaders/skin-vertex.glsl'
@@ -61,7 +61,12 @@ export default class Lids {
 		}
 		this.material = new ShaderMaterial({
 			uniforms: this.uniforms,
-			defines: { MAX_EMITTERS, EMITTER_VEC4S, DEBUG_VIEW: debugViewDefine(debugView) },
+			defines: {
+				MAX_EMITTERS,
+				EMITTER_VEC4S,
+				LIT_EMITTERS,
+				DEBUG_VIEW: debugViewDefine(debugView),
+			},
 			vertexShader,
 			fragmentShader,
 		})

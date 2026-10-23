@@ -3,9 +3,9 @@
 // the accumulation pass averages still frames, the depth of field blurs fresh
 // ones, then one effect pass applies the lens and color effects in linear
 // light and tone mapping, and a last one antialiases fresh frames (FXAA) and
-// adds the film grain. A frame that passes through the accumulation is split:
-// what the depth of field blurs is shaded at half resolution
-// (src/render/scenePass.js).
+// adds the film grain; frames without FXAA take both in one pass. A frame
+// that passes through the accumulation can be split: what the depth of field
+// blurs is shaded at half resolution (src/render/scenePass.js).
 import {
 	BlendFunction,
 	ChromaticAberrationEffect,
@@ -153,6 +153,20 @@ export default class PostProcessing {
 		this.composer.addPass(this.dust)
 		this.composer.addPass(this.effectPass)
 		this.composer.addPass(this.antialiasPass)
+		// The same effects and grain in one pass, for the frames FXAA leaves
+		// as they are (its weight 0: accumulated samples from the 16th on,
+		// quality.antialias off), which save the RGBA16F buffer in between.
+		this.finalPass = new EffectPass(
+			camera,
+			this.colorGrade,
+			this.chromaticAberration,
+			this.vignette,
+			this.toneMapping,
+			this.grain,
+		)
+		this.composer.addPass(this.finalPass)
+		// addPass() leaves the screen to the last pass only.
+		this.antialiasPass.renderToScreen = true
 	}
 
 	// `camera`: { focalLength, fNumber, focusDistance, sensorHeight }; the
@@ -174,6 +188,9 @@ export default class PostProcessing {
 		this.grain.intensity = post.grain
 		// Faded out with the interactive depth of field, as samples accumulate.
 		this.fxaa.blendMode.opacity.value = this.antialias ? this.dof.weight : 0
+		const fxaa = this.antialias && this.dof.weight > 0
+		this.effectPass.enabled = this.antialiasPass.enabled = fxaa
+		this.finalPass.enabled = !fxaa
 	}
 
 	// The tone mapping operator, a define of the effect pass's program: set
@@ -199,6 +216,7 @@ export default class PostProcessing {
 			{ scene: this.dust.dustScene, camera: this.dust.camera, target },
 			{ scene: this.effectPass.scene, camera: this.effectPass.camera, target },
 			{ scene: this.antialiasPass.scene, camera: this.antialiasPass.camera, target: null },
+			{ scene: this.finalPass.scene, camera: this.finalPass.camera, target: null },
 		]
 	}
 
@@ -242,9 +260,18 @@ export default class PostProcessing {
 		u.uDustShadow.value = dust.shadow
 	}
 
-	render() {
+	// `shown`: false renders the scene into the accumulation only, without the
+	// passes that show it; the canvas keeps the image shown last.
+	render(shown = true) {
 		this.renderPass.split = this.splitShading && this.accumulation.passthrough
+		const display = [this.dof, this.dust, this.effectPass, this.antialiasPass, this.finalPass]
+		const enabled = display.map((pass) => pass.enabled)
+		if (!shown) for (const pass of display) pass.enabled = false
 		this.composer.render()
+		if (shown) return
+		display.forEach((pass, i) => (pass.enabled = enabled[i]))
+		// The next living frame splits by these radii only if they are fresh.
+		this.dof.preparedLast = false
 	}
 
 	setSize(width, height) {

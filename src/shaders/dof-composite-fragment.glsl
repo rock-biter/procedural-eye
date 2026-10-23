@@ -18,6 +18,7 @@ uniform sampler2D uBlurred;
 uniform sampler2D uPrepared; // the gather's input (alpha: the texel's signed blur radius)
 uniform sampler2D uTileMax; // around each tile: r largest blur radius (dof-dilate-fragment.glsl)
 uniform float uWeight;
+uniform bool uBackdropGathered; // the backdrop's blur circle is past NEAR_RADIUS + 0.5: the gather shows it whole
 
 varying vec2 vUv;
 
@@ -97,6 +98,16 @@ vec3 nearBlur(vec4 center) {
 }
 
 void main() {
+	// Around the pixel's tile: the largest blur radius, and whether all of it
+	// is the backdrop (the tiles are drawn only while the gather is).
+	ivec2 tile = ivec2(gl_FragCoord.xy) / (2 * DOF_TILE);
+	vec2 around = uWeight > 0.0 ? texelFetch(uTileMax, tile, 0).rg : vec2(0.0);
+	// The backdrop alone, which the gather shows whole: the upsample there is
+	// the bilinear filter.
+	if (uWeight >= 1.0 && around.y > 0.5 && uBackdropGathered) {
+		gl_FragColor = vec4(textureLod(uBlurred, vUv, 0.0).rgb, 1.0);
+		return;
+	}
 	vec4 sharp = texelFetch(uSharp, ivec2(gl_FragCoord.xy), 0);
 	// Shaded at half resolution only: the gather covers it, unless the last
 	// frame's blur misjudged it.
@@ -106,12 +117,15 @@ void main() {
 	vec4 blurred = vec4(0.0);
 	float w = 0.0;
 	if (uWeight > 0.0) {
-		blurred = upsample(radius);
-		float gather = smoothstep(NEAR_RADIUS - 0.5, NEAR_RADIUS + 0.5, blurred.a);
-		w = gather * uWeight;
+		// No gather where every blur circle around is under its share.
+		float gather = 0.0;
+		if (around.x >= NEAR_RADIUS - 0.5) {
+			blurred = upsample(radius);
+			gather = smoothstep(NEAR_RADIUS - 0.5, NEAR_RADIUS + 0.5, blurred.a);
+			w = gather * uWeight;
+		}
 		// The near blur, unless every pixel around is in focus.
-		ivec2 tile = ivec2(gl_FragCoord.xy) / (2 * DOF_TILE);
-		if (w < 1.0 && texelFetch(uTileMax, tile, 0).r >= 0.5) {
+		if (w < 1.0 && around.x >= 0.5) {
 			// Its share of what the gather leaves, the rest the sharp mean's.
 			float near = uWeight * (1.0 - gather) / (1.0 - w);
 			color = mix(color, nearBlur(vec4(sharp.rgb, radius)), near);

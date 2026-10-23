@@ -18,6 +18,7 @@
 | 11 | Optional refinements (below) | Open |
 | 12 | Sound: camera foley for every control (CC0 recordings: the buttons, the detents of the zoom and aperture rings, the film advance, the shutter; synthesized: the hover, the focus beep, the creak past a knob's end), a focus beep before Snapshot's shutter, the mirror and the focus beep in photo mode, a soft synthesized glass harp, fading in at the first gesture, every sound paused while the page is hidden or out of focus, mute toggle and M ([`docs/AUDIO.md`](AUDIO.md)) | Done |
 | 13 | Performance, first pass: unused code and assets out of the build, the development tools loaded only on request, exact speed-ups of the bakes (the color lookup, the fissure map), the compile overlapped with the first rebuild, a 60 fps adaptive resolution on phones | Done |
+| 14 | Performance, second pass: effects and grain in one pass without FXAA, the depth of field's composite with early outs, photo previews every 150 ms with several samples per frame, the iris march's last evaluation reused, the skin's lit emitters per vertex and its wet mirror only near the margin, the light shafts' cookie on the GPU | Done |
 
 ## Changes From the Plan
 
@@ -71,7 +72,7 @@
 - Purkinje III/IV refinements, the red reflex with coaxial light, corneal and limbal caustics.
 - Axial chromatic fringing.
 - A 3D bake of the iris field for cheaper interactive frames.
-- Performance, second pass: the frame optimizations of the October 2026 audit and the bakes that are close but not exact, each to be decided against its change to the image.
+- Further performance work: the measurements of the second pass are in [`docs/QUALITY.md`](QUALITY.md#performance). Tried there and left out: split frames by default (they lose the thin wet highlights), a deferred cap shading (at most 0.65 ms of the cap's draw), and the smaller ones none of which was faster.
 - Lighter meshes on phones (the layout's tolerance in the phone's pixels): estimated at 1–2% of a frame, left until `?stats` measures a phone. A skin relief baked at half size on phones was tried and left out: at the closest zoom it coarsens the wet glints along the lid margin.
 - Tried and left out (October 2026): the iris noise's lattice gradients read from a baked table instead of hashed, for the micro striations and the ruff. The image was the same to the bit, but the eyeball's draw did not get measurably faster on the M1 (sine and cosine cost about what the texture read does).
 - Tiled high-resolution export.

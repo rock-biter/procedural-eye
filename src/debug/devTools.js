@@ -24,9 +24,9 @@ export function installDevTools(context) {
 	// Every rendered frame, timed: the app's renders go through renderSample().
 	const stats = new FrameStats(app.setup.renderer)
 	const renderSample = app.renderSample.bind(app)
-	app.renderSample = (sample) => {
+	app.renderSample = (sample, shown) => {
 		stats.beginFrame()
-		renderSample(sample)
+		renderSample(sample, shown)
 		stats.endFrame()
 	}
 	const getRenderStats = () => ({

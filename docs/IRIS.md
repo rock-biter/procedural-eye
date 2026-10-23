@@ -92,7 +92,7 @@ The same bake with `PIGMENT_PASS` writes the pigment atlas, with the same layout
   - Heights are shares of the *uncarved* surface, so where a crypt removes the stroma, the fibers bridge over it.
   - A vertical bound skips the cells when the point is far from the family's band.
 - **Pupillary ruff**: a crenated rim of the pigment epithelium on the margin (`ruff.width`, `ruff.crenations`), evaluated only near the margin.
-- **Micro striations**: `micro.amplitude` at `micro.frequency` around, faded out by the ray-footprint LOD. Fresh interactive frames also leave them out where the depth of field's gather will blur them away: the trace estimates, at every step, the blur radius of the point from its apparent (paraxial) distance against the focus distance (`uDefocus`, as the gather computes it), and the striations fade once it passes both two of their widths and the 3 px from which the gather shows in full. In the default oblique framing most of the iris lies outside the millimeter of macro depth of field; the accumulated samples always draw them.
+- **Micro striations**: `micro.amplitude` at `micro.frequency` around, faded out by the ray-footprint LOD. Fresh interactive frames also leave them out where the depth of field's gather will blur them away: the field estimates, for the points near the surface (`defocusBlur()` of the trace's distance `gIrisT`), the blur radius of the point from its apparent (paraxial) distance against the focus distance (`uDefocus`, as the gather computes it), and the striations fade once it passes both two of their widths and the 3 px from which the gather shows in full. In the default oblique framing most of the iris lies outside the millimeter of macro depth of field; the accumulated samples always draw them.
 
 ## Tracing
 
@@ -103,7 +103,8 @@ The same bake with `PIGMENT_PASS` writes the pigment atlas, with the same layout
   - At most `quality.irisSteps` steps.
   - The hit tolerance is half the pixel footprint: a ray cone from the camera's pixel angle through the refraction.
 - **Atlas LOD**: atlas lookups use `textureLod` at the mip level whose texels match the footprint.
-- **Normal**: forward differences from the field at the hit (the shading evaluates it anyway), three evaluations in a loop, with an epsilon of half the footprint (at least 2 µm).
+- **Hit**: the march's last evaluation is the hit's (`IrisHit.parts`): the shading takes its parts from there instead of evaluating the field again.
+- **Normal**: forward differences from the field at the hit (its parts, which the shading reads anyway), three evaluations in a loop, with an epsilon of half the footprint (at least 2 µm).
 - **Ambient occlusion**: `quality.irisAoSteps` samples along the normal, spaced quadratically from 12 µm to 0.3 mm. This covers fiber crevices and whole crypts.
 - **Soft shadow**: iq's improved penumbra toward the key light, along its refracted direction, over `quality.irisShadowSteps` steps.
 

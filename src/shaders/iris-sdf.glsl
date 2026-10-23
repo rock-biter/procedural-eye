@@ -16,6 +16,7 @@
 #include ./iris-space.glsl
 #include ./iris-noise.glsl
 #include ./eye-profile.glsl
+#include ./cornea-optics.glsl
 
 uniform sampler2D uIrisAtlas;
 uniform vec4 uFiberRadial; // count, radius (mm), waviness (cells), height (share of surface)
@@ -33,11 +34,26 @@ uniform float uIrisMicroBlur;
 #define IRIS_GATHERED_BLUR 3.0
 
 // The ray footprint (mm), the mip level of the atlas lookups there, and the
-// radius (mm) over which the depth of field spreads that point, set by the
+// distance along the trace (mm) of the point being evaluated, set by the
 // trace (iris-trace.glsl).
 float gIrisFootprint = 0.0;
 float gIrisLod = 0.0;
-float gIrisBlur = 0.0;
+float gIrisT = 0.0;
+
+uniform vec2 uDefocus; // camera aperture diameter, focus distance (mm)
+
+// The camera's distance to the corneal point of the pixel and the path from
+// there to the start of the trace (mm), set by eyeball-cap-fragment.glsl.
+vec2 gIrisSight = vec2(0.0);
+
+// The radius (mm) over which the depth of field spreads the point `t` mm
+// along the trace: its apparent distance against the focus distance, as the
+// interactive gather blurs it (src/render/dofPass.js). Only the micro
+// striations ask, near the surface.
+float defocusBlur(float t) {
+	float distance = gIrisSight.x + apparentDepth(gIrisSight.y + t);
+	return 0.5 * uDefocus.x * abs(distance - uDefocus.y) / uDefocus.y;
+}
 
 #define IRIS_MARGIN_ROUNDING 0.1
 // Heightfield to distance: the surface slopes stay below about 1.3.
@@ -154,7 +170,7 @@ IrisParts irisParts(vec3 p) {
 	if (uRuff.z > 0.0 && gIrisLod < 1.5 && abs(slab) < 0.05) {
 		int around = int(uRuff.w);
 		float striation = TAU * r / float(around);
-		float hidden = gIrisBlur / max(uIrisMicroBlur * striation, IRIS_GATHERED_BLUR * gIrisFootprint);
+		float hidden = defocusBlur(gIrisT) / max(uIrisMicroBlur * striation, IRIS_GATHERED_BLUR * gIrisFootprint);
 		float resolved = 1.0 - smoothstep(1.0, 2.0, hidden);
 		if (resolved > 0.0) {
 			micro = uRuff.z * resolved * (1.0 - gIrisLod / 1.5) *

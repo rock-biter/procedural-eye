@@ -55,9 +55,15 @@ export default class ScleraMaps {
 				const y0 = ((segment.psi0 - SCLERA_PSI.min) / (SCLERA_PSI.max - SCLERA_PSI.min)) * HEIGHT
 				const y1 = ((segment.psi1 - SCLERA_PSI.min) / (SCLERA_PSI.max - SCLERA_PSI.min)) * HEIGHT
 				layer.lineWidth = Math.max(0.6, segment.width * pixelsPerMm)
-				// Wrapped copies so the seam at φ = 0 stays continuous.
+				// Wrapped copies so the seam at φ = 0 stays continuous: only those
+				// that reach the canvas (the round caps and a pixel of
+				// antialiasing past the ends), a few segments out of thousands.
+				const reach = layer.lineWidth / 2 + 1
+				const left = Math.min(x0, x1) - reach
+				const right = Math.max(x0, x1) + reach
 				for (const shift of [-WIDTH, 0, WIDTH]) {
 					const offset = Math.floor(x0 / WIDTH) * -WIDTH + shift
+					if (right + offset < 0 || left + offset > WIDTH) continue
 					layer.beginPath()
 					layer.moveTo(x0 + offset, y0)
 					layer.lineTo(x1 + offset, y1)
