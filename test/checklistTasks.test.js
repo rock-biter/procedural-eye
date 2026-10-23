@@ -14,6 +14,11 @@ test('the tasks are short, named once, the controls first, then the achievements
 		TASKS.filter((task) => task.counted).map((task) => task.id),
 		['titles', 'shots'],
 	)
+	// Phones and tablets leave out what only a desktop has.
+	assert.deepEqual(
+		TASKS.filter((task) => task.desktop).map((task) => task.id),
+		['focus', 'photo', 'titles', 'shots'],
+	)
 })
 
 test('only the task shown can be done, one after the other', () => {

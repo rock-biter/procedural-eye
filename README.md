@@ -27,7 +27,7 @@ pnpm capture    # renders presets headlessly next to the reference photos
 - **Skin tone** (the dots at the left of the circle): glide the skin color from light to deep.
 - **Space** toggles photo mode: the eye freezes (open, even mid-blink) and the image converges.
 - **M** (or **sound on/off** at the end of the credit line) turns the sound off and on; it starts with your first click or key.
-- **Eye exam** (desktop only, under the title): a checklist that shows the controls one task at a time, then turns into achievements that only hint at what to do. It remembers how far you got.
+- **Eye exam** (under the title): a checklist that shows the controls one task at a time, then turns into achievements that only hint at what to do. On phones it shows one task at a time and skips the desktop's ones. It remembers how far you got.
 
 **Random eye** (the eye button, below the zoom): an eye drawn from measured population data for the chosen ancestry.
 

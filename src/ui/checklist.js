@@ -4,9 +4,11 @@
 // comes in under it, its text scrambling into place (GSAP's
 // ScrambleTextPlugin), as the title and the first task do when it shows; a
 // counted task shows its count beside it. Where its height runs out, the
-// tasks done first leave at the top, fading. Reset, beside the title once a
-// task is done, scrambles the tasks out from the last to the first and
-// starts again. With reduced motion the texts show and go at once.
+// tasks done first leave at the top, fading. `compact` (phones and tablets)
+// shows the task to do alone: done, it scrambles out before the next one
+// comes in. Reset, beside the title once a task is done, scrambles the tasks
+// out from the last to the first and starts again. With reduced motion the
+// texts show and go at once.
 import { gsap } from 'gsap'
 import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin'
 
@@ -40,10 +42,17 @@ export const CHECKLIST = Object.freeze({
 // as it starts again. Returns the element, `resetButton`, show(), which
 // brings it in (once: main.js, as the intro ends), report(id, key)
 // (createProgress()), heard only while it shows and is not resetting
-// (counting()), complete(), which does the task to do, and reset(), Reset's
+// (counting(); nor while a compact one's task leaves, after which it tells
+// onChange()), complete(), which does the task to do, and reset(), Reset's
 // (both the console's too, src/debug/devTools.js), and fit(width, height),
 // the room it has beside the HUD (px; too narrow or too short, it hides).
-export function createChecklist({ tasks, progress, onChange = () => {}, onReset = () => {} }) {
+export function createChecklist({
+	tasks,
+	progress,
+	compact = false,
+	onChange = () => {},
+	onReset = () => {},
+}) {
 	const motionless = window.matchMedia('(prefers-reduced-motion: reduce)')
 	const element = document.createElement('section')
 	// Cramped until the first fit().
@@ -128,11 +137,22 @@ export function createChecklist({ tasks, progress, onChange = () => {}, onReset 
 	let shown = false
 	let cramped = true
 	let resetting = false
-	const counting = () => shown && !cramped && !resetting
+	let leaving = false
+	const counting = () => shown && !cramped && !resetting && !leaving
+	// A task's text scrambling out to nothing on `timeline` from `at` s, the
+	// task fading.
+	const scrambleOut = (timeline, item, at) => {
+		const { duration } = CHECKLIST.scrambleOut
+		const { chars, speed } = CHECKLIST.scramble
+		const text = item.querySelector('.checklist-text')
+		gsap.killTweensOf(text)
+		timeline.to(text, { duration, scrambleText: { text: '', chars, speed } }, at)
+		timeline.to(item, { opacity: 0, duration: duration / 2 }, at + duration / 2)
+	}
 	// The tasks scramble out, the last first, the dots fading with them; then
 	// the first task comes in again.
 	const reset = () => {
-		if (!shown || resetting) return
+		if (!shown || resetting || leaving) return
 		resetting = true
 		const again = () => {
 			progress.reset()
@@ -146,25 +166,33 @@ export function createChecklist({ tasks, progress, onChange = () => {}, onReset 
 		}
 		if (motionless.matches) return again()
 		const { duration, stagger } = CHECKLIST.scrambleOut
-		const { chars, speed } = CHECKLIST.scramble
 		const timeline = gsap.timeline({ onComplete: again })
 		timeline.to(dots, { opacity: 0, duration }, 0)
-		;[...list.children].reverse().forEach((item, i) => {
-			const text = item.querySelector('.checklist-text')
-			gsap.killTweensOf(text)
-			timeline.to(text, { duration, scrambleText: { text: '', chars, speed } }, i * stagger)
-			timeline.to(item, { opacity: 0, duration: duration / 2 }, i * stagger + duration / 2)
-		})
+		;[...list.children].reverse().forEach((item, i) => scrambleOut(timeline, item, i * stagger))
 	}
 	const step = (result) => {
 		if (result === 'counted') showCount()
 		if (result === 'done') {
-			current.classList.add('done')
 			current.querySelector('.checklist-count')?.remove()
+			if (compact) return leave()
+			current.classList.add('done')
 			addCurrent()
 			clip()
 		}
 		if (result) onChange(progress.state())
+	}
+	// A compact list's task done leaves before the next one comes in.
+	const leave = () => {
+		const next = () => {
+			list.replaceChildren()
+			addCurrent()
+			leaving = false
+			onChange(progress.state())
+		}
+		if (motionless.matches) return next()
+		leaving = true
+		const timeline = gsap.timeline({ onComplete: next })
+		scrambleOut(timeline, current, 0)
 	}
 
 	return {
@@ -174,7 +202,7 @@ export function createChecklist({ tasks, progress, onChange = () => {}, onReset 
 			if (shown) return
 			shown = true
 			element.classList.add('shown')
-			list.replaceChildren(...progress.done().map((task) => entry(task, true)))
+			list.replaceChildren(...(compact ? [] : progress.done().map((task) => entry(task, true))))
 			scramble(title, CHECKLIST.title)
 			addCurrent()
 			clip()
@@ -185,7 +213,7 @@ export function createChecklist({ tasks, progress, onChange = () => {}, onReset 
 		},
 		complete() {
 			const task = progress.current()
-			if (!shown || resetting || !task) return
+			if (!shown || resetting || leaving || !task) return
 			let result = null
 			for (let key = 0; result !== 'done'; key++) result = progress.report(task.id, `skip-${key}`)
 			step(result)

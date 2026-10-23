@@ -689,7 +689,7 @@ canvas {
 }
 
 /* The hidden tone (main.js) is never seen, pressed or not; it takes the
-   pointer only once unlocked, and a split HUD leaves it out. */
+   pointer only once unlocked. */
 .skin-secret {
 	opacity: 0;
 	pointer-events: none;
@@ -697,10 +697,6 @@ canvas {
 
 .skin-secret.unlocked {
 	pointer-events: auto;
-}
-
-.hud.split .skin-secret {
-	display: none;
 }
 
 .zoom-in .hud-glyph,

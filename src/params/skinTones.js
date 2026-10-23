@@ -11,7 +11,7 @@ export const SKIN_TONES = Object.freeze([
 	{ name: 'deep', label: 'Deep', color: '#301d15' },
 ])
 
-// The hidden tone (desktop only, main.js): Hellboy's red, its button one
-// spacing past the deepest, never seen, and pressable once the checklist
-// shows its task and every tone above has been worn since.
+// The hidden tone (main.js): Hellboy's red, its button one spacing past the
+// deepest, never seen, and pressable once the checklist shows its task and
+// every tone above has been worn since.
 export const SECRET_TONE = Object.freeze({ name: 'hellboy', label: 'Hellboy', color: '#7e1a10' })

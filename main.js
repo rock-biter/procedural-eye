@@ -405,12 +405,13 @@ if (urlParams.get('gui') !== '0') {
 	// aperture (desktop only) and Random eye on a dashed circle. The tone of
 	// the color the params are heading for is pressed, also after the panel or
 	// a preset changes it; the zoom and aperture knobs follow the camera every
-	// frame, gliding or not. A desktop's (a fine pointer) also has the hidden
-	// tone, which the checklist unlocks (below).
+	// frame, gliding or not. It also has the hidden tone, which the checklist
+	// unlocks (below). `desktop` (a fine pointer) tells a desktop's checklist
+	// and photo mode's line from a phone's or a tablet's.
 	const desktop = window.matchMedia('(pointer: fine)').matches
 	const hud = createHud({
 		tones: SKIN_TONES,
-		secretTone: desktop ? SECRET_TONE : null,
+		secretTone: SECRET_TONE,
 		onTone: (name) => {
 			const color = app.targetParams.skin.color
 			wearTone(name)
@@ -485,15 +486,18 @@ if (urlParams.get('gui') !== '0') {
 		document.documentElement.style.setProperty('--masthead-height', `${masthead.offsetHeight}px`)
 	}).observe(masthead)
 
-	// The checklist under it, on desktops only (src/ui/checklist.js): as wide
-	// as the room left of the HUD's circle, short of the skin tones, and down
-	// to above the camera's angles, by the circle's middle (hidden where it is
-	// too narrow or too short, as on a split HUD), shown once the intro ends.
-	// The controls report what is done; only the task shown counts
-	// (src/ui/checklistTasks.js). The hidden tone (SECRET_TONE) can be
-	// pressed once its task shows and every tone has been worn since (a press
-	// that brings the task in is not one of them), and from then on. The
-	// progress is kept in the browser, with those tones.
+	// The checklist under it (src/ui/checklist.js): on desktops as wide as the
+	// room left of the HUD's circle, short of the skin tones, and down to above
+	// the camera's angles, by the circle's middle (hidden where it is too
+	// narrow or too short); on a split HUD (phones) across the title's width,
+	// down to the circle's middle. Phones and tablets (no fine pointer) show
+	// one task at a time and leave out a desktop's tasks (the focus, photo
+	// mode, the tab's titles, the console's reports). It shows once the intro
+	// ends. The controls report what is done;
+	// only the task shown counts (src/ui/checklistTasks.js). The hidden tone
+	// (SECRET_TONE) can be pressed once its task shows and every tone has
+	// been worn since (a press that brings the task in is not one of them),
+	// and from then on. The progress is kept in the browser, with those tones.
 	const readChecklist = () => {
 		try {
 			return JSON.parse(readStored(CHECKLIST_KEY)) ?? {}
@@ -502,7 +506,8 @@ if (urlParams.get('gui') !== '0') {
 		}
 	}
 	const saved = readChecklist()
-	const progress = createProgress(TASKS, {
+	const tasks = desktop ? TASKS : TASKS.filter((task) => !task.desktop)
+	const progress = createProgress(tasks, {
 		counts: { titles: TAB_TITLES.length, shots: SHOTS.length + 1 },
 		saved,
 	})
@@ -515,62 +520,61 @@ if (urlParams.get('gui') !== '0') {
 		const allWorn = SKIN_TONES.every((tone) => worn.has(tone.name))
 		hud.unlockSecret(found || (secretShown() && allWorn))
 	}
-	const checklist = desktop
-		? createChecklist({
-				tasks: TASKS,
-				progress,
-				onChange: () => {
-					keepChecklist()
-					unlockSecret()
-					countFirstShot()
-				},
-				// Reset forgets the tones worn too: the hidden tone locks again.
-				onReset: () => worn.clear(),
-			})
-		: null
-	const report = (id, key) => checklist?.report(id, key)
+	const checklist = createChecklist({
+		tasks,
+		progress,
+		compact: !desktop,
+		onChange: () => {
+			keepChecklist()
+			unlockSecret()
+			countFirstShot()
+		},
+		// Reset forgets the tones worn too: the hidden tone locks again.
+		onReset: () => worn.clear(),
+	})
+	const report = (id, key) => checklist.report(id, key)
 	// The T-800's first report comes once a page, before every other: told
 	// already, it counts as soon as the task of the reports shows (shoot()).
 	const countFirstShot = () => {
 		if (shotLog.line !== null && progress.current()?.id === 'shots') report('shots', FIRST_SHOT)
 	}
 	const wearTone = (name) => {
-		if (!checklist?.counting() || !secretShown() || worn.has(name)) return
+		if (!checklist.counting() || !secretShown() || worn.has(name)) return
 		if (!SKIN_TONES.some((tone) => tone.name === name)) return
 		worn.add(name)
 		keepChecklist()
 		unlockSecret()
 	}
-	if (checklist) {
-		document.body.appendChild(checklist.element)
-		sounding(checklist.resetButton, 'reset')
-		unlockSecret()
-		// Its room, measured once the HUD has laid out (its own observer, made
-		// first, runs first).
-		new ResizeObserver(() => {
-			const circle = hud.circle()
-			const { left, top } = checklist.element.getBoundingClientRect()
-			if (!circle || circle.split) return checklist.fit(0, 0)
-			const tones = circle.x - circle.radius - HUD.button / 2
-			const angles = circle.y - CHECKLIST.readout
-			checklist.fit(tones - CHECKLIST.gap - left, angles - CHECKLIST.gap - top)
-		}).observe(hud.element)
-		// Once a frame, the framing (the camera's distance or orbit: the zoom's
-		// controls, the wheel, a drag) and the focus (the f-number: the
-		// aperture knob, the wheel over it, a right-drag) moving.
-		let camera = null
-		const watchCamera = () => {
-			requestAnimationFrame(watchCamera)
-			const { distance, azimuth, elevation, fNumber } = app.params.camera
-			if (camera) {
-				const { distance: d, azimuth: a, elevation: e, fNumber: f } = camera
-				if (distance !== d || azimuth !== a || elevation !== e) report('framing')
-				if (fNumber !== f) report('focus')
-			}
-			camera = { distance, azimuth, elevation, fNumber }
-		}
+	document.body.appendChild(checklist.element)
+	sounding(checklist.resetButton, 'reset')
+	unlockSecret()
+	// Its room, measured once the HUD has laid out (its own observer, made
+	// first, runs first).
+	new ResizeObserver(() => {
+		const circle = hud.circle()
+		const { left, top } = checklist.element.getBoundingClientRect()
+		if (!circle) return checklist.fit(0, 0)
+		const right = circle.split
+			? masthead.getBoundingClientRect().right
+			: circle.x - circle.radius - HUD.button / 2 - CHECKLIST.gap
+		const bottom = circle.y - CHECKLIST.readout - CHECKLIST.gap
+		checklist.fit(right - left, bottom - top)
+	}).observe(hud.element)
+	// Once a frame, the framing (the camera's distance or orbit: the zoom's
+	// controls, the wheel, a drag) and the focus (the f-number: the
+	// aperture knob, the wheel over it, a right-drag) moving.
+	let camera = null
+	const watchCamera = () => {
 		requestAnimationFrame(watchCamera)
+		const { distance, azimuth, elevation, fNumber } = app.params.camera
+		if (camera) {
+			const { distance: d, azimuth: a, elevation: e, fNumber: f } = camera
+			if (distance !== d || azimuth !== a || elevation !== e) report('framing')
+			if (fNumber !== f) report('focus')
+		}
+		camera = { distance, azimuth, elevation, fNumber }
 	}
+	requestAnimationFrame(watchCamera)
 
 	// The tab's title while the page is hidden (TAB_TITLES), "I can see you…"
 	// the first time, then another one drawn each time (never the same twice

@@ -119,9 +119,9 @@ function place(element, cut, angle, { cx, cy, radius }) {
 }
 
 // `tones`: [{ name, label, color }], and `secretTone`, if given, one more
-// (desktop only, main.js): its button one spacing past the deepest, turning
-// with them, never seen, pressed or not, without a cut in the circle, and
-// pressable only once unlockSecret(true); a split HUD leaves it out.
+// (main.js): its button one spacing past the deepest, turning with them,
+// never seen, pressed or not, without a cut in the circle, and pressable only
+// once unlockSecret(true).
 // onTone(name), onZoom('in' | 'out',
 // duration), onZoomLevel(level, including elastic overshoot),
 // onZoomWheel(deltaY) (the wheel over the knob) and onRandom() run the
@@ -827,9 +827,11 @@ export function createHud({
 			)
 			for (const item of items) cutRadius(item)
 			// The hidden tone turns the group to bring its empty slot to the
-			// center; the arcs light up where they are.
+			// center (a split HUD's stays, clear of the checklist above it); the
+			// arcs light up where they are.
 			if (secretButton && color === secretTone.color) {
-				turnToTone(tones.length)
+				if (placed?.split) activate('tone')
+				else turnToTone(tones.length)
 				return
 			}
 			// A color of no tone leaves the tones and the arcs where they are.

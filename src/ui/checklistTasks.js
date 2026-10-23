@@ -3,20 +3,34 @@
 // at what to do. One task shows at a time and only it can be done: what a
 // later one asks for does not count before it shows. A counted task
 // (`counted`) is done once it has heard as many different keys as main.js
-// gives it (the tab's titles, the T-800's reports of the shots).
+// gives it (the tab's titles, the T-800's reports of the shots); a desktop's
+// (`desktop`) asks for what only a desktop has (the aperture knob, Space, the
+// tabs' titles, the console).
 export const TASKS = Object.freeze(
 	[
 		{ id: 'iris', text: 'Change the iris' },
 		{ id: 'tone', text: 'Change the skin tone' },
 		{ id: 'framing', text: 'Change the framing' },
-		{ id: 'focus', text: 'Adjust the focus' },
+		{ id: 'focus', text: 'Adjust the focus', desktop: true },
 		{ id: 'volume', text: 'Set the volume' },
 		{ id: 'snapshot', text: 'Take a snapshot' },
 		{ id: 'eleven', text: 'Turn it up to eleven', achievement: true },
-		{ id: 'photo', text: 'Give it some space', achievement: true },
-		{ id: 'titles', text: 'Look away. Again, and again', achievement: true, counted: true },
+		{ id: 'photo', text: 'Give it some space', achievement: true, desktop: true },
+		{
+			id: 'titles',
+			text: 'Look away. Again, and again',
+			achievement: true,
+			counted: true,
+			desktop: true,
+		},
 		{ id: 'cannon', text: 'Do what you were told not to', achievement: true },
-		{ id: 'shots', text: 'Make it run out of words', achievement: true, counted: true },
+		{
+			id: 'shots',
+			text: 'Make it run out of words',
+			achievement: true,
+			counted: true,
+			desktop: true,
+		},
 		{ id: 'secret', text: 'Wear every skin.... every!', achievement: true },
 		{ id: 'blink', text: "Let's take another one", achievement: true },
 	].map((task) => Object.freeze(task)),
