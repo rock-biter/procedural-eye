@@ -76,8 +76,4 @@ vec3 refineOnSurface(vec3 origin, vec3 dir, vec3 guess) {
 	return origin + dir * t;
 }
 
-float irisBackZ(float r) {
-	return uIrisShape.x - uIrisShape.y * r * r;
-}
-
 #endif

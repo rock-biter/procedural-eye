@@ -260,7 +260,7 @@ export const BASE_PARAM_SCHEMA = {
 		upperCurl: num(0.45, 0, 1.5, 0.01, '', 'rebuild', 'upper curl'),
 		lowerCurl: num(0.35, 0, 1.5, 0.01, '', 'rebuild', 'lower curl'),
 		clumping: num(0.5, 0, 1, 0.01, '', 'rebuild'),
-		randomness: num(0.6, 0, 1, 0.01, '', 'rebuild'),
+		randomness: num(0.6, 0, 1.5, 0.01, '', 'rebuild'),
 		color: color('#1d140f'),
 		shine: num(0.5, 0, 1, 0.01),
 		// How much thicker the lashes are zoomed all the way out (none zoomed
@@ -391,7 +391,7 @@ export const BASE_PARAM_SCHEMA = {
 		extent: num(160, 60, 1000, 10, 'mm', 'uniform', 'cube side'),
 		forward: num(0.65, 0, 0.95, 0.01, '', 'uniform', 'forward scattering'),
 		drift: num(0.3, 0, 10, 0.05, 'mm/s', 'uniform', 'air drift'),
-		turbulence: num(0.6, 0, 5, 0.05, 'mm'),
+		turbulence: num(0.6, 0, 12, 0.05, 'mm'),
 		haze: num(0.04, 0, 3, 0.005, '1/m', 'uniform', 'haze density'),
 		shadow: num(0.7, 0, 1, 0.01, '', 'uniform', 'shadow of the patch'),
 	},

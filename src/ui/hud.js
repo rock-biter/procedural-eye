@@ -28,6 +28,7 @@ import {
 import { gsap } from 'gsap'
 import { TextPlugin } from 'gsap/TextPlugin'
 import { follow } from '../camera/orbitMotion'
+import { clamp01 } from '../math'
 import bracketAsset from './assets/bracket.svg?url'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -63,7 +64,6 @@ const CLICK_SLOP = 4
 const SNAP_GLIDE = 0.25
 const SPRING_BACK = 600
 
-const clamp01 = (value) => Math.min(Math.max(value, 0), 1)
 // The end a zoom level sits at, 1 (zoom in) or 0 (zoom out), or null.
 const endOf = (level) => (level >= 0.999 ? 1 : level <= 0.001 ? 0 : null)
 // An angle within π of `center`.
@@ -647,8 +647,10 @@ export function createHud({
 		requestAnimationFrame(stepSway)
 		const dt = swayTime === null ? 0 : Math.min((time - swayTime) / 1000, 0.1)
 		swayTime = time
+		// They land within 1e-4 rad (a twentieth of a pixel out at 500 px),
+		// so the layers stop being redrawn a second or two sooner.
 		const toward = (current, layer) =>
-			follow(current, still.matches ? 0 : swayTurn(layer, mouse), dt, layer.lag, 1e-5)
+			follow(current, still.matches ? 0 : swayTurn(layer, mouse), dt, layer.lag, 1e-4)
 		let rings = false
 		for (const kind of ['inner', 'outer']) {
 			const turn = toward(sway[kind], HUD.sway[kind])

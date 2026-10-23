@@ -31,15 +31,53 @@ export function signedFissureDistance(polygon, x, y) {
 	return inside ? best : -best
 }
 
-// Float data, row-major from the bottom-left (texture layout).
+// Float data, row-major from the bottom-left (texture layout): the values of
+// signedFissureDistance() at the texel centers, to the bit, faster. The
+// segments' differences and squared lengths are computed once, and a texel
+// takes Math.hypot() only for the segments whose squared distance comes
+// within a hair (NEAR, far above its rounding) of the nearest one so far:
+// only those can give the smallest hypot().
+const NEAR = 1 + 1e-9
 export function bakeFissureMap(lids, nasalSign, map = FISSURE_MAP) {
 	const polygon = fissurePolygon(lids, nasalSign, map.segments)
+	const count = polygon.length
+	const xs = new Float64Array(count)
+	const ys = new Float64Array(count)
+	const exs = new Float64Array(count)
+	const eys = new Float64Array(count)
+	const lengths = new Float64Array(count)
+	for (let i = 0, j = count - 1; i < count; j = i++) {
+		const [xi, yi] = polygon[i]
+		const [xj, yj] = polygon[j]
+		xs[i] = xi
+		ys[i] = yi
+		exs[i] = xj - xi
+		eys[i] = yj - yi
+		lengths[i] = exs[i] * exs[i] + eys[i] * eys[i]
+	}
 	const data = new Float32Array(map.size * map.size)
-	for (let j = 0; j < map.size; j++) {
-		const y = ((j + 0.5) / map.size - 0.5) * 2 * map.halfHeight
-		for (let i = 0; i < map.size; i++) {
-			const x = ((i + 0.5) / map.size - 0.5) * 2 * map.halfWidth
-			data[j * map.size + i] = signedFissureDistance(polygon, x, y)
+	for (let row = 0; row < map.size; row++) {
+		const y = ((row + 0.5) / map.size - 0.5) * 2 * map.halfHeight
+		for (let column = 0; column < map.size; column++) {
+			const x = ((column + 0.5) / map.size - 0.5) * 2 * map.halfWidth
+			let inside = false
+			let best = Infinity
+			let nearest = Infinity
+			for (let i = 0, j = count - 1; i < count; j = i++) {
+				const xi = xs[i]
+				const yi = ys[i]
+				const ex = exs[i]
+				const ey = eys[i]
+				if (yi > y !== ys[j] > y && x < (ex * (y - yi)) / ey + xi) inside = !inside
+				const t = Math.min(Math.max(((x - xi) * ex + (y - yi) * ey) / lengths[i], 0), 1)
+				const dx = x - xi - ex * t
+				const dy = y - yi - ey * t
+				const squared = dx * dx + dy * dy
+				if (squared > nearest * NEAR) continue
+				nearest = Math.min(nearest, squared)
+				best = Math.min(best, Math.hypot(dx, dy))
+			}
+			data[row * map.size + column] = inside ? best : -best
 		}
 	}
 	return data

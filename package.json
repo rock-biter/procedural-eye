@@ -30,7 +30,6 @@
     "vite-plugin-glsl": "^1.6.2"
   },
   "dependencies": {
-    "@tweakpane/plugin-essentials": "^0.2.1",
     "alea": "^1.0.1",
     "gsap": "^3.15.0",
     "postprocessing": "^6.39.5",

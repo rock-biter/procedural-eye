@@ -72,7 +72,9 @@ export default class LidBlink {
 		if (this.ready || this.pending || this.failed) return
 		this.worker ??= this.createWorker()
 		this.pending = true
-		this.worker.postMessage({ id: this.version, params, lids: !this.lidsReady })
+		const lids = !this.lidsReady
+		const layout = lids ? this.lids.restLayout : null
+		this.worker.postMessage({ id: this.version, params, lids, layout })
 	}
 
 	createWorker() {

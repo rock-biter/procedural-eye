@@ -66,9 +66,9 @@ pnpm sounds
 - [`src/atmosphere/`](src/atmosphere/): the dust field (seeded motes in a cube around the eye), the lights the haze scatters and the light shafts (seeded beams and their cookie).
 - [`src/render/`](src/render/): the post-processing chain, accumulation, depth of field, the dust pass, the backdrop with the floor shadow and PNG metadata.
 - [`src/audio/`](src/audio/): the audio engine, the camera foley and the ambience, with their pure parts (the foley's arithmetic, the sound bank, the synthesized buffers, the glass harp's tuning and voices, the reverb's impulse response) and the recorded sounds in `sounds/`.
-- [`src/debug/`](src/debug/) holds the panel, the mesh tree (`?meshtree=1`) and the debug view numbering; [`src/ui/`](src/ui/) the HUD around the eye, its layout and its SVG assets, and the intro's timeline; [`src/shaders/`](src/shaders/) holds every GLSL file.
+- [`src/debug/`](src/debug/) holds the development tools, loaded only on request (`devTools.js`: the console API, the frame telemetry, the panel, the mesh tree with `?meshtree=1`), and the debug view numbering; [`src/ui/`](src/ui/) the HUD around the eye, its layout and its SVG assets, and the intro's timeline; [`src/shaders/`](src/shaders/) holds every GLSL file.
 - _Pure_ modules (marked in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) import no three.js objects or browser state and are tested in Node.
-- [`references/`](references/) holds the user's reference photographs (not shipped). [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/compare.mjs`](scripts/compare.mjs) measures captures against a baseline; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/); [`scripts/sounds.mjs`](scripts/sounds.mjs) cuts the recorded sounds from their CC0 sources (`scripts/sounds.json`).
+- [`references/`](references/) holds the user's reference photographs and an unused PBR skin texture set (`skin-pbr/`), none of it shipped. [`scripts/capture.mjs`](scripts/capture.mjs) renders presets next to them and benchmarks frames; [`scripts/compare.mjs`](scripts/compare.mjs) measures captures against a baseline; [`scripts/brand.mjs`](scripts/brand.mjs) renders the icons and the social image into [`public/`](public/); [`scripts/sounds.mjs`](scripts/sounds.mjs) cuts the recorded sounds from their CC0 sources (`scripts/sounds.json`).
 
 ## Project Rules
 
@@ -86,6 +86,8 @@ pnpm sounds
   | [`src/random.js`](src/random.js) `pcg()` | `pcgHash()` |
   | `hgPhase()` in [`src/atmosphere/dustField.js`](src/atmosphere/dustField.js) | `scattering.glsl` |
   | `beamIntegral()` and `erf()` in [`src/atmosphere/lightShafts.js`](src/atmosphere/lightShafts.js) | `applyShafts()` and `shaftErf()` in `light-shafts.glsl` |
+  | `bakeShaftCookie()` (over `cookieBlades()`) in [`src/atmosphere/lightShafts.js`](src/atmosphere/lightShafts.js) | `shaft-cookie-fragment.glsl` |
+- Keep development-only code (the console API, telemetry, benchmarks, the panel) in the development tools of [`src/debug/devTools.js`](src/debug/devTools.js), which `main.js` imports only on request: a plain page neither downloads nor runs it.
 - Scene materials write the apparent focus distance in alpha. Only the accumulation history keeps it; the effects receive opaque alpha (see [`docs/RENDERING.md`](docs/RENDERING.md)).
 - In shaders:
   - use the `ZERO` loop bound (ANGLE-Metal compile times);

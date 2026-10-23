@@ -823,11 +823,6 @@ export function lidLayout(lids, eye, nasalSign = 1, { around, across } = {}) {
 	return layout
 }
 
-// The face the lids turn into (its height at x, y), for these settings.
-export function lidFace(lids, eye, nasalSign = 1) {
-	return lidContext(lids, eye, createFissure(lids, nasalSign)).face
-}
-
 // A lid point at loop parameter t (0–0.5 the upper margin medial → lateral,
 // 0.5–1 the lower one back) and profile coordinate s, for the lash roots.
 export function lidPoint(t, s, fissure, eye, lids) {
@@ -842,7 +837,7 @@ export function lidPoint(t, s, fissure, eye, lids) {
 // (row direction x, y, groove depth (mm, ≤ 0), share of the way along the
 // margin from the medial canthus) and `follow` = (upper share, follow
 // weight). `rim`: the outer row, the patch's edge, column by column; `face`:
-// the face the lids turn into (lidFace()), height at (x, y); `layout`.
+// the face the lids turn into, height at (x, y); `layout`.
 export function createLidMesh(
 	lids,
 	eye,

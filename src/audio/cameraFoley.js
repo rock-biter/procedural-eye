@@ -5,6 +5,7 @@
 // past its end and the autofocus beep once a photo has converged. Sounds pan
 // with the place of their control on the screen.
 import { follow } from '../camera/orbitMotion'
+import { clamp01 } from '../math'
 import { crossings, overshoot, stops, strainDrive } from './foley'
 
 // Time constants (s): the speeds the creak follows, and its levels.
@@ -87,7 +88,6 @@ export default class CameraFoley {
 		const { engine } = this
 		const levels = this.params.sound
 		const pan = PAN * 0.6
-		const clamp01 = (value) => Math.min(Math.max(value, 0), 1)
 		// The detents a frame crossed, spread evenly over the next frame's
 		// time, so a fast turn keeps its density at any frame rate.
 		const run = (name, count, rate) => {

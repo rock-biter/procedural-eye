@@ -126,9 +126,25 @@ export default class IrisAtlas {
 	}
 
 	// `space`: createIrisSpace() of the current params; `nasalSign`: +1 for a
-	// right eye.
+	// right eye. The structure bakes again only when its inputs changed, so a
+	// glide of the color alone leaves it as it is; the pigment, which reads the
+	// structure's uniforms too, when either changed.
 	bake(renderer, params, space, nasalSign = 1) {
 		const s = params.irisStructure
+		const color = params.irisColor
+		const structureKey = JSON.stringify([s, space.rp0, space.R, space.rc0])
+		const pigmentKey = JSON.stringify([color, nasalSign])
+		const structure = structureKey !== this.structureKey
+		const pigment = structure || pigmentKey !== this.pigmentKey
+		this.structureKey = structureKey
+		this.pigmentKey = pigmentKey
+		const previous = renderer.getRenderTarget()
+		if (structure) this.bakeStructure(renderer, s, space)
+		if (pigment) this.bakePigment(renderer, color, s.seed, nasalSign)
+		renderer.setRenderTarget(previous)
+	}
+
+	bakeStructure(renderer, s, space) {
 		this.collarette.image.data.set(
 			createCollaretteCurve({
 				position: s.collarette.position,
@@ -161,25 +177,24 @@ export default class IrisAtlas {
 		u.uCryptsShape.value.set(c.peripheral, c.depth, c.wall, c.roundness)
 		u.uNodules.value.set(s.nodules.count, s.nodules.size, s.nodules.ring, 0)
 		u.uSeed.value = s.seed >>> 0
-		const color = params.irisColor
+		this.quad.material = this.material
+		renderer.setRenderTarget(this.target)
+		renderer.render(this.scene, this.camera)
+	}
+
+	bakePigment(renderer, color, seed, nasalSign) {
 		const p = this.pigmentMaterial.uniforms
 		p.uPigment.value.set(color.ablMelanin, color.eumelanin, color.variation, 0)
 		const h = color.heterochromia
 		p.uHeterochromia.value.set(h.amount, h.melanin, h.eumelanin, h.extent)
 		p.uPigmentMisc.value.set(h.softness, color.periphery.amount, color.periphery.width, 0)
-		this.freckles = createFreckles({ ...color.freckles, seed: s.seed }, nasalSign)
+		this.freckles = createFreckles({ ...color.freckles, seed }, nasalSign)
 		packFreckles(this.freckles, p.uFreckles.value)
 		p.uFreckleCount.value = this.freckles.length
 		p.uFreckleColor.value.set(color.freckles.melanin, color.freckles.eumelanin)
-
-		const previous = renderer.getRenderTarget()
-		this.quad.material = this.material
-		renderer.setRenderTarget(this.target)
-		renderer.render(this.scene, this.camera)
 		this.quad.material = this.pigmentMaterial
 		renderer.setRenderTarget(this.pigmentTarget)
 		renderer.render(this.scene, this.camera)
-		renderer.setRenderTarget(previous)
 	}
 
 	dispose() {

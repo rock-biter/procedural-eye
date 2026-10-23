@@ -32,6 +32,12 @@ export default class AudioEngine {
 		this.last = {}
 		this.lastTake = {}
 		this.pending = []
+		// The master's last scheduled target and time constant.
+		this.target = null
+		this.lag = null
+		// The meter of stats(), only once asked for.
+		this.metered = false
+		this.analyser = null
 		this.peak = 0
 		this.power = { sum: 0, count: 0 }
 		this.readyListeners = []
@@ -105,10 +111,9 @@ export default class AudioEngine {
 		limiter.ratio.value = 12
 		limiter.attack.value = 0.002
 		limiter.release.value = 0.15
-		this.analyser = context.createAnalyser()
-		this.analyser.fftSize = 2048
-		this.samples = new Float32Array(this.analyser.fftSize)
-		this.master.connect(limiter).connect(this.analyser).connect(context.destination)
+		this.limiter = limiter
+		this.master.connect(limiter).connect(context.destination)
+		if (this.metered) this.insertMeter()
 		this.buses = { controls: context.createGain(), ambience: context.createGain() }
 		for (const bus of Object.values(this.buses)) bus.connect(this.master)
 		for (const sound of Object.values(SOUNDS)) {
@@ -220,15 +225,23 @@ export default class AudioEngine {
 			)
 	}
 
-	// Once a frame: the master volume from the params (none muted or
-	// paused), and the loudest sample and the power of the master since the
-	// last stats().
+	// Once a frame: the master volume from the params (none muted or paused),
+	// scheduled again only when it or its time constant changes (the same
+	// target from the current value is the same exponential); with the meter
+	// (stats()), the loudest sample and the power of the master since the last
+	// stats().
 	update() {
 		if (!this.context) return
 		const now = this.context.currentTime
 		const silent = this.muted || this.paused
 		const lag = !silent && now - this.resumed < 1 ? RESUME_FADE : FADE
-		this.master.gain.setTargetAtTime(silent ? 0 : this.params.sound.volume, now, lag)
+		const target = silent ? 0 : this.params.sound.volume
+		if (target !== this.target || lag !== this.lag) {
+			this.target = target
+			this.lag = lag
+			this.master.gain.setTargetAtTime(target, now, lag)
+		}
+		if (!this.analyser) return
 		this.analyser.getFloatTimeDomainData(this.samples)
 		for (const sample of this.samples) {
 			this.peak = Math.max(this.peak, Math.abs(sample))
@@ -237,10 +250,26 @@ export default class AudioEngine {
 		this.power.count += this.samples.length
 	}
 
+	// The meter of stats() (the development tools): an analyser after the
+	// limiter, read once a frame from then on. Off the graph otherwise.
+	enableMeter() {
+		this.metered = true
+		if (this.context && !this.analyser) this.insertMeter()
+	}
+
+	insertMeter() {
+		this.analyser = this.context.createAnalyser()
+		this.analyser.fftSize = 2048
+		this.samples = new Float32Array(this.analyser.fftSize)
+		this.limiter.disconnect()
+		this.limiter.connect(this.analyser).connect(this.context.destination)
+	}
+
 	// The context's state, the mute and the pause, how often each sound
 	// played, and the peak and the RMS level of the master (dBFS, sampled once
-	// a frame) since the last call.
+	// a frame, from the first call on) since the last call.
 	stats() {
+		this.enableMeter()
 		const decibels = (amplitude) => (amplitude > 0 ? 20 * Math.log10(amplitude) : -Infinity)
 		const stats = {
 			state: this.context?.state ?? 'none',

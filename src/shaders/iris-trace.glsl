@@ -11,11 +11,6 @@
 uniform int uIrisSteps;
 uniform int uIrisShadowSteps;
 uniform int uIrisAoSteps;
-uniform vec2 uDefocus; // camera aperture diameter, focus distance (mm)
-
-// The camera's distance to the corneal point of the pixel and the path from
-// there to the start of the trace (mm), set by eyeball-cap-fragment.glsl.
-vec2 gIrisSight = vec2(0.0);
 
 #define IRIS_SHELL_HEIGHT 1.3
 #define IRIS_MAX_PATH 4.0
@@ -27,15 +22,8 @@ struct IrisHit {
 	float t;
 	float footprint; // pixel footprint at the hit (mm)
 	int steps;
+	IrisParts parts; // the field's parts at the hit, which the shading reads
 };
-
-// The radius (mm) over which the depth of field spreads the point `t` mm
-// along the trace: its apparent distance against the focus distance, as the
-// interactive gather blurs it (src/render/dofPass.js).
-float defocusBlur(float t) {
-	float distance = gIrisSight.x + apparentDepth(gIrisSight.y + t);
-	return 0.5 * uDefocus.x * abs(distance - uDefocus.y) / uDefocus.y;
-}
 
 // The ray footprint (mm) of the field's next evaluations, and the mip level
 // whose texels match it (ρ texels of the atlas).
@@ -74,8 +62,9 @@ IrisHit traceIris(vec3 roEye, vec3 rd, float coneOrigin, float coneSpread) {
 		hit.steps = i + 1;
 		footprint = coneOrigin + coneSpread * t;
 		setIrisFootprint(footprint);
-		gIrisBlur = defocusBlur(t);
-		float signedRadius = irisField(ro + rd * t);
+		gIrisT = t;
+		IrisParts parts = irisParts(ro + rd * t);
+		float signedRadius = irisCombine(parts);
 		float radius = abs(signedRadius);
 		bool fail = omega > 1.0 && (radius + previousRadius) < stepLength;
 		if (fail) {
@@ -87,6 +76,7 @@ IrisHit traceIris(vec3 roEye, vec3 rd, float coneOrigin, float coneSpread) {
 		previousRadius = radius;
 		if (!fail && radius < 0.5 * footprint) {
 			hit.hit = true;
+			hit.parts = parts;
 			break;
 		}
 		t += stepLength;

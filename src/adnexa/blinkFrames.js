@@ -101,8 +101,12 @@ export function vertexNormals(positions, indices) {
 // (`lids`, positions, normals and occlusion, when `lids` is set: it takes most
 // of the time), the meniscus (positions, normals) and the lashes (positions,
 // normals, tangents); and `fissure`, the fissure map closed (bakeFissureMap()),
-// with the lids.
-export function createBlinkFrames(params, { lids: withLids = true } = {}) {
+// with the lids. `layout`: the lid mesh's at rest (createLidMesh()'s), when
+// the caller has it: it is built from the lids at rest otherwise.
+export function createBlinkFrames(
+	params,
+	{ lids: withLids = true, layout: restLayout = null } = {},
+) {
 	const eye = createEyeGeometry(params)
 	const side = eye.nasalSign
 	// The open lashes' rings orient the closing ones.
@@ -115,7 +119,7 @@ export function createBlinkFrames(params, { lids: withLids = true } = {}) {
 		: null
 	// The lids at rest lay the mesh out (its rows, columns and quads'
 	// diagonals), so the frames' vertices and triangles are theirs.
-	const layout = withLids ? createLidMesh(params.lids, eye, side).layout : null
+	const layout = withLids ? (restLayout ?? createLidMesh(params.lids, eye, side).layout) : null
 	for (const closure of blinkClosures(params.lids.closure)) {
 		const lids = { ...params.lids, closure }
 		if (withLids) {

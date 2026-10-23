@@ -7,6 +7,7 @@ import {
 	EMITTER_VEC4S,
 	facingAxes,
 	flashRig,
+	LIT_EMITTERS,
 	MAX_EMITTERS,
 	packBackground,
 	packEmitters,
@@ -60,6 +61,27 @@ test('the camera-mounted silhouettes and lights follow the camera', () => {
 	const lens = list.find((item) => item.type === EMITTER_TYPE.LENS)
 	assert.ok(lens.center[2] > camera.position[2])
 	assert.ok(list.length <= MAX_EMITTERS)
+})
+
+test('the lit emitters come first, at most LIT_EMITTERS of them (the skin lights them per vertex)', () => {
+	const params = createDefaults(BASE_PARAM_SCHEMA)
+	const on = { enabled: true, intensity: 1 }
+	applyOverrides(BASE_PARAM_SCHEMA, params, {
+		lighting: {
+			key: on,
+			fill: on,
+			window: on,
+			ring: on,
+			leds: on,
+			camera: { enabled: true, photographer: true },
+		},
+	})
+	const list = buildEmitters(params.lighting, camera)
+	const lit = (item) => item.type !== EMITTER_TYPE.LENS && item.type !== EMITTER_TYPE.BLOCKER
+	const count = list.filter(lit).length
+	assert.equal(count, LIT_EMITTERS)
+	assert.ok(list.slice(0, count).every(lit))
+	assert.ok(list.length > count)
 })
 
 test('packing writes six vec4s per emitter and transforms into another space', () => {

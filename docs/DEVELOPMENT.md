@@ -32,11 +32,11 @@ pnpm sounds         # cuts the recorded sounds from their CC0 sources into src/a
 
 ## Toolchain
 
-- **Vite 8** builds the ES-module application. `vite-plugin-glsl` makes shader files importable and removes repeated `#include`s (`vite.config.js`). Shader chunks also carry `#ifndef` guards, because the Node hooks inline every include.
+- **Vite 8** builds the ES-module application, for `es2022` (`main.js` awaits the presets at the top level, [URL Flags](#url-flags)). `vite-plugin-glsl` makes shader files importable, removes repeated `#include`s and, in `pnpm build`, strips the shaders' comments and whitespace (`minify`, `vite.config.js`). Shader chunks also carry `#ifndef` guards, because the Node hooks inline every include.
 - **three** ^0.186.1, with `WebGLRenderer` (WebGL2) and GLSL `ShaderMaterial`s.
 - **`postprocessing`** (pmndrs) provides the effect composer. Its `three` peer range must include the installed three version.
-- **`tweakpane` 4** with `@tweakpane/plugin-essentials` builds the panel.
-  - The terrain project uses lil-gui; Tweakpane is used here for its folders, color pickers and FPS graph.
+- **`tweakpane` 4** builds the panel and the mesh tree, both loaded only on request.
+  - The terrain project uses lil-gui; Tweakpane is used here for its folders and color pickers.
   - The panel is generated from the schema, so the library stays replaceable.
 - **`alea`** seeds the CPU generators.
 - **`gsap`** plays the intro's timeline ([Intro](#intro)) and the interface's glides and springs; its TextPlugin retypes the HUD's zoom value, and its GSDevTools (free since GSAP 3.13) scrubs the intro with `?intro=dev`, loaded only then.
@@ -84,16 +84,21 @@ pnpm sounds         # cuts the recorded sounds from their CC0 sources into src/a
 
 | Flag | Effect |
 | --- | --- |
-| `?preset=<name>` | Starts from a preset of `src/params/presets.js` (`default`, the values of `src/params/defaults.json`, otherwise). |
+| `?preset=<name>` | Starts from a preset of `src/params/presets.js` (`default`, the values of `src/params/defaults.json`, otherwise). The presets load only with this flag (a top-level `await import()` in `main.js`). |
 | `?state=<string>` | Applies the non-default values encoded by **Copy state URL** or **Save PNG** (base64url JSON), on top of the preset. |
 | `?photo=<n>` | Sets `quality.photoSamples` to `n` and starts in photo mode (frozen clock); the accumulation stops after `n` samples. No intro plays. |
 | `?intro=0` | Starts without the intro ([Intro](#intro)); `?intro=dev` plays it, keeps its timeline when it ends and loads GSDevTools to scrub it. |
 | `?view=<name>` | Sets `debug.view`; see [`docs/RENDERING.md`](RENDERING.md#debug-views) for the list. |
 | `?gui=0` | Hides the frame, the HUD, the title, the credit line, the frame rate and the panel, plays no intro and makes no sound (captures). |
 | `?dpr=<ratio>` | Pins the pixel ratio (0.5–2) and turns the adaptive resolution off. |
-| `?debug=1` | Exposes the app object as `window.__EYE_APP__` for console debugging. |
+| `?mobile=1`, `?mobile=0` | Forces the phone profile on or off; without the flag a coarse pointer chooses it (`RenderSetup.mobile`): the adaptive resolution aims at 60 fps instead of 30, a small step at a time ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#adaptive-resolution)). |
+| `?dev` | Loads the development tools and nothing else: the console API ([Console API](#console-api)). |
+| `?debug=1` | Loads the development tools and also exposes the app object as `window.__EYE_APP__` for console debugging. |
+| `?stats` | Loads the development tools and shows, at the top left, the frame interval (median and 95th percentile), the CPU and GPU time of a frame, the adaptive pixel ratio and its window, and the seconds since load, read twice a second: to follow a phone over minutes. |
 | `?meshtree=1` | Shows the mesh tree at the left (loaded on demand, with or without the HUD): see [Mesh Tree](#mesh-tree). |
 | `#debug` | Shows the panel (it is not even loaded otherwise). It follows the hash: adding or removing `#debug` on an open page shows or hides it. It also makes the skin evaluate its relief and freckles per pixel, so the panel's edits show at once; without it they are baked ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). This part works with `?gui=0` too. |
+
+**The development tools** ([`src/debug/devTools.js`](../src/debug/devTools.js)) are a chunk of their own that a plain page never downloads. `main.js` imports it only with a flag of the scripts or the console (`?debug`, `?dev`, `?stats`, `?gui=0`, `?photo=`, `?preset=`, `?view=`, `?meshtree=1`, `?intro=dev`) or once the URL ends in `#debug`, and passes it the app and its own glides. It installs the console API, times every frame ([`src/debug/frameStats.js`](../src/debug/frameStats.js), from then on), logs each random eye's features, and, as asked, the panel ([`src/debug/panel.js`](../src/debug/panel.js), another chunk), the mesh tree and the `?stats` overlay; with the interface it also inserts the sound meter. The scripts poll for `window.__EYE__`, so its asynchronous arrival makes no difference to them.
 
 ## Controls
 
@@ -178,7 +183,7 @@ With `?meshtree=1` a second Tweakpane panel, **Mesh tree**, lists the main scene
 
 ## Console API
 
-`window.__EYE__` always exposes:
+`window.__EYE__` exists only with the development tools ([URL Flags](#url-flags): `?dev` loads them alone); it exposes:
 
 | Member | Purpose |
 | --- | --- |
@@ -195,7 +200,7 @@ With `?meshtree=1` a second Tweakpane panel, **Mesh tree**, lists the main scene
 | `blink()`, `isBlinkReady()` | Starts a blink of a living eye now (also while the intro holds the blinks; it counts as the spontaneous one, which is rescheduled); whether the blink's frames are built (until then the lids stay open, and `blink()` returns `false`). |
 | `measure(frames)` | Interactive frames back to back; resolves with frame statistics. |
 | `measureSync(frames)` | The same, each frame finished with a synchronous read; returns mean, median, minimum and maximum ms. |
-| `getCompileMs()` | The time spent compiling programs at start-up. |
+| `getCompileMs()` | How long `EyeApp.start()` took: the programs' compile, overlapped with the first rebuild and bake ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-loop)). |
 | `setSkinBaked(baked)`, `isSkinBaked()`, `getSkinBakeMs()` | The skin's relief baked or per pixel (what `#debug` switches; the next hash change sets it again); the last bake's time. |
 | `getEyeGeometry()` | `{ apexZ, focusDepth }`. |
 | `getPresetNames()`, `getPresetInfo(name)` | Preset names, labels and reference photographs. |

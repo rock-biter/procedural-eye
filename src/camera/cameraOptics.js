@@ -31,10 +31,6 @@ export function circleOfConfusion(focalLength, fNumber, focusDistance, distance)
 	)
 }
 
-export function cocToPixels(coc, sensorHeight, imageHeightPx) {
-	return (coc * imageHeightPx) / sensorHeight
-}
-
 // Offsets to add to the projection matrix elements [8] and [9] (three's
 // column-major layout) for a camera moved by `lensX`, `lensY` (mm, in its own
 // x and y) that keeps the focus plane fixed, plus a jitter of `jitterX`,

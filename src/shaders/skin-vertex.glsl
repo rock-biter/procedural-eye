@@ -12,6 +12,7 @@ attribute vec2 coords; // the skin unrolled into the front plane (mm)
 
 #include ./lid-follow.glsl
 #include ./lid-morph.glsl
+#include ./env-rig.glsl
 
 attribute vec2 follow;
 
@@ -33,6 +34,11 @@ centroid varying vec4 vRelief;
 centroid varying float vAo;
 varying vec3 vCenterWorldPos;
 varying vec4 vCenterFrame;
+// The lit emitters' irradiance facing them (emitterIrradiance() toward each
+// one's center): it depends on the position only, smoothly over a triangle a
+// millimeter wide hundreds of millimeters from the lights, so the vertices
+// evaluate it for the pixels (lit-surface.glsl).
+centroid varying vec3 vFacing[LIT_EMITTERS];
 
 void main() {
 	float angle = lidFollowAngle(follow);
@@ -52,5 +58,13 @@ void main() {
 	vAo = lidMorph(vec3(ao), 2).x;
 	vCenterWorldPos = vWorldPos;
 	vCenterFrame = vec4(vRestPos.xy, relief.w, lid.y);
+	for (int i = 0; i < LIT_EMITTERS; i++) {
+		vec3 facing = vec3(0.0);
+		if (i < uEmitterCount) {
+			vec3 center = uEmitters[i * EMITTER_VEC4S].xyz;
+			facing = emitterIrradiance(i, world.xyz, normalize(center - world.xyz));
+		}
+		vFacing[i] = facing;
+	}
 	gl_Position = projectionMatrix * viewMatrix * world;
 }

@@ -85,41 +85,60 @@ export function cookieExtent(shafts, elongation = 1) {
 	return extent
 }
 
+// The blades as the cookie sums them (bakeShaftCookie(), and its GPU twin,
+// shaft-cookie-fragment.glsl), over `size`² texels on the square of half
+// side `extent` (mm): each one's center (u, v, mm), intensity, the factors
+// of its Gaussian across and along, the cosine and sine of its angle, and
+// the texel box it fills ([i0, i1, j0, j1], within 3.5 of its long σ).
+export function cookieBlades(shafts, elongation, size, extent) {
+	const texel = (2 * extent) / size
+	const index = (x) => (x + extent) / texel - 0.5
+	const blades = []
+	for (let o = 0; o < shafts.length; o += SHAFT_FLOATS) {
+		const [u, v, sigma, intensity, angle] = shafts.subarray(o, o + SHAFT_FLOATS)
+		const reach = 3.5 * sigma * Math.max(elongation, 1)
+		const across = 1 / (2 * sigma * sigma)
+		blades.push({
+			u,
+			v,
+			intensity,
+			across,
+			along: across / (elongation * elongation),
+			cos: Math.cos(angle),
+			sin: Math.sin(angle),
+			box: [
+				Math.max(0, Math.floor(index(u - reach))),
+				Math.min(size - 1, Math.ceil(index(u + reach))),
+				Math.max(0, Math.floor(index(v - reach))),
+				Math.min(size - 1, Math.ceil(index(v + reach))),
+			],
+		})
+	}
+	return blades
+}
+
 // The cookie: the beams' summed profile, Σ intensity · exp(−(a² / σ² + b² /
 // (σ·elongation)²) / 2) across (a) and along (b) each blade, at the centers
-// of `size`² texels over the square of half side `extent` (mm), rows along v.
-// Each beam fills only the texels within 3.5 of its long σ: added into `out`
-// (zero where nothing was), the texel boxes it filled pushed into `boxes`
-// ([i0, i1, j0, j1]), so an animated cookie clears and converts only those.
+// of `size`² texels over the square of half side `extent` (mm), rows along v;
+// each beam only over its box (cookieBlades()). The app bakes it on the GPU
+// (src/lighting/shaftLight.js); this is its twin.
 export function bakeShaftCookie(
 	shafts,
 	elongation = 1,
 	size = COOKIE_SIZE,
 	extent = cookieExtent(shafts, elongation),
-	out = new Float32Array(size * size),
-	boxes = [],
 ) {
+	const out = new Float32Array(size * size)
 	const texel = (2 * extent) / size
-	const index = (x) => (x + extent) / texel - 0.5
-	for (let o = 0; o < shafts.length; o += SHAFT_FLOATS) {
-		const [u, v, sigma, intensity, angle] = shafts.subarray(o, o + SHAFT_FLOATS)
-		const reach = 3.5 * sigma * Math.max(elongation, 1)
-		const across = 1 / (2 * sigma * sigma)
-		const along = across / (elongation * elongation)
-		const c = Math.cos(angle)
-		const s = Math.sin(angle)
-		const i0 = Math.max(0, Math.floor(index(u - reach)))
-		const i1 = Math.min(size - 1, Math.ceil(index(u + reach)))
-		const j0 = Math.max(0, Math.floor(index(v - reach)))
-		const j1 = Math.min(size - 1, Math.ceil(index(v + reach)))
-		boxes.push([i0, i1, j0, j1])
+	for (const blade of cookieBlades(shafts, elongation, size, extent)) {
+		const [i0, i1, j0, j1] = blade.box
 		for (let j = j0; j <= j1; j++) {
-			const dy = -extent + (j + 0.5) * texel - v
+			const dy = -extent + (j + 0.5) * texel - blade.v
 			for (let i = i0; i <= i1; i++) {
-				const dx = -extent + (i + 0.5) * texel - u
-				const a = -dx * s + dy * c
-				const b = dx * c + dy * s
-				out[j * size + i] += intensity * Math.exp(-a * a * across - b * b * along)
+				const dx = -extent + (i + 0.5) * texel - blade.u
+				const a = -dx * blade.sin + dy * blade.cos
+				const b = dx * blade.cos + dy * blade.sin
+				out[j * size + i] += blade.intensity * Math.exp(-a * a * blade.across - b * b * blade.along)
 			}
 		}
 	}
