@@ -11,6 +11,7 @@ import {
 	createDefaults,
 	createParams,
 	decodeState,
+	getLeaf,
 	setValue,
 } from './src/params/params'
 import { TRANSITION } from './src/params/paramTransition'
@@ -631,9 +632,9 @@ if (urlParams.get('gui') !== '0') {
 	}
 	const glide = { level: 0, to: 0 }
 	const gliding = () => gsap.isTweening(glide)
-	// The volume to `to` over `duration` s, set through `apply` (eased out;
-	// at once with reduced motion), then `done`.
-	const glideVolume = (to, duration, apply = putVolume, done = () => {}) => {
+	// The volume to `to` over `duration` s, set through `apply` (eased out
+	// unless `ease` says otherwise; at once with reduced motion), then `done`.
+	const glideVolume = (to, duration, apply = putVolume, done = () => {}, ease = 'power2.out') => {
 		gsap.killTweensOf(glide)
 		glide.level = app.params.sound.volume
 		glide.to = to
@@ -645,7 +646,7 @@ if (urlParams.get('gui') !== '0') {
 		gsap.to(glide, {
 			level: to,
 			duration,
-			ease: 'power2.out',
+			ease,
 			onUpdate: () => apply(glide.level),
 			onComplete: done,
 		})
@@ -729,9 +730,10 @@ if (urlParams.get('gui') !== '0') {
 	// shoots the handle at Snapshot (on a phone, where Snapshot is above it,
 	// off the window's right edge first), which recoils the way it was hit,
 	// and the handle bounces off it and tumbles out of the window, the volume
-	// going to full; a moment later a new handle pops up at the end of the
-	// line. The hit glitches the eye, the T-800 showing through
-	// (src/eye/terminator.js), and the photo is taken at the glitch's peak.
+	// going to full and falling back from there to the default level, where a
+	// new handle pops up a moment later. The hit glitches the eye, the T-800
+	// showing through (src/eye/terminator.js), and the photo is taken at the
+	// glitch's peak.
 	const SPRING_RELEASE = 0.8
 	const SQUEEZE_BULGE = 0.8
 	const SHOT_SPEED = 2200
@@ -784,13 +786,16 @@ if (urlParams.get('gui') !== '0') {
 		const { under, armed } = spring
 		if (under <= 0) return
 		const amount = under / spring.reach
+		const shot = fire && armed
 		setArmed(false)
-		if (fire && armed) shoot()
-		const level = fire && armed ? 1 : amount
+		if (shot) shoot()
+		const level = shot ? 1 : amount
+		// Shot, the handle is gone and comes back on its own (shoot()), even
+		// while the spring, held up by the photo, still bounces.
 		const ease = () => {
 			showSpring(spring.under)
 			ambience.setSpeed(slowed((amount * Math.max(spring.under, 0)) / under))
-			if (!volume.classList.contains('fired')) showVolume(spring.shown)
+			if (!shot) showVolume(spring.shown)
 		}
 		spring.shown = 0
 		if (motionless.matches) {
@@ -818,7 +823,8 @@ if (urlParams.get('gui') !== '0') {
 	// px/s; a bank shot BANK_SPEED, its legs short), spinning SHOT_SPIN
 	// degrees a second, Snapshot takes a photo and recoils (the T-800 reports
 	// each hit in the console, shotLog), and the handle bounces off it, falls
-	// out of the window tumbling and comes back later at the end of the line.
+	// out of the window tumbling and comes back later at the default level,
+	// where the volume has fallen meanwhile.
 	const shotLog = createShotLog()
 	const shoot = () => {
 		const from = volume.querySelector('.volume-handle').getBoundingClientRect()
@@ -919,11 +925,16 @@ if (urlParams.get('gui') !== '0') {
 			}
 			requestAnimationFrame(fall)
 		})
-		setTimeout(() => {
+		// The volume glides from full down to the default level while the
+		// handle is away, reaching it as the new one pops up there: both on
+		// GSAP's clock, held up alike by the photo. A mute or a key meanwhile
+		// takes over.
+		const rest = getLeaf(PARAM_SCHEMA, 'sound.volume').default
+		glideVolume(rest, RESPAWN, userVolume, settle, 'power2.inOut')
+		gsap.delayedCall(RESPAWN, () => {
 			volume.classList.remove('fired')
 			volume.classList.add('respawn')
-			showVolume()
-		}, RESPAWN * 1000)
+		})
 	}
 	volume.addEventListener('animationend', (event) => {
 		if (event.animationName === 'volume-respawn') volume.classList.remove('respawn')
