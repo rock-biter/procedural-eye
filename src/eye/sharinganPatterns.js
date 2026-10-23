@@ -212,15 +212,17 @@ const madaraTomoe = (r) => [
 ]
 
 // The patterns, by the names of the reference (references/sharingan-hd.jpg).
+// `owner`: the character whose eye it is, the name by default (none for the
+// tomoe, every Sharingan's first stages).
 const tomoeRing = (count, angle) => [
 	ring(0.52, 0.006),
 	...tomoe(0.52, angle, 0.12, { count }),
 	rim(0.035),
 ]
 const PATTERN_LIST = [
-	{ name: 'tomoe-1', base: red, shapes: tomoeRing(1, 60) },
-	{ name: 'tomoe-2', base: red, shapes: tomoeRing(2, 60) },
-	{ name: 'tomoe-3', base: red, shapes: tomoeRing(3, 90) },
+	{ name: 'tomoe-1', owner: null, base: red, shapes: tomoeRing(1, 60) },
+	{ name: 'tomoe-2', owner: null, base: red, shapes: tomoeRing(2, 60) },
+	{ name: 'tomoe-3', owner: null, base: red, shapes: tomoeRing(3, 90) },
 	{
 		name: 'baru',
 		base: ink,
@@ -318,6 +320,7 @@ const PATTERN_LIST = [
 	},
 	{
 		name: 'madara-eternal',
+		owner: 'madara',
 		base: red,
 		shapes: [
 			spoke(90, 0.09, 0.6, { count: 3 }),
@@ -328,6 +331,7 @@ const PATTERN_LIST = [
 	},
 	{
 		name: 'sasuke-eternal',
+		owner: 'sasuke',
 		base: ink,
 		shapes: [
 			vesica(90, 1.84, 0.74, red),
@@ -349,6 +353,7 @@ const PATTERN_LIST = [
 	},
 	{
 		name: 'rinnegan',
+		owner: 'sasuke',
 		base: lavender,
 		rinnegan: true,
 		shapes: [
@@ -366,10 +371,20 @@ const PATTERN_LIST = [
 // `under`: the color under the ink where nothing else is painted (a
 // pattern on ink shows it as its ink thins in a morph).
 export const PATTERNS = Object.freeze(
-	PATTERN_LIST.map((pattern) => Object.freeze({ rinnegan: false, under: red, ...pattern })),
+	PATTERN_LIST.map((pattern) =>
+		Object.freeze({ rinnegan: false, under: red, owner: pattern.name, ...pattern }),
+	),
 )
 export const PATTERN_NAMES = Object.freeze(PATTERNS.map((pattern) => pattern.name))
 export const patternIndex = (name) => PATTERN_NAMES.indexOf(name)
+
+// The words a photo of the pattern `name` is named with (main.js): its
+// owner first (itachi, madara-eternal, sasuke-rinnegan), else its own name
+// (tomoe-2).
+export function photoWords(name) {
+	const { owner } = PATTERNS[patternIndex(name)]
+	return !owner || name.startsWith(owner) ? name : `${owner}-${name}`
+}
 // The Sharingan alone, without the Rinnegan.
 export const SHARINGAN_NAMES = Object.freeze(
 	PATTERNS.filter((pattern) => !pattern.rinnegan).map((pattern) => pattern.name),

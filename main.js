@@ -18,7 +18,7 @@ import { TRANSITION } from './src/params/paramTransition'
 import { randomEye, randomIrises } from './src/params/populationPriors'
 import { SECRET_TONE, SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
-import { SHARINGAN_NAMES, pickPattern } from './src/eye/sharinganPatterns'
+import { SHARINGAN_NAMES, photoWords, pickPattern } from './src/eye/sharinganPatterns'
 import { KONAMI, createSequence, parseUnlocks } from './src/ui/unlocks'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
@@ -260,16 +260,21 @@ async function savePng(element) {
 	await takePhoto()
 }
 
-// The download of savePng(), without its sound, as `name`.png (the time by
-// default). The image is the one of the call, caught before the PNG's tools
-// load; it is encoded off the main thread, so the page goes on meanwhile.
-async function takePhoto(name = `eye-${Date.now()}`) {
+// The download of savePng(), without its sound, as `name`.png (eye- and the
+// time by default), with the owner of the Sharingan on the eye, if any, after
+// the name or before the time (eye-itachi-<time>.png, photoWords()). The
+// image is the one of the call, caught before the PNG's tools load; it is
+// encoded off the main thread, so the page goes on meanwhile.
+async function takePhoto(name) {
+	const pattern = app.sharingan.onEye(app.params)
+	const owner = pattern && photoWords(pattern)
+	const words = name ? [name, owner] : ['eye', owner, Date.now()]
 	const state = app.getState()
 	const captured = app.captureBlob()
 	const { insertPngText } = await import('./src/render/pngMetadata')
 	const bytes = new Uint8Array(await (await captured).arrayBuffer())
 	const tagged = insertPngText(bytes, 'eye-state', state)
-	download(new Blob([tagged], { type: 'image/png' }), `${name}.png`)
+	download(new Blob([tagged], { type: 'image/png' }), `${words.filter(Boolean).join('-')}.png`)
 }
 
 // The viewer's mute and volume (sound.volume, the master), kept in the

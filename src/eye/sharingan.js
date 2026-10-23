@@ -197,6 +197,13 @@ export default class Sharingan {
 		return preview === 'off' ? -1 : patternIndex(preview)
 	}
 
+	// The name of the pattern on the eye: sharingan.preview's, else the one
+	// shown or coming in, or null.
+	onEye(params) {
+		const preview = this.preview(params)
+		return preview >= 0 ? PATTERNS[preview].name : this.name
+	}
+
 	// The pupil's diameter (mm) under the pattern: narrowing to
 	// sharingan.pupil as it comes in.
 	pupil(diameter, params) {

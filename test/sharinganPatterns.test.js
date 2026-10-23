@@ -16,6 +16,7 @@ import {
 	packPatterns,
 	paintPattern,
 	patternIndex,
+	photoWords,
 	FIELD,
 	SHARINGAN_NAMES,
 	pickPattern,
@@ -50,6 +51,14 @@ test('the eighteen Sharingan of the reference and the Rinnegan, each named once'
 		assert.ok(PATTERN_NAMES.includes(name), name)
 	assert.equal(patternIndex('itachi'), PATTERN_NAMES.indexOf('itachi'))
 	assert.equal(patternIndex(null), -1)
+})
+
+test('a photo of a pattern is named after its owner', () => {
+	assert.equal(photoWords('itachi'), 'itachi')
+	assert.equal(photoWords('madara-eternal'), 'madara-eternal')
+	assert.equal(photoWords('rinnegan'), 'sasuke-rinnegan')
+	assert.equal(photoWords('tomoe-2'), 'tomoe-2')
+	for (const name of PATTERN_NAMES) assert.match(photoWords(name), /^[a-z0-9]+(-[a-z0-9]+)*$/)
 })
 
 test('every pattern fits the shader: shapes, terms and copies within their bounds', () => {
