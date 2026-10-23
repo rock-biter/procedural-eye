@@ -40,13 +40,15 @@ gsap.registerPlugin(TextPlugin)
 // low, its ends a little above the pupil's middle and meeting at an angle,
 // like the canthi, so it reads as an eye, not as a wifi sign); and filled,
 // a tomoe for the Sharingan (the magatama of a yin-yang: its head the upper
-// small disc, its tail down the big one's right side, turned a little).
+// small disc, its tail down the big one's right side, turned a little, then
+// its box, 15 × 15.3 around (12.9, 11.24), moved to the middle and scaled
+// to 0.85).
 const ICONS = {
 	plus: '<path d="M6 12h12M12 6v12"/>',
 	minus: '<path d="M6 12h12"/>',
 	eye: '<path d="M3 13.5C6.5 6.5 17.5 6.5 21 13.5"/><circle class="icon-fill" cx="12" cy="14.5" r="2.75"/>',
 	tomoe:
-		'<path class="icon-fill" transform="rotate(-35 12 12)" d="M12 3.6A8.4 8.4 0 0 1 12 20.4A4.2 4.2 0 0 0 12 12A4.2 4.2 0 0 1 12 3.6Z"/>',
+		'<path class="icon-fill" transform="translate(12 12) scale(0.85) translate(-12.9 -11.24) rotate(-35 12 12)" d="M12 3.6A8.4 8.4 0 0 1 12 20.4A4.2 4.2 0 0 0 12 12A4.2 4.2 0 0 1 12 3.6Z"/>',
 }
 const icon = (name) =>
 	`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`
