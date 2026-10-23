@@ -1,5 +1,6 @@
 // The white of the eye: tinted diffuse under the rig, shadowed by the lids
-// (key light shadow map) and occluded near their margins.
+// (key light shadow map) and occluded near their margins. The Rinnegan
+// (sharingan.glsl) turns it lavender, ringed.
 #ifndef SCLERA_GLSL
 #define SCLERA_GLSL
 
@@ -9,6 +10,7 @@
 #include ./eye-profile.glsl
 #include ./noise3.glsl
 #include ./lid-follow.glsl
+#include ./sharingan.glsl
 
 uniform vec3 uScleraColor;
 uniform vec4 uSclera; // redness, yellowing, surface irregularity, unused
@@ -69,7 +71,7 @@ float lidOcclusion(vec3 world) {
 
 // Albedo of the sclera at eye-space point p: the white, yellower with age,
 // pinker toward the lids (`fissure`: the distance to them at rest), with the
-// vessel network over it.
+// vessel network over it; the Rinnegan's where it reaches.
 vec3 scleraAlbedo(vec3 p, float fissure) {
 	float phi = atan(p.y, p.x);
 	float psi = acos(clamp(p.z / length(p), -1.0, 1.0));
@@ -83,7 +85,7 @@ vec3 scleraAlbedo(vec3 p, float fissure) {
 	vec3 deep = vec3(0.42, 0.16, 0.24);
 	albedo = mix(albedo, deep, saturate(vessels.g * (0.35 + 0.5 * uSclera.x)));
 	albedo = mix(albedo, superficial, saturate(vessels.r * (0.35 + 0.65 * uSclera.x)));
-	return albedo;
+	return rinneganSclera(albedo, p, uScleraColor);
 }
 
 // Conjunctival micro-relief: the wet surface is not a perfect mirror.

@@ -398,6 +398,8 @@
       "shutter": 0.56,
       "mirror": 0.35,
       "beep": 0.08,
+      "unlock": 0.015,
+      "gong": 0.05,
       "glasses": 0.03,
       "lead": 0.07
     },
@@ -444,6 +446,33 @@
     "coreColor": "#ffd2a0",
     "chrome": "#c9ced6",
     "roughness": 0.15
+  },
+  "sharingan": {
+    "preview": "off",
+    "red": "#9e0b08",
+    "ink": "#0b0505",
+    "lavender": "#9b74d6",
+    "violet": "#6d43b5",
+    "tissue": 0.6,
+    "glow": 0.08,
+    "pupil": 2.2,
+    "duration": 1.2,
+    "turns": 1.5,
+    "melt": 0.12,
+    "spread": 1.4,
+    "rinnegan": 0.02,
+    "ringSpacing": 1.05,
+    "ringWidth": 0.045,
+    "hint": 0.45,
+    "hintDuration": 0.6
+  },
+  "shockwave": {
+    "duration": 1.6,
+    "width": 0.045,
+    "push": 0.06,
+    "split": 0.8,
+    "fray": 0.04,
+    "glow": 0.35
   },
   "post": {
     "toneMapping": "agx",

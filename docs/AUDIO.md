@@ -1,17 +1,18 @@
 # Audio
 
-The interface sounds like a camera. Every control of the HUD makes the mechanical noise of the part it stands for: the zoom and the aperture click through the detents of their rings, the buttons click, Random eye advances the film, and Snapshot beeps for focus and fires a shutter. The recorded sounds are real cameras (CC0 recordings from Freesound); the hover's tick, the focus beep, the creak of a knob pulled past its end and one choice of the aperture's ticks are synthesized with Web Audio. Under them plays a soft glass harp, wine glasses rubbed with a wet finger far off in a long reverb, synthesized too: a few quiet glasses singing in turn, now and then a louder one, fading in slowly at the first gesture. There is no audio library. Every sound pauses while the page is hidden or the window has lost the focus.
+The interface sounds like a camera. Every control of the HUD makes the mechanical noise of the part it stands for: the zoom and the aperture click through the detents of their rings, the buttons click, Random eye advances the film, and Snapshot beeps for focus and fires a shutter. The recorded sounds are real cameras (CC0 recordings from Freesound); the hover's tick, the focus beep, the creak of a knob pulled past its end, one choice of the aperture's ticks, the checklist's chime and the singing bowl of the Sharingan's awakening are synthesized with Web Audio. Under them plays a soft glass harp, wine glasses rubbed with a wet finger far off in a long reverb, synthesized too: a few quiet glasses singing in turn, now and then a louder one, fading in slowly at the first gesture. There is no audio library. Every sound pauses while the page is hidden or the window has lost the focus.
 
 ## Engine
 
 [`src/audio/audioEngine.js`](../src/audio/audioEngine.js) (`AudioEngine`) owns the Web Audio graph.
 
 - **Start**: a page may make sound only after a gesture. The recordings are fetched when the page loads, but the `AudioContext` is created at the first press or key (capture-phase listeners on `window`), and the recordings are decoded then. A sound asked for while they decode plays if they arrive within 0.15 s. So the first press of a control is heard, and no autoplay warning is logged.
-- **Graph**: the controls bus (the foley) and the ambience bus feed the master gain (`sound.volume`, the master volume). From there the signal goes through a limiter (a `DynamicsCompressorNode`: threshold −6 dB, ratio 12, attack 2 ms) to the output. The meter, an analyser after the limiter, is inserted only for the development tools (`enableMeter()`, which they call, or the first `stats()`), so the page reads no samples otherwise.
+- **Graph**: the controls bus (the foley) and the ambience bus feed the master gain (`sound.volume`, the master volume). A sound of the bank with a `reverb` share also sends that much into the controls' reverb, a convolver into their bus (a synthetic hall, `impulseResponse()` with an rt60 of 4 s, darker than the glasses'), made once the page is idle after the first gesture. From there the signal goes through a limiter (a `DynamicsCompressorNode`: threshold −6 dB, ratio 12, attack 2 ms) to the output. The meter, an analyser after the limiter, is inserted only for the development tools (`enableMeter()`, which they call, or the first `stats()`), so the page reads no samples otherwise.
 - **One-shots**: `play(name, { gain, rate, pan, delay })` plays a sound of the bank on the controls bus, `delay` s from now.
   - Each play draws a take other than the last one, a rate within ±`sound.variation` cents and a gain within ±1.5 dB, both scaled by the sound's `vary`.
   - A sound may have at most `voices` copies playing at once. A sound asked for less than `gap` s after the last one plays no new voice; half its level is added to the last one's instead (detents passed in a single frame sound as one louder click).
   - Each decoded buffer starts 1 ms before its sound comes within 40 dB of its peak, past any silence a decoder put before it.
+  - The synthesized buffers are built at the first gesture; a long one (`lazy`: the bowl, about 35 ms of the main thread) once the page is idle after it, or when it first plays.
 - **Mute**: the master fades to 0 (time constant 0.08 s) and the context then suspends, so the ambience pauses where it is, as below; turned back on, it goes on from there ([fade in](#the-ambience)).
 - **Pause**: while the page is hidden (`visibilitychange`) or the window has lost the focus (`blur`), the master fades out the same way and the context suspends, so every sound stops where it is, the ambience included. Back (`focus`, the page shown again, or a press in it), the context resumes, unless muted, and the master fades in with a time constant of 0.3 s.
 - **Stats**: `stats()` returns the context's state, whether the sounds are decoded, the mute, the pause and the play count of each sound (with the glass harp's quiet `glass`es and louder `glass-lead`s), plus the peak and RMS of the master (dBFS) since the last call, measured from the meter's insertion on. The analyser is read once a frame, so a sound played while the main thread is blocked (`capture()` while Snapshot saves) can escape the peak while it still plays in full.
@@ -42,8 +43,11 @@ The app itself emits no events; everything is read per frame.
 | Snapshot (and the panel's Save PNG) | `savePng()` | `beep`, then 0.22 s later `shutter`: a Minolta XE-7 firing |
 | Photo mode on and off | the `'frozen'` notification | `mirrorUp` and `mirrorDown`: the first and the last part of the same shot |
 | The photo converging | `app.converged` turning true while frozen, at most once a second | `beep`: two 2.8 kHz blips of 55 ms, 45 ms apart, the autofocus confirmation (synthesized) |
+| A task of the checklist done, a control's or an achievement (`achievement` cue, from its list at the left) | `main.js`, when its progress has a task more done | `unlock` (synthesized, `chime`): a latch springing open (two small metal knocks 40 ms apart, ringing three modes near 2.3, 3.7 and 5.6 kHz), then a glass struck twice a fifth up, D6 then A6, with a glass's inharmonic overtones (2.32 and 4.25 times), dying in 1.1 s; 2.6 s, in the glass harp's key (`keyRate()`), a third of it into the reverb |
+| The Sharingan's awakening (`awaken` cue), the task that unlocks it | `main.js`, instead of the task's chime | `gong` (synthesized, `bowl`): a large singing bowl struck once, its fundamental D3: its five lowest modes as a thin bowl's (1, 2.83, 5.42, 8.77, 12.87), each a pair beating slowly (0.8 to 3.4 Hz), the higher ones fainter and shorter; a sub-octave blooming in over a third of a second, as a gong's body; a shimmer of six high partials swelling for half a second; the mallet's soft thump; 9 s, in the glass harp's key, 0.6 of it into the reverb |
 
 - **Detents**: `crossings(from, to, step)` counts a detent when it is reached, not when it is left, signed with the move. A move that starts on a detent does not count it again. The detents a frame crossed (at most 8) play spread evenly over the next frame's time (`delay`), so a fast turn keeps its density at any frame rate; clicks closer than a sound's `gap` (12 ms for the zoom, 8 ms for the aperture) merge. The zoom's detents follow the camera, whatever moves it, so a glide of + or − runs through them as a quick ratchet.
+- **Key**: the chime and the bowl are tuned to D, and play at the rate that moves D to the glasses' key (`keyRate()` of [`src/audio/soundscape.js`](../src/audio/soundscape.js): 0.67 to 1.19, as the glasses' tonic moves), so they sound with the music.
 - **Panning**: a cue's control pans with its place on the screen, 0.6 at the window's edges, so the tones sound from the left and the zoom from the right. The detents and the beep of a converged photo pan a little to the right; the mirror sits in the middle.
 - **Smoothing**: the creak follows the knobs' speeds with a time constant of 0.04 s (`follow()` of [`src/camera/orbitMotion.js`](../src/camera/orbitMotion.js)), and its gain, rate and resonance follow with 0.03 s.
 
@@ -81,6 +85,7 @@ The `sound` group of [`src/params/paramSchema.js`](../src/params/paramSchema.js)
 | --- | --- | --- |
 | `volume` | 0.64 | The master volume, over every sound; the volume slider sets it. |
 | `volumes.press`, `.hover`, `.zoom`, `.aperture`, `.strain`, `.advance`, `.shutter`, `.mirror`, `.beep` | 0.35, 0.3, 0.2, 0.15, 0.35, 0.42, 0.56, 0.35, 0.08 | Each sound's own volume, under the master (`advance` also sets `wind`, `aperture` both kinds of ticks, `beep` both beeps). |
+| `volumes.unlock`, `.gong` | 0.12, 0.5 | The checklist's chime (a task done) and the Sharingan's awakening bowl. |
 | `volumes.glasses`, `.lead` | 0.22, 0.3 | The glass harp's quiet glasses and its louder ones. |
 | `variation` | 60 cents | How far a sound's pitch varies from one play to the next. |
 | `zoomDetents` | 16 | The zoom ring's detents across the knob's track. |
@@ -121,7 +126,7 @@ The cuts were chosen from measurements (onsets, transients, spectral flatness an
 
 ## Tuning and Checking
 
-- **By ear**: with `#debug`, the panel's `sound` folder holds the master volume, a `volumes` folder with each sound's volume, then **listen to** (a list of the bank's sounds) and **Play sound** (`audition` in `main.js`), then the rest of the group. **Export defaults JSON** writes them into `defaults.json`.
+- **By ear**: with `#debug`, the panel's `sound` folder holds the master volume, a `volumes` folder with each sound's volume, then **listen to** (a list of the bank's sounds) and **Play sound** ([`src/debug/panel.js`](../src/debug/panel.js)), then the rest of the group; the `achievements` folder plays the checklist's chime and the awakening again. **Export defaults JSON** writes them into `defaults.json`.
 - **By numbers**: `__EYE__.getSoundStats()` (with the interface only). The measured levels in headless Chrome at 1600 × 1000 with the defaults (dBFS) are:
 
   | Sound | Peak |
@@ -130,6 +135,8 @@ The cuts were chosen from measurements (onsets, transients, spectral flatness an
   | The hover's tick | −17 |
   | The zoom's detents | −15 to −21 |
   | The aperture's ticks (either kind) | −16 to −23 |
+  | The checklist's chime | −24 |
+  | The awakening's bowl | −11 |
 
   The glass harp alone, measured as RMS over 15 s windows: its quiet glasses rise to −44 dBFS about 12 s after the first press with the 10 s fade (−86, −58, −46 and −44 dBFS at 3, 6, 9 and 12 s), then sing at −41 to −46 dBFS, peaking at −32 to −35; the louder glasses peak at −27 dBFS.
 

@@ -18,6 +18,7 @@ import { TRANSITION } from './src/params/paramTransition'
 import { randomEye, randomIrises } from './src/params/populationPriors'
 import { SECRET_TONE, SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
+import { SHARINGAN_NAMES, pickPattern } from './src/eye/sharinganPatterns'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
 import { CHECKLIST, createChecklist } from './src/ui/checklist'
@@ -276,6 +277,9 @@ const MUTED_KEY = 'random-eyes:muted'
 const VOLUME_KEY = 'random-eyes:volume'
 // The checklist's progress and the skin tones worn (desktop only).
 const CHECKLIST_KEY = 'random-eyes:checklist'
+// How long (s) after the checklist is done the Sharingan awakens: after the
+// photo's shutter that does the last task.
+const AWAKEN_DELAY = 0.4
 function readStored(key) {
 	try {
 		return window.localStorage.getItem(key)
@@ -405,9 +409,10 @@ if (urlParams.get('gui') !== '0') {
 	// aperture (desktop only) and Random eye on a dashed circle. The tone of
 	// the color the params are heading for is pressed, also after the panel or
 	// a preset changes it; the zoom and aperture knobs follow the camera every
-	// frame, gliding or not. It also has the hidden tone, which the checklist
-	// unlocks (below). `desktop` (a fine pointer) tells a desktop's checklist
-	// and photo mode's line from a phone's or a tablet's.
+	// frame, gliding or not. It also has the hidden tone and, on desktops, the
+	// Sharingan, which the checklist unlocks (below). `desktop` (a fine
+	// pointer) tells a desktop's checklist and photo mode's line from a
+	// phone's or a tablet's.
 	const desktop = window.matchMedia('(pointer: fine)').matches
 	const hud = createHud({
 		tones: SKIN_TONES,
@@ -430,10 +435,26 @@ if (urlParams.get('gui') !== '0') {
 		onApertureWheel: (deltaY) => app.controls.apertureWheel(deltaY),
 		getApertureElasticity: () => app.params.aperture.elasticity,
 		onRandom: () => {
+			// A new eye is a human one again.
+			app.sharingan.hide(app.params, motionless.matches)
 			const features = loadRandomEye()
 			hooks.onRandomEye?.(panelState.ancestry, features)
 			report('iris')
 		},
+		// Once the checklist is done (below), a desktop's Sharingan: another
+		// pattern at random at each press, counted for the Uchiha clan; with the
+		// clan complete, now and then the Rinnegan (src/eye/sharingan.js).
+		onSharingan: desktop
+			? () => {
+					const clan = progress.done().some((task) => task.id === 'uchiha')
+					const odds = clan ? app.params.sharingan.rinnegan : 0
+					const next = pickPattern(app.sharingan.name, Math.random, odds)
+					app.sharingan.show(next, app.params, motionless.matches)
+					if (next === 'rinnegan') report('rinnegan')
+					// The clan complete, the Rinnegan shows through for an instant.
+					else if (report('uchiha', next) === 'done') app.sharingan.hint()
+				}
+			: null,
 		onCue: (name, detail) => cue(name, detail),
 	})
 	document.body.appendChild(hud.element)
@@ -508,7 +529,11 @@ if (urlParams.get('gui') !== '0') {
 	const saved = readChecklist()
 	const tasks = desktop ? TASKS : TASKS.filter((task) => !task.desktop)
 	const progress = createProgress(tasks, {
-		counts: { titles: TAB_TITLES.length, shots: SHOTS.length + 1 },
+		counts: {
+			titles: TAB_TITLES.length,
+			shots: SHOTS.length + 1,
+			uchiha: SHARINGAN_NAMES.length,
+		},
 		saved,
 	})
 	const worn = new Set(Array.isArray(saved.tones) ? saved.tones : [])
@@ -520,6 +545,42 @@ if (urlParams.get('gui') !== '0') {
 		const allWorn = SKIN_TONES.every((tone) => worn.has(tone.name))
 		hud.unlockSecret(found || (secretShown() && allWorn))
 	}
+	// A desktop's checklist done unlocks the Sharingan (the HUD's tomoe) and
+	// its hidden tasks; Reset locks it again and takes it off the eye. Done
+	// live (`live`), it awakens AWAKEN_DELAY s later, after the photo's
+	// shutter: a singing bowl, a shockwave over the image from the eye (not
+	// with reduced motion), the HUD's tomoe coming in and a first Sharingan
+	// at random, counted for the clan. True when it awakens.
+	let sharinganUnlocked = false
+	// `count`: the first Sharingan counts for the clan (not when the panel of
+	// #debug plays the awakening again).
+	const awaken = (count = true) => {
+		cue('awaken')
+		if (!motionless.matches) app.post.shockwave.trigger()
+		if (sharinganUnlocked) hud.unlockSharingan(true, true)
+		const first = pickPattern(app.sharingan.name, Math.random, 0)
+		app.sharingan.show(first, app.params, motionless.matches)
+		if (count) report('uchiha', first)
+	}
+	const unlockSharingan = (live) => {
+		const ids = new Set(progress.done().map((task) => task.id))
+		const done = desktop && tasks.every((task) => task.hidden || ids.has(task.id))
+		const awakens = live && done && !sharinganUnlocked
+		sharinganUnlocked = done
+		if (awakens)
+			gsap.delayedCall(AWAKEN_DELAY, () => {
+				if (sharinganUnlocked) awaken()
+			})
+		else hud.unlockSharingan(done)
+		if (!done) app.sharingan.hide(app.params)
+		return awakens
+	}
+	// Each task done sounds as something unlocking (by the list, at the
+	// left), the controls' as the achievements'; the one that awakens the
+	// Sharingan sounds its bowl instead.
+	// The panel of #debug hears every change too.
+	let doneCount = progress.done().length
+	const checklistListeners = new Set()
 	const checklist = createChecklist({
 		tasks,
 		progress,
@@ -527,7 +588,12 @@ if (urlParams.get('gui') !== '0') {
 		onChange: () => {
 			keepChecklist()
 			unlockSecret()
+			const newly = progress.done().slice(doneCount)
+			doneCount = progress.done().length
+			const awakens = unlockSharingan(true)
+			if (!awakens && newly.length > 0) cue('achievement', { element: checklist.element })
 			countFirstShot()
+			for (const listener of checklistListeners) listener()
 		},
 		// Reset forgets the tones worn too: the hidden tone locks again.
 		onReset: () => worn.clear(),
@@ -548,6 +614,7 @@ if (urlParams.get('gui') !== '0') {
 	document.body.appendChild(checklist.element)
 	sounding(checklist.resetButton, 'reset')
 	unlockSecret()
+	unlockSharingan(false)
 	// Its room, measured once the HUD has laid out (its own observer, made
 	// first, runs first).
 	new ResizeObserver(() => {
@@ -1312,10 +1379,29 @@ if (urlParams.get('gui') !== '0') {
 	else checklist?.show()
 	// The checklist for the console: complete() does the task shown, reset()
 	// is Reset's.
+	// The panel of #debug's too: every task done or not, the awakening played
+	// again (with the Sharingan unlocked, its button hidden and brought in
+	// again; otherwise its sound, its shockwave and a Sharingan alone),
+	// counting for nothing, and its parts alone.
 	const checklistTools = {
 		complete: () => checklist?.complete(),
 		reset: () => checklist?.reset(),
 		state: () => ({ ...progress.state(), tones: [...worn] }),
+		tasks: tasks.map(({ id, text, achievement = false, hidden = false }) => ({
+			id,
+			text,
+			achievement,
+			hidden,
+		})),
+		setDone: (id, done) => checklist?.setDone(id, done),
+		subscribe: (listener) => checklistListeners.add(listener),
+		replayAwakening: () => {
+			if (sharinganUnlocked) hud.unlockSharingan(false)
+			awaken(false)
+		},
+		achievementSound: () => cue('achievement', { element: checklist.element }),
+		shockwave: () => app.post.shockwave.trigger(),
+		hint: () => app.sharingan.hint(),
 	}
 	ui = { audio, ambience, intro, INTRO, checklist: checklistTools }
 

@@ -9,6 +9,10 @@
 // octave, where wine glasses sing (in D, A4 440 Hz to F#6 1480 Hz; the keys
 // span D4 to A6 between them).
 export const KEYS = { C: 72, D: 74, E: 76, F: 77, G: 67, A: 69 }
+
+// The rate that moves a sound tuned to D into the key `name`, as the
+// glasses' tonic moves (the foley's achievement and awakening).
+export const keyRate = (name) => 2 ** (((KEYS[name] ?? KEYS.D) - KEYS.D) / 12)
 const PENTATONIC = [0, 2, 4, 7, 9]
 
 // The glasses of the key `name`: its major pentatonic from a fourth below the

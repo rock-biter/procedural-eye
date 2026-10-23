@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { TASKS, createProgress } from '../src/ui/checklistTasks'
 
-const counts = { titles: 3, shots: 2 }
+const counts = { titles: 3, shots: 2, uchiha: 4 }
 
 test('the tasks are short, named once, the controls first, then the achievements', () => {
 	assert.equal(new Set(TASKS.map((task) => task.id)).size, TASKS.length)
@@ -12,13 +12,19 @@ test('the tasks are short, named once, the controls first, then the achievements
 	assert.ok(TASKS.slice(first).every((task) => task.achievement))
 	assert.deepEqual(
 		TASKS.filter((task) => task.counted).map((task) => task.id),
-		['titles', 'shots'],
+		['titles', 'shots', 'uchiha'],
 	)
 	// Phones and tablets leave out what only a desktop has.
 	assert.deepEqual(
 		TASKS.filter((task) => task.desktop).map((task) => task.id),
-		['focus', 'photo', 'titles', 'shots'],
+		['focus', 'photo', 'titles', 'shots', 'uchiha', 'rinnegan'],
 	)
+	// The Sharingan's tasks come last, hidden until the rest is done.
+	assert.deepEqual(
+		TASKS.filter((task) => task.hidden).map((task) => task.id),
+		['uchiha', 'rinnegan'],
+	)
+	assert.ok(TASKS.slice(-2).every((task) => task.hidden))
 })
 
 test('only the task shown can be done, one after the other', () => {
@@ -93,4 +99,23 @@ test('a reset starts again from the first task', () => {
 	assert.equal(progress.current().id, 'iris')
 	assert.equal(progress.done().length, 0)
 	assert.deepEqual(progress.state(), { done: [], seen: { task: 'iris', keys: [] } })
+})
+
+test('the panel marks any task done or not, the keys kept only for the task still shown', () => {
+	const progress = createProgress(TASKS, { counts })
+	assert.equal(progress.set('nope', true), false)
+	assert.equal(progress.set('tone', true), true)
+	assert.equal(progress.set('tone', true), false)
+	assert.equal(progress.current().id, 'iris')
+	assert.equal(progress.set('iris', true), true)
+	assert.equal(progress.current().id, 'framing')
+	for (const task of TASKS.slice(2, 8)) progress.set(task.id, true)
+	assert.equal(progress.current().id, 'titles')
+	assert.equal(progress.report('titles', 0), 'counted')
+	// Another task cleared before it: the keys go with the task shown.
+	progress.set('iris', false)
+	assert.equal(progress.current().id, 'iris')
+	assert.equal(progress.count(), 0)
+	assert.deepEqual(progress.state().seen, { task: 'iris', keys: [] })
+	assert.equal(progress.set('iris', false), false)
 })

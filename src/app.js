@@ -32,6 +32,7 @@ import Eyeball from './eye/eyeball'
 import { createEyeGeometry } from './eye/eyeProfile'
 import EyeRig from './eye/eyeRig'
 import Terminator from './eye/terminator'
+import Sharingan from './eye/sharingan'
 import IrisAtlas from './iris/irisAtlas'
 import IrisColorLut from './iris/irisColorLut'
 import { createIrisSpace } from './iris/irisSpace'
@@ -115,6 +116,10 @@ export default class EyeApp {
 		}
 		// The easter egg: the volume cannon's glitch on the eye (main.js).
 		this.terminator = new Terminator()
+		// The other: the checklist's Sharingan (main.js), and whether its
+		// awakening's shockwave runs (src/render/shockwave.js).
+		this.sharingan = new Sharingan()
+		this.shocking = false
 		this.scleraMaps = new ScleraMaps()
 		// The fissure map: r where the lids rest, g closed (the blink's,
 		// src/adnexa/lidBlink.js).
@@ -134,7 +139,7 @@ export default class EyeApp {
 				pigment: this.irisAtlas.pigmentTexture,
 				colorLut: this.irisColorLut.texture,
 			},
-			{ ...keyLight, ...this.terminator.uniforms },
+			{ ...keyLight, ...this.terminator.uniforms, ...this.sharingan.uniforms },
 			{ texture: this.fissureMap, extent: [FISSURE_MAP.halfWidth, FISSURE_MAP.halfHeight] },
 			{ texture: this.scleraMaps.texture, psi: SCLERA_PSI },
 			params.debug.view,
@@ -238,7 +243,8 @@ export default class EyeApp {
 	}
 
 	// The start-up compile jobs of the bakes: the iris atlases, the skin's
-	// patterns and relief, the light shafts' cookie, the soft coverages.
+	// patterns and relief, the light shafts' cookie, the soft coverages, the
+	// Sharingan's maps.
 	bakePrograms() {
 		const target = this.post.composer.inputBuffer
 		const quad = (mesh, materials) => materials.map((material) => withMaterial(mesh, material))
@@ -266,6 +272,7 @@ export default class EyeApp {
 				target,
 				variants: quad(coverage.mesh, [coverage.reduce, coverage.blur]),
 			})),
+			{ scene: this.sharingan.scene, camera: this.sharingan.camera, target },
 		]
 	}
 
@@ -587,15 +594,20 @@ export default class EyeApp {
 		this.pose(delta / 1000)
 		if (!this.frozen) this.dustTime += Math.min(delta / 1000, 0.1)
 		if (this.shaftsMove) this.invalidate()
-		// A shot's glitch runs in photo mode too, its preview does not.
+		// A shot's glitch runs in photo mode too, its preview does not; the
+		// Sharingan's spin too.
 		const glitchDelta = Math.min(delta / 1000, 0.1)
 		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
+		if (this.sharingan.step(glitchDelta, this.params)) this.invalidate()
+		// The awakening's shockwave moves over the image, which shows every
+		// frame meanwhile.
+		this.shocking = this.post.stepShockwave(glitchDelta, this.params)
 		if (this.converged) {
 			this.lastFresh = false
 			this.lastAccumulating = false
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
-			if (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30) {
+			if (this.shocking || (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30)) {
 				this.dustShown = this.dustTime
 				this.renderDisplay()
 			}
@@ -639,7 +651,8 @@ export default class EyeApp {
 		const count = Math.min(this.batch, target - this.samples)
 		for (let i = 0; i < count; i++) {
 			const last = this.samples + 1 >= target
-			const shown = i === count - 1 && (last || time - this.sampleShown >= PREVIEW_INTERVAL)
+			const shown =
+				i === count - 1 && (last || this.shocking || time - this.sampleShown >= PREVIEW_INTERVAL)
 			if (shown) this.sampleShown = time
 			this.renderSample(accumulationSample(this.samples), shown)
 		}
@@ -710,7 +723,8 @@ export default class EyeApp {
 			(this.params.animation.enabled && !this.frozen) ||
 			this.transition !== null ||
 			this.shaftsMove ||
-			this.terminator.moving(this.params, this.frozen)
+			this.terminator.moving(this.params, this.frozen) ||
+			this.sharingan.moving()
 		)
 	}
 
@@ -781,9 +795,11 @@ export default class EyeApp {
 		const pixelAngle = (camera.fov * Math.PI) / 180 / size.height
 		this.pixelAngle = pixelAngle
 		this.terminator.update(this.params, this.lightRig.luminance * 0.05)
+		this.sharingan.prepare(renderer, this.params)
+		this.sharingan.update(this.params, this.lightRig.luminance * 0.05)
 		this.eyeball.update(
 			this.params,
-			this.pupilDiameter,
+			this.sharingan.pupil(this.pupilDiameter, this.params),
 			this.eye,
 			this.irisSpace,
 			this.cameraEye,

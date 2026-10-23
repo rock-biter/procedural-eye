@@ -44,7 +44,8 @@ export const CHECKLIST = Object.freeze({
 // (createProgress()), heard only while it shows and is not resetting
 // (counting(); nor while a compact one's task leaves, after which it tells
 // onChange()), complete(), which does the task to do, and reset(), Reset's
-// (both the console's too, src/debug/devTools.js), and fit(width, height),
+// (both the console's too, src/debug/devTools.js), setDone(id, done), any
+// task done or not (the panel of #debug), and fit(width, height),
 // the room it has beside the HUD (px; too narrow or too short, it hides).
 export function createChecklist({
 	tasks,
@@ -129,7 +130,11 @@ export function createChecklist({
 				showCount()
 			}
 		}
-		const left = tasks.length - progress.done().length - (task ? 1 : 0)
+		// The tasks after it, a hidden one only once one shows.
+		const done = new Set(progress.done().map(({ id }) => id))
+		const left = tasks.filter(
+			(other) => other !== task && !done.has(other.id) && (!other.hidden || task?.hidden),
+		).length
 		dots.replaceChildren(...Array.from({ length: left }, () => document.createElement('span')))
 		resetButton.hidden = progress.done().length === 0
 	}
@@ -208,8 +213,25 @@ export function createChecklist({
 			clip()
 		},
 		counting,
+		// Marks the task `id` done or not (the panel of #debug): the task
+		// shown done as a report would do it; any other one, the list drawn
+		// again at once.
+		setDone(id, done) {
+			if (!shown || resetting || leaving) return
+			if (done && progress.current()?.id === id) return this.complete()
+			if (!progress.set(id, done)) return
+			gsap.killTweensOf(list.querySelectorAll('.checklist-text'))
+			list.replaceChildren(...(compact ? [] : progress.done().map((task) => entry(task, true))))
+			addCurrent()
+			clip()
+			onChange(progress.state())
+		},
+		// What the report did: 'done', 'counted' or null (progress.report()).
 		report(id, key) {
-			if (counting()) step(progress.report(id, key))
+			if (!counting()) return null
+			const result = progress.report(id, key)
+			step(result)
+			return result
 		},
 		complete() {
 			const task = progress.current()

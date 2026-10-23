@@ -1,5 +1,6 @@
 // The camera foley of the interface (docs/AUDIO.md): the HUD's cues (a
-// press, a hover, a tap on a knob, Random eye, Snapshot, photo mode) and,
+// press, a hover, a tap on a knob, Random eye, Snapshot, photo mode), the
+// checklist's (a task done, the Sharingan's awakening) and,
 // once a frame, the sounds that follow the camera itself, whatever moves it:
 // the zoom ring's and the aperture ring's detents, the creak of a knob pulled
 // past its end and the autofocus beep once a photo has converged. Sounds pan
@@ -7,6 +8,7 @@
 import { follow } from '../camera/orbitMotion'
 import { clamp01 } from '../math'
 import { crossings, overshoot, stops, strainDrive } from './foley'
+import { keyRate } from './soundscape'
 
 // Time constants (s): the speeds the creak follows, and its levels.
 const SPEED_LAG = 0.04
@@ -65,7 +67,16 @@ export default class CameraFoley {
 				this.engine.play('press', { pan, gain: 0.6 })
 				break
 			case 'random':
+			case 'sharingan':
 				this.engine.play(this.params.sound.film === 'motor' ? 'wind' : 'advance', { pan })
+				break
+			// A task of the checklist done, and the Sharingan's awakening, in
+			// the glass harp's key.
+			case 'achievement':
+				this.engine.play('unlock', { pan, rate: keyRate(this.params.sound.glassKey) })
+				break
+			case 'awaken':
+				this.engine.play('gong', { rate: keyRate(this.params.sound.glassKey) })
 				break
 			case 'snapshot':
 				this.engine.play('beep', { pan })

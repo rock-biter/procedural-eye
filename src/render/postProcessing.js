@@ -3,7 +3,8 @@
 // the accumulation pass averages still frames, the depth of field blurs fresh
 // ones, then one effect pass applies the lens and color effects in linear
 // light and tone mapping, and a last one antialiases fresh frames (FXAA) and
-// adds the film grain; frames without FXAA take both in one pass. A frame
+// adds the film grain; frames without FXAA take both in one pass. While the
+// Sharingan's awakening runs, a shockwave's pass comes before the effects. A frame
 // that passes through the accumulation can be split: what the depth of field
 // blurs is shaded at half resolution (src/render/scenePass.js).
 import {
@@ -28,6 +29,7 @@ import DofPass from './dofPass'
 import DustPass from './dustPass'
 import { withMaterial } from './precompile'
 import ScenePass from './scenePass'
+import ShockwaveEffect from './shockwave'
 
 const TONE_MAPPING_MODES = {
 	agx: ToneMappingMode.AGX,
@@ -135,6 +137,10 @@ export default class PostProcessing {
 		this.vignette = new VignetteEffect({ offset: 0.3, darkness: 0.35 })
 		this.toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.AGX })
 		this.grain = new FilmGrainEffect()
+		// The awakening's shockwave, its pass enabled only while it runs.
+		this.shockwave = new ShockwaveEffect()
+		this.shockPass = new EffectPass(camera, this.shockwave)
+		this.shockPass.enabled = false
 		this.effectPass = new EffectPass(
 			camera,
 			this.colorGrade,
@@ -151,6 +157,7 @@ export default class PostProcessing {
 		this.composer.addPass(this.accumulation)
 		this.composer.addPass(this.dof)
 		this.composer.addPass(this.dust)
+		this.composer.addPass(this.shockPass)
 		this.composer.addPass(this.effectPass)
 		this.composer.addPass(this.antialiasPass)
 		// The same effects and grain in one pass, for the frames FXAA leaves
@@ -193,6 +200,14 @@ export default class PostProcessing {
 		this.finalPass.enabled = !fxaa
 	}
 
+	// Moves the awakening's shockwave on, its pass enabled while it runs; true
+	// while the image must show again.
+	stepShockwave(dt, params) {
+		const shown = this.shockwave.step(dt, params)
+		this.shockPass.enabled = this.shockwave.running
+		return shown
+	}
+
 	// The tone mapping operator, a define of the effect pass's program: set
 	// before it is compiled (src/app.js) and every frame (a change recompiles).
 	setToneMapping(params) {
@@ -214,6 +229,7 @@ export default class PostProcessing {
 			fullscreen(this.accumulation, [this.accumulation.blendMaterial]),
 			fullscreen(dof, [dof.prepare, dof.tileReduce, dof.dilate, dof.gather, dof.composite]),
 			{ scene: this.dust.dustScene, camera: this.dust.camera, target },
+			{ scene: this.shockPass.scene, camera: this.shockPass.camera, target },
 			{ scene: this.effectPass.scene, camera: this.effectPass.camera, target },
 			{ scene: this.antialiasPass.scene, camera: this.antialiasPass.camera, target: null },
 			{ scene: this.finalPass.scene, camera: this.finalPass.camera, target: null },
@@ -264,7 +280,14 @@ export default class PostProcessing {
 	// passes that show it; the canvas keeps the image shown last.
 	render(shown = true) {
 		this.renderPass.split = this.splitShading && this.accumulation.passthrough
-		const display = [this.dof, this.dust, this.effectPass, this.antialiasPass, this.finalPass]
+		const display = [
+			this.dof,
+			this.dust,
+			this.shockPass,
+			this.effectPass,
+			this.antialiasPass,
+			this.finalPass,
+		]
 		const enabled = display.map((pass) => pass.enabled)
 		if (!shown) for (const pass of display) pass.enabled = false
 		this.composer.render()

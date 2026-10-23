@@ -38,11 +38,15 @@ gsap.registerPlugin(TextPlugin)
 // Icons on a 24 px grid, stroked: a plus, a minus, and an eye for Random eye
 // (a filled dot, the pupil, under a flattened arc, the upper lid: wide and
 // low, its ends a little above the pupil's middle and meeting at an angle,
-// like the canthi, so it reads as an eye, not as a wifi sign).
+// like the canthi, so it reads as an eye, not as a wifi sign); and filled,
+// a tomoe for the Sharingan (the magatama of a yin-yang: its head the upper
+// small disc, its tail down the big one's right side, turned a little).
 const ICONS = {
 	plus: '<path d="M6 12h12M12 6v12"/>',
 	minus: '<path d="M6 12h12"/>',
 	eye: '<path d="M3 13.5C6.5 6.5 17.5 6.5 21 13.5"/><circle class="icon-fill" cx="12" cy="14.5" r="2.75"/>',
+	tomoe:
+		'<path class="icon-fill" transform="rotate(-35 12 12)" d="M12 3.6A8.4 8.4 0 0 1 12 20.4A4.2 4.2 0 0 0 12 12A4.2 4.2 0 0 1 12 3.6Z"/>',
 }
 const icon = (name) =>
 	`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`
@@ -121,7 +125,9 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // `tones`: [{ name, label, color }], and `secretTone`, if given, one more
 // (main.js): its button one spacing past the deepest, turning with them,
 // never seen, pressed or not, without a cut in the circle, and pressable only
-// once unlockSecret(true).
+// once unlockSecret(true). `onSharingan`, if given (a desktop's), gives
+// it the Sharingan's button below Random eye, which shows once
+// unlockSharingan(true).
 // onTone(name), onZoom('in' | 'out',
 // duration), onZoomLevel(level, including elastic overshoot),
 // onZoomWheel(deltaY) (the wheel over the knob) and onRandom() run the
@@ -141,8 +147,8 @@ function place(element, cut, angle, { cx, cy, radius }) {
 // (src/ui/intro.js); circle(), its circle in the window ({ x, y, radius,
 // split }, px; null before the first layout). onCue(name, detail), if given, hears the controls for the
 // sound design (src/audio/cameraFoley.js): 'press' and 'hover' of a button
-// or knob, 'tap' of a knob and 'random'; `detail.element` is the control,
-// `detail.control` its name.
+// or knob, 'tap' of a knob, 'random' and 'sharingan'; `detail.element` is
+// the control, `detail.control` its name.
 export function createHud({
 	tones,
 	secretTone = null,
@@ -156,6 +162,7 @@ export function createHud({
 	onApertureWheel,
 	getApertureElasticity = () => 0,
 	onRandom,
+	onSharingan = null,
 	onCue = () => {},
 }) {
 	const element = document.createElement('div')
@@ -405,6 +412,24 @@ export function createHud({
 	})
 	sounding(random, 'random')
 
+	// The Sharingan's button (main.js): hidden, out of the keyboard's way
+	// and without a cut in the circle until unlocked. A click turns the
+	// spinning circle as Random eye's does.
+	const sharingan =
+		onSharingan &&
+		hudButton('sharingan', 'Sharingan', icon('tomoe'), () => {
+			spinTurns++
+			placeSpin()
+			activate('random')
+			onCue('sharingan', { control: 'sharingan', element: sharingan })
+			onSharingan()
+		})
+	if (sharingan) {
+		sharingan.tabIndex = -1
+		sharingan.setAttribute('aria-hidden', 'true')
+		sounding(sharingan, 'sharingan')
+	}
+
 	// The HUD's layers take the accent while their control is in use, as if
 	// they lit up (style.css eases the color from white and back): the zoom
 	// rings, the zoom value and the knob's marker while the zoom moves or the
@@ -455,6 +480,7 @@ export function createHud({
 		zoomGroup,
 		apertureGroup,
 		random,
+		...(sharingan ? [sharingan] : []),
 	)
 
 	// Each button with its angle on the circle and its cut in the line.
@@ -469,6 +495,9 @@ export function createHud({
 		{ button: zoomIn, angle: (angles) => angles.zoomIn, zoom: true, follow: 'zoom' },
 		{ button: zoomOut, angle: (angles) => angles.zoomOut, zoom: true, follow: 'zoom' },
 		{ button: random, angle: (angles) => angles.random, follow: 'random' },
+		...(sharingan
+			? [{ button: sharingan, angle: (angles) => angles.sharingan, follow: 'random' }]
+			: []),
 	]
 
 	// The tone group turns along the circle to bring the pressed tone to its
@@ -517,7 +546,8 @@ export function createHud({
 		const pressed = item.button.getAttribute('aria-pressed') === 'true'
 		const tone = item.button.classList.contains('skin')
 		const scale = tone && !pressed ? HUD.toneScale : 1
-		item.cut.style.r = `${(HUD.reticle / 2) * scale + HUD.gap}px`
+		const hidden = item.button === sharingan && !sharingan.classList.contains('unlocked')
+		item.cut.style.r = hidden ? '0px' : `${(HUD.reticle / 2) * scale + HUD.gap}px`
 	}
 
 	// A drag stretches the knob, and with it the rings and the brackets, past
@@ -745,7 +775,11 @@ export function createHud({
 		const { clientWidth: width, clientHeight: height } = element
 		laidElasticity = getApertureElasticity()
 		const knobbed = coarse.matches ? null : { elasticity: laidElasticity }
-		const fit = hudLayout(width, height, tones.length, HUD, { bottom, aperture: knobbed })
+		const fit = hudLayout(width, height, tones.length, HUD, {
+			bottom,
+			aperture: knobbed,
+			sharingan: Boolean(sharingan),
+		})
 		if (!fit) return
 		const { radius, angles, split } = fit
 		const circle = { cx: width / 2, cy: height / 2, radius }
@@ -847,6 +881,66 @@ export function createHud({
 		unlockSecret(unlocked) {
 			secretButton?.classList.toggle('unlocked', unlocked)
 		},
+		// Whether the Sharingan's button shows (main.js: once the checklist is
+		// done). `reveal`: it awakens, its cut in the circle opening: two
+		// rings ripple out from it in the accent, the tomoe spins in two turns
+		// from nothing, the brackets close in, the icon glows in the accent for
+		// a moment and the spinning circle turns (otherwise, and with reduced
+		// motion, it shows at once).
+		unlockSharingan(unlocked, reveal = false) {
+			if (!sharingan || sharingan.classList.contains('unlocked') === unlocked) return
+			sharingan.classList.toggle('unlocked', unlocked)
+			sharingan.tabIndex = unlocked ? 0 : -1
+			if (unlocked) sharingan.removeAttribute('aria-hidden')
+			else sharingan.setAttribute('aria-hidden', 'true')
+			const item = items.find((entry) => entry.button === sharingan)
+			const glyph = sharingan.firstElementChild
+			gsap.killTweensOf(glyph)
+			if (!unlocked || !reveal || motionless.matches) {
+				sharingan.classList.remove('engaged', 'awakening')
+				item.cut.classList.add('instant')
+				cutRadius(item)
+				item.cut.getBoundingClientRect()
+				item.cut.classList.remove('instant')
+				return
+			}
+			cutRadius(item)
+			spinTurns++
+			placeSpin()
+			activate('random')
+			sharingan.classList.add('engaged', 'awakening')
+			const { awaken } = HUD.sharingan
+			for (let i = 0; i < 2; i++) {
+				const ripple = document.createElement('span')
+				ripple.className = 'hud-ripple'
+				sharingan.append(ripple)
+				gsap.fromTo(
+					ripple,
+					{ scale: 0.3, opacity: 1 },
+					{
+						scale: awaken.ripple,
+						opacity: 0,
+						duration: 1.1,
+						delay: i * 0.18,
+						ease: 'power2.out',
+						onComplete: () => ripple.remove(),
+					},
+				)
+			}
+			gsap.fromTo(
+				glyph,
+				{ opacity: 0, scale: 0, rotate: -720 },
+				{
+					opacity: 1,
+					scale: 1,
+					rotate: 0,
+					duration: awaken.spin,
+					ease: 'back.out(1.4)',
+					clearProps: 'opacity,scale,rotate,transform',
+				},
+			)
+			gsap.delayedCall(awaken.glow, () => sharingan.classList.remove('engaged', 'awakening'))
+		},
 		circle() {
 			if (!placed) return null
 			const box = element.getBoundingClientRect()
@@ -902,7 +996,15 @@ export function createHud({
 				layers: [
 					{ radius: radii.arcs, elements: [arcsLayer] },
 					{ radius: radii.inner, elements: [innerRing] },
-					{ radius: radii.line, elements: [lineLayer], buttons: [...toneButtons, random] },
+					{
+						radius: radii.line,
+						elements: [lineLayer],
+						buttons: [
+							...toneButtons,
+							random,
+							...(sharingan?.classList.contains('unlocked') ? [sharingan] : []),
+						],
+					},
 					{
 						radius: radii.zoom,
 						elements: [zoomLayer],

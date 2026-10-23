@@ -20,6 +20,7 @@ void main() {
 	vec3 p = hits.x > 0.0 ? uCameraEye + dir * hits.x : vEyePos;
 	vec3 world = (uEyeToWorld * vec4(p, 1.0)).xyz;
 	if (world.z < uGlobeCut) discard;
+	gSharinganFootprint = length(p - uCameraEye) * uPixelAngle;
 	// On the glitch's front the point slides along the globe (terminator.glsl).
 	Glitch glitch = glitchAt(p);
 	vec2 xy = p.xy + glitch.shift;
