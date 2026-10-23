@@ -535,6 +535,8 @@ export const BASE_PARAM_SCHEMA = {
 			shutter: num(0.56, 0, 1, 0.01, '', 'uniform', 'shutter (Snapshot)'),
 			mirror: num(0.35, 0, 1, 0.01, '', 'uniform', 'mirror (photo mode)'),
 			beep: num(0.08, 0, 1, 0.01, '', 'uniform', 'focus beep'),
+			unlock: num(0.3, 0, 1, 0.01, '', 'uniform', 'achievement'),
+			gong: num(0.5, 0, 1, 0.01, '', 'uniform', 'Sharingan awakening'),
 			glasses: num(0.22, 0, 1, 0.01, '', 'uniform', 'music: quiet glasses'),
 			lead: num(0.3, 0, 1, 0.01, '', 'uniform', 'music: louder glasses'),
 		},
@@ -638,6 +640,21 @@ export const BASE_PARAM_SCHEMA = {
 		ringWidth: num(0.045, 0, 0.3, 0.005, 'mm', 'uniform', 'Rinnegan ring half-width'),
 		hint: num(0.45, 0, 1, 0.01, '', 'uniform', 'Rinnegan hint opacity'),
 		hintDuration: num(0.6, 0.1, 3, 0.05, 's', 'uniform', 'Rinnegan hint duration'),
+	},
+	// The shockwave of the Sharingan's awakening (src/render/shockwave.js,
+	// docs/RENDERING.md): over `duration` it runs from the middle of the frame
+	// past its corners, its front a ring `width` of the half-diagonal wide at
+	// first (and 3.5 times as wide at the end), frayed by `fray` of it around,
+	// pushing the image out ahead of it and in behind it by up to `push` of
+	// the half-diagonal, red and blue `split` of that further and nearer,
+	// brightened by `glow`.
+	shockwave: {
+		duration: num(1.6, 0.3, 5, 0.05, 's', 'uniform', 'duration'),
+		width: num(0.045, 0.005, 0.2, 0.001, '', 'uniform', 'front width'),
+		push: num(0.06, 0, 0.2, 0.001, '', 'uniform', 'push'),
+		split: num(0.8, 0, 2, 0.01, '', 'uniform', 'color split'),
+		fray: num(0.04, 0, 0.3, 0.001, '', 'uniform', 'fraying'),
+		glow: num(0.35, 0, 2, 0.01, '', 'uniform', 'brightening'),
 	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),

@@ -398,6 +398,8 @@
       "shutter": 0.56,
       "mirror": 0.35,
       "beep": 0.08,
+      "unlock": 0.25,
+      "gong": 0.45,
       "glasses": 0.03,
       "lead": 0.07
     },
@@ -463,6 +465,14 @@
     "ringWidth": 0.045,
     "hint": 0.45,
     "hintDuration": 0.6
+  },
+  "shockwave": {
+    "duration": 1.6,
+    "width": 0.045,
+    "push": 0.06,
+    "split": 0.8,
+    "fray": 0.04,
+    "glow": 0.35
   },
   "post": {
     "toneMapping": "agx",

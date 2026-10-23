@@ -882,8 +882,11 @@ export function createHud({
 			secretButton?.classList.toggle('unlocked', unlocked)
 		},
 		// Whether the Sharingan's button shows (main.js: once the checklist is
-		// done). `reveal`: it comes in, its cut in the circle opening, as the
-		// intro brings the buttons in (otherwise at once).
+		// done). `reveal`: it awakens, its cut in the circle opening: two
+		// rings ripple out from it in the accent, the tomoe spins in two turns
+		// from nothing, the brackets close in, the icon glows in the accent for
+		// a moment and the spinning circle turns (otherwise, and with reduced
+		// motion, it shows at once).
 		unlockSharingan(unlocked, reveal = false) {
 			if (!sharingan || sharingan.classList.contains('unlocked') === unlocked) return
 			sharingan.classList.toggle('unlocked', unlocked)
@@ -894,6 +897,7 @@ export function createHud({
 			const glyph = sharingan.firstElementChild
 			gsap.killTweensOf(glyph)
 			if (!unlocked || !reveal || motionless.matches) {
+				sharingan.classList.remove('engaged', 'awakening')
 				item.cut.classList.add('instant')
 				cutRadius(item)
 				item.cut.getBoundingClientRect()
@@ -901,18 +905,41 @@ export function createHud({
 				return
 			}
 			cutRadius(item)
+			spinTurns++
+			placeSpin()
+			activate('random')
+			sharingan.classList.add('engaged', 'awakening')
+			const { awaken } = HUD.sharingan
+			for (let i = 0; i < 2; i++) {
+				const ripple = document.createElement('span')
+				ripple.className = 'hud-ripple'
+				sharingan.append(ripple)
+				gsap.fromTo(
+					ripple,
+					{ scale: 0.3, opacity: 1 },
+					{
+						scale: awaken.ripple,
+						opacity: 0,
+						duration: 1.1,
+						delay: i * 0.18,
+						ease: 'power2.out',
+						onComplete: () => ripple.remove(),
+					},
+				)
+			}
 			gsap.fromTo(
 				glyph,
-				{ opacity: 0, scale: 0.3, rotate: -180 },
+				{ opacity: 0, scale: 0, rotate: -720 },
 				{
 					opacity: 1,
 					scale: 1,
 					rotate: 0,
-					duration: 0.9,
-					ease: 'back.out(1.6)',
-					clearProps: 'all',
+					duration: awaken.spin,
+					ease: 'back.out(1.4)',
+					clearProps: 'opacity,scale,rotate,transform',
 				},
 			)
+			gsap.delayedCall(awaken.glow, () => sharingan.classList.remove('engaged', 'awakening'))
 		},
 		circle() {
 			if (!placed) return null

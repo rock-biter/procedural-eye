@@ -40,8 +40,23 @@ function buildFolder(container, schema, values, prefix, onChange) {
 	}
 }
 
-// `actions`: [{ title, run }] buttons above the folders; `presets`: { name: { label } }.
-export function createGui({ schema, params, onChange, actions = [], presets = null, onPreset }) {
+// The folder of the schema's group `key` in `container` (a folder of the
+// panel's own, src/debug/panel.js), its bindings as the others.
+export function addGroupFolder(container, schema, params, key, onChange) {
+	buildFolder(container, { [key]: schema[key] }, params, '', onChange)
+}
+
+// `actions`: [{ title, run }] buttons above the folders; `presets`: { name: { label } };
+// `skip`: groups left for addGroupFolder().
+export function createGui({
+	schema,
+	params,
+	onChange,
+	actions = [],
+	presets = null,
+	onPreset,
+	skip = [],
+}) {
 	const pane = new Pane({ title: 'Procedural eye', expanded: false })
 	if (presets) {
 		const state = { preset: Object.keys(presets)[0] }
@@ -54,7 +69,8 @@ export function createGui({ schema, params, onChange, actions = [], presets = nu
 			.on('change', (event) => onPreset(event.value))
 	}
 	for (const action of actions) pane.addButton({ title: action.title }).on('click', action.run)
-	buildFolder(pane, schema, params, '', onChange)
+	const kept = Object.fromEntries(Object.entries(schema).filter(([key]) => !skip.includes(key)))
+	buildFolder(pane, kept, params, '', onChange)
 	const refresh = () => {
 		refreshing = true
 		try {

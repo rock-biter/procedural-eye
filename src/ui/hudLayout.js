@@ -77,8 +77,14 @@ export const HUD = Object.freeze({
 	}),
 	// Random eye below the zoom: at `angle`, or at least `spacing` px past zoom out.
 	random: Object.freeze({ angle: 33 * DEGREE, spacing: 60 }),
-	// The Sharingan `spacing` px past Random eye, lower down the circle.
-	sharingan: Object.freeze({ spacing: 60 }),
+	// The Sharingan `spacing` px past Random eye, lower down the circle. Its
+	// awakening (hud.js unlockSharingan()): rings rippling out to `ripple`
+	// times the reticle, the tomoe spinning in over `spin` s, the brackets
+	// and the accent held `glow` s.
+	sharingan: Object.freeze({
+		spacing: 60,
+		awaken: Object.freeze({ ripple: 3.5, spin: 1.4, glow: 1.8 }),
+	}),
 	// A portrait box splits the HUD. The circle keeps the skin tones, the
 	// pressed one at `tones.center` (the middle of the bottom left quarter),
 	// and Random eye at `random.angle` (the right, on the horizontal); their

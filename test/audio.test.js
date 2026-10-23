@@ -11,11 +11,12 @@ import {
 	frequency,
 	glassNotes,
 	glassVoice,
+	keyRate,
 	nextLoudGlass,
 	nextQuietGlass,
 	pickNote,
 } from '../src/audio/soundscape'
-import { beep, fineTick, noise, tick } from '../src/audio/synth'
+import { beep, bowl, chime, fineTick, noise, tick } from '../src/audio/synth'
 import { BASE_PARAM_SCHEMA } from '../src/params/paramSchema'
 import { createRandom } from '../src/random'
 
@@ -75,6 +76,61 @@ test('synthesized buffers: seeded, within ±1', () => {
 	close(fineTick(44100).length / 44100, 0.006, 1e-4)
 	assert.notDeepEqual(fineTick(rate, 0), fineTick(rate, 1))
 	close(beep(rate).length / rate, 0.155, 1e-3)
+})
+
+// The strongest of `candidates` (Hz) in `samples` from `start` s on, over
+// `seconds` (a projection on each frequency's sine and cosine).
+function strongest(samples, rate, start, seconds, candidates) {
+	const first = Math.round(start * rate)
+	const count = Math.round(seconds * rate)
+	const power = (frequency) => {
+		let c = 0
+		let s = 0
+		for (let i = 0; i < count; i++) {
+			const phase = (2 * Math.PI * frequency * i) / rate
+			c += samples[first + i] * Math.cos(phase)
+			s += samples[first + i] * Math.sin(phase)
+		}
+		return c * c + s * s
+	}
+	return candidates.reduce((best, f) => (power(f) > power(best) ? f : best))
+}
+
+const rms = (samples, rate, from, to) => {
+	let sum = 0
+	for (let i = Math.round(from * rate); i < Math.round(to * rate); i++) sum += samples[i] ** 2
+	return Math.sqrt(sum / ((to - from) * rate))
+}
+
+test('the achievement chime: a latch, then a glass a fifth up, ringing out', () => {
+	const rate = 16000
+	const samples = chime(rate)
+	close(samples.length / rate, 2.6, 1e-3)
+	assert.ok(samples.every((v) => Number.isFinite(v) && Math.abs(v) <= 1 + 1e-6))
+	assert.deepEqual(chime(rate), chime(rate))
+	// D6 first, then A6 joining it.
+	assert.equal(strongest(samples, rate, 0.08, 0.09, [880, 1174.66, 1760, 2349]), 1174.66)
+	assert.equal(strongest(samples, rate, 0.19, 0.1, [880, 1760, 2349]), 1760)
+	assert.ok(rms(samples, rate, 1.6, 2) < 0.3 * rms(samples, rate, 0.1, 0.5))
+	assert.ok(rms(samples, rate, 2.59, 2.6) < 0.005)
+})
+
+test('the awakening bowl: D3 beating slowly, a long ring, faded out at its end', () => {
+	const rate = 8000
+	const samples = bowl(rate)
+	close(samples.length / rate, 9, 1e-3)
+	assert.ok(samples.every((v) => Number.isFinite(v) && Math.abs(v) <= 1 + 1e-6))
+	assert.equal(strongest(samples, rate, 1, 2, [110, 146.83, 196, 220, 293.66]), 146.83)
+	// Still singing seconds later, silent at the very end.
+	assert.ok(rms(samples, rate, 4, 5) > 0.15 * rms(samples, rate, 0.5, 1.5))
+	assert.ok(rms(samples, rate, 8.99, 9) < 0.01)
+})
+
+test("the foley's tuned sounds follow the glasses' key", () => {
+	assert.equal(keyRate('D'), 1)
+	close(keyRate('A'), 2 ** (-5 / 12), 1e-12)
+	close(keyRate('F'), 2 ** (3 / 12), 1e-12)
+	for (const key of Object.keys(KEYS)) assert.ok(keyRate(key) > 0.6 && keyRate(key) < 1.3, key)
 })
 
 test('every sound has its takes or its synth, and a level in the params', () => {

@@ -3,13 +3,17 @@
 // the first press or key (the recordings are fetched before, decoded then);
 // a sound asked for while they decode plays if they arrive within LATE s.
 // The controls' bus and the ambience's feed the master (`sound.volume`),
-// which a limiter keeps under 0 dBFS. Muted, the master fades out and the
+// which a limiter keeps under 0 dBFS; a sound may also send into the
+// controls' reverb (the achievements', the awakening's). Muted, the master fades out and the
 // context suspends. So does every sound while the page is hidden or the
 // window has lost the focus; back, it fades in again where it was.
 import { SOUNDS, SOUND_FILES, takesOf } from './soundBank'
-import { beep, fineTick, tick } from './synth'
+import { impulseResponse } from './impulse'
+import { beep, bowl, chime, fineTick, tick } from './synth'
 
-const SYNTHS = { tick, beep, fine: fineTick }
+const SYNTHS = { tick, beep, fine: fineTick, chime, bowl }
+// The controls' reverb: a hall, darker than the glasses'.
+const REVERB = { rt60: 4, bright: 6000, seed: 'controls' }
 const LATE = 0.15
 // The master's time constant (s) toward a new volume or mute, and back
 // from a pause.
@@ -116,19 +120,46 @@ export default class AudioEngine {
 		if (this.metered) this.insertMeter()
 		this.buses = { controls: context.createGain(), ambience: context.createGain() }
 		for (const bus of Object.values(this.buses)) bus.connect(this.master)
-		for (const sound of Object.values(SOUNDS)) {
-			if (!sound.synth) continue
-			for (const key of takesOf(sound)) {
-				const [name, take] = key.split(':')
-				const samples =
-					take === undefined
-						? SYNTHS[name](context.sampleRate)
-						: SYNTHS[name](context.sampleRate, Number(take))
-				this.buffers.set(key, { buffer: this.buffer(samples), offset: 0 })
-			}
-		}
+		this.reverb = null
+		// The synthesized buffers now; the long ones (`lazy`) and the reverb
+		// once the page is idle, or when first played.
+		for (const sound of Object.values(SOUNDS))
+			if (sound.synth && !sound.lazy) this.synthesize(sound)
+		const later = window.requestIdleCallback ?? ((run) => setTimeout(run, 500))
+		later(() => {
+			for (const sound of Object.values(SOUNDS)) if (sound.lazy) this.synthesize(sound)
+			this.send()
+		})
 		this.update()
 		this.decode()
+	}
+
+	// The buffers of a synthesized sound, unless built already.
+	synthesize(sound) {
+		for (const key of takesOf(sound)) {
+			if (this.buffers.has(key)) continue
+			const [name, take] = key.split(':')
+			const samples =
+				take === undefined
+					? SYNTHS[name](this.context.sampleRate)
+					: SYNTHS[name](this.context.sampleRate, Number(take))
+			this.buffers.set(key, { buffer: this.buffer(samples), offset: 0 })
+		}
+	}
+
+	// The controls' reverb, made at its first use, into their bus.
+	send() {
+		if (this.reverb) return this.reverb
+		const rate = this.context.sampleRate
+		const [left, right] = impulseResponse(rate, REVERB)
+		const impulse = this.context.createBuffer(2, left.length, rate)
+		impulse.copyToChannel(left, 0)
+		impulse.copyToChannel(right, 1)
+		this.reverb = this.context.createConvolver()
+		this.reverb.normalize = false
+		this.reverb.buffer = impulse
+		this.reverb.connect(this.buses.controls)
+		return this.reverb
 	}
 
 	async decode() {
@@ -181,6 +212,7 @@ export default class AudioEngine {
 			return null
 		}
 		if ((this.voices[name] ?? 0) >= sound.voices) return null
+		if (sound.lazy) this.synthesize(sound)
 		const { buffer, offset } = this.buffers.get(this.take(name, takesOf(sound))) ?? {}
 		if (!buffer) return null
 		const source = this.context.createBufferSource()
@@ -192,11 +224,19 @@ export default class AudioEngine {
 		const panner = this.context.createStereoPanner()
 		panner.pan.value = Math.max(-1, Math.min(1, pan))
 		source.connect(output).connect(panner).connect(this.buses.controls)
+		// Its share sent into the reverb (`reverb`).
+		let wet = null
+		if (sound.reverb) {
+			wet = this.context.createGain()
+			wet.gain.value = sound.reverb
+			output.connect(wet).connect(this.send())
+		}
 		source.start(now, offset)
 		this.voices[name] = (this.voices[name] ?? 0) + 1
 		source.onended = () => {
 			this.voices[name]--
 			panner.disconnect()
+			wet?.disconnect()
 		}
 		this.last[name] = { time: now, gain: output, level: output.gain.value }
 		this.played[name] = (this.played[name] ?? 0) + 1

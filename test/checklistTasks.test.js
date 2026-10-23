@@ -100,3 +100,22 @@ test('a reset starts again from the first task', () => {
 	assert.equal(progress.done().length, 0)
 	assert.deepEqual(progress.state(), { done: [], seen: { task: 'iris', keys: [] } })
 })
+
+test('the panel marks any task done or not, the keys kept only for the task still shown', () => {
+	const progress = createProgress(TASKS, { counts })
+	assert.equal(progress.set('nope', true), false)
+	assert.equal(progress.set('tone', true), true)
+	assert.equal(progress.set('tone', true), false)
+	assert.equal(progress.current().id, 'iris')
+	assert.equal(progress.set('iris', true), true)
+	assert.equal(progress.current().id, 'framing')
+	for (const task of TASKS.slice(2, 8)) progress.set(task.id, true)
+	assert.equal(progress.current().id, 'titles')
+	assert.equal(progress.report('titles', 0), 'counted')
+	// Another task cleared before it: the keys go with the task shown.
+	progress.set('iris', false)
+	assert.equal(progress.current().id, 'iris')
+	assert.equal(progress.count(), 0)
+	assert.deepEqual(progress.state().seen, { task: 'iris', keys: [] })
+	assert.equal(progress.set('iris', false), false)
+})

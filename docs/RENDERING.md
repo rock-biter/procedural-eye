@@ -22,6 +22,8 @@ Every frame renders one sample ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md#frame-l
    - A fresh frame that the next one restarts anyway (a living eye, a running transition: `EyeApp.restartsEveryFrame`) passes through: the history is not written, `history` is the scene buffer itself, and the samples stay at 0. The full-resolution float copy of every living frame is saved.
 4. **Depth of field** ([`src/render/dofPass.js`](../src/render/dofPass.js)): the interactive gather, faded out as lens samples accumulate, composited over the mean with an opaque alpha (see [Depth of Field](#depth-of-field)). The haze and the light shafts join the image here ([Dust and Haze](#dust-and-haze), [Light Shafts](#light-shafts)).
 5. **Dust** ([`src/render/dustPass.js`](../src/render/dustPass.js)): the motes as their blurred images, added into the composite's buffer (no swap) ([Dust and Haze](#dust-and-haze)).
+
+   **Shockwave** (only while the Sharingan's awakening runs, [Shockwave](#shockwave)): an `EffectPass` of its own, disabled otherwise, so it costs nothing.
 6. **Effect pass**, in the order pmndrs compiles its effects (`EffectPass` sorts those that read their neighbors first, whatever order they are passed in):
    1. chromatic aberration: `post.chromaticAberration` pixels, radially modulated;
    2. color grade: white balance from `camera.whiteBalance`, saturation and contrast, in linear light;
@@ -90,6 +92,15 @@ A few blades of the key light (emitter 0, when it casts) cutting across the air 
 - **On the dust**: the key's irradiance × `shafts.intensity` × `shafts.dust` × `shafts.color` times the cookie, with the phase toward the source, under the shafts' coverage ([Dust and Haze](#dust-and-haze)): motes crossing a blade flash bright, motes in its shadow behind the patch keep only the rest of the light.
 - **In the air** (`light-shafts.glsl`, in the depth of field's prepare and composite passes, like the haze): along each pixel's ray, from the camera to the focus distance in alpha, each blade's density integrates in closed form. Across, along its long side and down its axis it is a Gaussian, so along the ray too, with erf (Winitzki's approximation) at the segment's ends: no singular view, and no cut where the densest point passes behind the camera. σ widens with the distance from the source, taken at the ray's densest point. The result is weighted by the ray's sin² against the blade's axis, so a blade shows most when the camera looks across it and fades when seen end on. The casters cut it where it passes behind them as seen from the source, along their sharp outline however far behind (`shaftCut()` at the ray's densest point, `shafts.shadow`): a blade does not go on past the face. The light the air scatters is the key's irradiance × `shafts.intensity` × `shafts.air` (1/m) × `shafts.color` with an isotropic phase. No geometry: a blade fades softly into the skin it passes through, is blurred by the gather with the surfaces under it, and costs the same at any zoom (a loop over at most 12 blades, skipping those whose density along the ray stays under e⁻⁶ of their peak). The composite skips it where the gather covers the pixel.
 - **Twins**: `beamIntegral()` and `erf()` in `lightShafts.js` are the CPU twins of the loop of `applyShafts()` and `shaftErf()`; `bakeShaftCookie()`, over the same `cookieBlades()`, is the twin of `shaft-cookie-fragment.glsl`.
+
+## Shockwave
+
+The Sharingan's awakening ([`docs/DEVELOPMENT.md`](DEVELOPMENT.md#controls)) sends a shockwave over the image: `ShockwaveEffect` ([`src/render/shockwave.js`](../src/render/shockwave.js), `shockwave-fragment.glsl`), in linear light before the color effects, in a pass of its own after the dust (it reads its neighbors, as the chromatic aberration does, and pmndrs merges only one such effect per pass). The pass is enabled only while a wave runs.
+
+- **Front** ([`src/render/shockwaveFront.js`](../src/render/shockwaveFront.js) *, `shockwaveAt()`): over `shockwave.duration` (1.6 s) it runs from the middle of the frame to 1.2 times the half-diagonal, past the corners, fast at first and slowing (1 − (1 − s)^2.2), its width `shockwave.width` of the half-diagonal growing 3.5 times; its strength rises over the first 8% and fades as (1 − s)^1.5.
+- **Lens**: around the front, a Gaussian band, the image ahead of it is pushed outward and the image behind it pulled in, by up to `shockwave.push` of the half-diagonal; red and blue `shockwave.split` of that further and nearer than green, and the band brightened by `shockwave.glow`.
+- **Fraying**: the front's radius moves by up to `shockwave.fray` of the half-diagonal around the frame, two octaves of periodic value noise (PCG over 14 and 37 cells) drifting apart as it runs.
+- **Clock**: its own, the frame's time (as the glitch's), in photo mode too; while it runs, the canvas shows every accumulated sample, and a converged image is shown again every frame (`renderDisplay()`), so the wave moves smoothly over a still photo. Its program is compiled at start-up with the others.
 
 ## Backdrop Shadow
 
@@ -171,6 +182,8 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uShaftCenters`, `uShaftAxes`, `uShaftSides`, `uShaftCount`, `uShaftAir`, `uShaftAirParams`, `uShaftOrigin` | The shafts in the air: per blade its center and intensity, its axis from the source and the source's distance, its thin side and σ; their count (0 when off); the light scattered per mm of blade; (elongation, how much the casters cut them); the pinhole camera's position. |
 | **Backdrop** | |
 | `uBackdropColor`, `uShadowPlane`, `uShadowStrength` | The clear color; the shadow plane's unit normal and offset; the shadow's strength (faded as the key turns away, 0 outside the beauty view). |
+| **Shockwave** | |
+| `shockFront`, `shockLook` | The front's radius (1 at the corners), half-width, push (of the half-diagonal) and color split; its fraying, the fraying's phase and the brightening ([Shockwave](#shockwave)). |
 
 Defines:
 - `MAX_EMITTERS` and `EMITTER_VEC4S` (from `envRig.js`); `MAX_SHAFTS` (from `lightShafts.js`);
@@ -202,6 +215,7 @@ The lids, the lashes and the tear meniscus blink by three.js morph targets ([`sr
 | `chamber.glsl` | `traceChamber()`: the iris, the angle, the pupil and the lens. |
 | `iris-space.glsl`, `iris-noise.glsl`, `iris-sdf.glsl`, `iris-trace.glsl`, `iris-shade.glsl` | The iris: rest space, periodic noise, distance field, sphere tracing (normal, AO, soft shadow), lighting and color. |
 | `iris-bake-fragment.glsl` | Structure and pigment atlas bake. |
+| `shockwave-fragment.glsl` | The Sharingan's awakening shockwave ([Shockwave](#shockwave)). |
 | `sharingan.glsl`, `sharingan-paint.glsl`, `sharingan-bake-fragment.glsl` | The Sharingan: the iris's pigment read from the baked fields and morphing between two (`sharinganIris()`), and the Rinnegan over the sclera (`rinneganSclera()`), its hint through both; the patterns' compass constructions and fields (`sharinganField()`, the twin of `patternField()`); their bake into a map. |
 | `sclera.glsl` | Sclera albedo with vessels, conjunctival micro-relief, fissure distance, lid occlusion and lid reflections. |
 | `lid-follow.glsl` | Lid rotation with the gaze and its inverse for rest-space lookups. |

@@ -82,6 +82,8 @@ export function installDevTools(context) {
 		},
 		sharinganOff: () => app.sharingan.hide(app.params),
 		sharinganHint: () => app.sharingan.hint(),
+		// The awakening's shockwave alone.
+		shockwave: () => app.post.shockwave.trigger(),
 		getSharingan: () => app.sharingan.name,
 		getSharinganNames: () => [...PATTERN_NAMES],
 		isSharinganMoving: () => app.sharingan.moving(),

@@ -116,8 +116,10 @@ export default class EyeApp {
 		}
 		// The easter egg: the volume cannon's glitch on the eye (main.js).
 		this.terminator = new Terminator()
-		// The other: the checklist's Sharingan (main.js).
+		// The other: the checklist's Sharingan (main.js), and whether its
+		// awakening's shockwave runs (src/render/shockwave.js).
 		this.sharingan = new Sharingan()
+		this.shocking = false
 		this.scleraMaps = new ScleraMaps()
 		// The fissure map: r where the lids rest, g closed (the blink's,
 		// src/adnexa/lidBlink.js).
@@ -597,12 +599,15 @@ export default class EyeApp {
 		const glitchDelta = Math.min(delta / 1000, 0.1)
 		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
 		if (this.sharingan.step(glitchDelta, this.params)) this.invalidate()
+		// The awakening's shockwave moves over the image, which shows every
+		// frame meanwhile.
+		this.shocking = this.post.stepShockwave(glitchDelta, this.params)
 		if (this.converged) {
 			this.lastFresh = false
 			this.lastAccumulating = false
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
-			if (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30) {
+			if (this.shocking || (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30)) {
 				this.dustShown = this.dustTime
 				this.renderDisplay()
 			}
@@ -646,7 +651,8 @@ export default class EyeApp {
 		const count = Math.min(this.batch, target - this.samples)
 		for (let i = 0; i < count; i++) {
 			const last = this.samples + 1 >= target
-			const shown = i === count - 1 && (last || time - this.sampleShown >= PREVIEW_INTERVAL)
+			const shown =
+				i === count - 1 && (last || this.shocking || time - this.sampleShown >= PREVIEW_INTERVAL)
 			if (shown) this.sampleShown = time
 			this.renderSample(accumulationSample(this.samples), shown)
 		}
