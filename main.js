@@ -1021,12 +1021,10 @@ if (urlParams.get('gui') !== '0') {
 			console.log(...shotLog.next())
 			report('shots', shotLog.line)
 			const name = shotLog.name
-			app.terminator
-				.trigger(motionless.matches)
-				.then(() => {
-					catchShut()
-					return takePhoto(name)
-				})
+			app.terminator.trigger(motionless.matches).then(() => {
+				catchShut()
+				return takePhoto(name)
+			})
 			// Bounced off Snapshot (back and up from its side; down from below,
 			// still drifting left), then falling, spinning.
 			let [x, y] = hit
