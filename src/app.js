@@ -55,6 +55,14 @@ import { SCLERA_PSI } from './sclera/vesselGenerator'
 // The skin tone of the backdrop: the light tone, which the page was matched to.
 const BACKDROP_SKIN = SKIN_TONES.find((tone) => tone.name === 'light').color
 
+// How often an accumulating image is shown (ms): its samples in between are
+// only accumulated.
+const PREVIEW_INTERVAL = 150
+// The most samples an animation frame renders, and how many frames back
+// paceBatch() looks for finished work.
+const MAX_BATCH = 8
+const BATCH_LAG = 2
+
 export default class EyeApp {
 	// `frozen`: start with the animation clock stopped (captures).
 	constructor({ setup, params, frozen = false }) {
@@ -164,6 +172,14 @@ export default class EyeApp {
 		// shown over a converged image.
 		this.dustTime = 0
 		this.dustShown = -Infinity
+		// When an accumulating image was last shown (ms, the frame's clock);
+		// its samples per animation frame and their pacing (paceBatch()).
+		this.sampleShown = -Infinity
+		this.lastAccumulating = false
+		this.batch = 1
+		this.batchPatience = 2
+		this.framesOnTime = 0
+		this.batchFences = []
 		// The radians per pixel of this frame; the half-resolution share of a
 		// split frame doubles them (src/render/scenePass.js).
 		this.pixelAngle = 0.001
@@ -222,7 +238,7 @@ export default class EyeApp {
 	}
 
 	// The start-up compile jobs of the bakes: the iris atlases, the skin's
-	// patterns and relief, the soft coverages.
+	// patterns and relief, the light shafts' cookie, the soft coverages.
 	bakePrograms() {
 		const target = this.post.composer.inputBuffer
 		const quad = (mesh, materials) => materials.map((material) => withMaterial(mesh, material))
@@ -237,6 +253,7 @@ export default class EyeApp {
 				variants: quad(atlas.quad, [atlas.material, atlas.pigmentMaterial]),
 			},
 			{ scene: pattern.scene, camera: pattern.camera, target },
+			{ scene: this.shaftLight.cookieScene, camera: this.shaftLight.cookieCamera, target },
 			{
 				scene: relief.scene,
 				camera: relief.camera,
@@ -575,6 +592,7 @@ export default class EyeApp {
 		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
 		if (this.converged) {
 			this.lastFresh = false
+			this.lastAccumulating = false
 			// The image is done, the dust still drifts over it: a few pixels per
 			// second, so 30 frames per second are enough.
 			if (this.dustDrifts && this.dustTime - this.dustShown >= 1 / 30) {
@@ -595,8 +613,60 @@ export default class EyeApp {
 		// A living eye or a transition restarts the image on the next frame:
 		// this one is shown without being kept.
 		this.post.accumulation.passthrough = fresh && this.restartsEveryFrame
-		this.renderSample(fresh ? null : accumulationSample(this.samples))
+		if (fresh) {
+			this.sampleShown = time
+			// Each image starts at a sample a frame and quickly finds its pace.
+			this.lastAccumulating = false
+			this.batch = 1
+			this.batchPatience = 2
+			this.framesOnTime = 0
+			this.renderSample(null)
+		} else {
+			if (this.lastAccumulating) this.paceBatch()
+			this.lastAccumulating = true
+			this.accumulate(time)
+		}
 		this.post.accumulation.passthrough = false
+	}
+
+	// The next samples of an accumulating image, `batch` of them in this
+	// animation frame. Showing a sample (the depth of field, the dust and the
+	// effects over the whole frame) costs as much as a sample at the start
+	// framing: the image shows every PREVIEW_INTERVAL ms and its last sample,
+	// the others are only accumulated. The canvas keeps the last one shown.
+	accumulate(time) {
+		const target = this.params.quality.photoSamples
+		const count = Math.min(this.batch, target - this.samples)
+		for (let i = 0; i < count; i++) {
+			const last = this.samples + 1 >= target
+			const shown = i === count - 1 && (last || time - this.sampleShown >= PREVIEW_INTERVAL)
+			if (shown) this.sampleShown = time
+			this.renderSample(accumulationSample(this.samples), shown)
+		}
+		// Marks the end of this frame's work, for paceBatch() BATCH_LAG frames on.
+		const gl = this.setup.renderer.getContext()
+		this.batchFences.push(gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0))
+		if (this.batchFences.length > BATCH_LAG) gl.deleteSync(this.batchFences.shift())
+		gl.flush()
+	}
+
+	// Paces the samples per animation frame by whether the GPU has finished
+	// the work of the frame BATCH_LAG frames back (the browser's pipeline
+	// holds the one before): one more after `batchPatience` frames it had,
+	// one fewer at once when it had not, and the next try waits twice as
+	// long. The interval between frames would not tell: the browser lets a
+	// busy GPU fall a few frames behind before it slows them.
+	paceBatch() {
+		const gl = this.setup.renderer.getContext()
+		if (this.batchFences.length < BATCH_LAG) return
+		if (gl.getSyncParameter(this.batchFences[0], gl.SYNC_STATUS) === gl.SIGNALED) {
+			if (++this.framesOnTime < this.batchPatience) return
+			this.batch = Math.min(this.batch + 1, MAX_BATCH)
+		} else if (this.batch > 1) {
+			this.batch--
+			this.batchPatience = Math.min(this.batchPatience * 2, 120)
+		}
+		this.framesOnTime = 0
 	}
 
 	// Whether the dust moves over a converged image (not in photo mode).
@@ -673,7 +743,8 @@ export default class EyeApp {
 		return size
 	}
 
-	renderSample(sample) {
+	// `shown`: false adds the sample to the accumulation without showing it.
+	renderSample(sample, shown = true) {
 		const size = this.placeSample(sample)
 		this.setup.renderer.setClearColor(
 			this.backdropColor.setRGB(...this.backdropRadiance()),
@@ -694,7 +765,7 @@ export default class EyeApp {
 		}
 		this.keyShadow.render(renderer, this.setup.scene, caster, shadowCenter, sample, coverage)
 		const beauty = this.params.debug.view === 'beauty'
-		this.shaftLight.update(this.params, caster, beauty, this.dustTime)
+		this.shaftLight.update(renderer, this.params, caster, beauty, this.dustTime)
 		if (!sample) {
 			this.shaftLight.renderShadow(
 				renderer,
@@ -739,7 +810,7 @@ export default class EyeApp {
 			sensorHeight: lens.sensorHeight,
 		})
 		this.updateAtmosphere()
-		this.post.render()
+		this.post.render(shown)
 	}
 
 	// The backdrop beyond the skin: the tone of the light skin lit (its

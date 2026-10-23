@@ -16,25 +16,31 @@
 // - `dust`: the beams' light on the motes (src/render/dustPass.js);
 // - `air`: the beams themselves and the light the air scatters from them
 //   (light-shafts.glsl, in src/render/dofPass.js).
-// The cookie bakes again only when the layout changes.
+// The cookie bakes again on the GPU when the beams move or their layout
+// changes (shaft-cookie-fragment.glsl, the twin of bakeShaftCookie()).
 import {
-	DataTexture,
-	DataUtils,
 	HalfFloatType,
 	LinearFilter,
 	Matrix3,
+	Mesh,
+	OrthographicCamera,
 	PerspectiveCamera,
+	PlaneGeometry,
 	RedFormat,
+	Scene,
+	ShaderMaterial,
 	Uniform,
+	Vector2,
 	Vector3,
 	Vector4,
+	WebGLRenderTarget,
 } from 'three'
 import { emitterIrradiance } from '../atmosphere/dustField'
 import {
 	animateShafts,
-	bakeShaftCookie,
 	beamGeometry,
 	COOKIE_SIZE,
+	cookieBlades,
 	cookieExtent,
 	createShafts,
 	MAX_SHAFTS,
@@ -42,6 +48,8 @@ import {
 	shaftFrame,
 } from '../atmosphere/lightShafts'
 import { clamp, DEG, vec3 } from '../math'
+import cookieShader from '../shaders/shaft-cookie-fragment.glsl'
+import vertexShader from '../shaders/fullscreen-vertex.glsl'
 import { hexToLinearRgb } from './colorTemperature'
 import { sphericalDirection } from './envRig'
 import { coverageKey, createShadowTarget, SHADOW_EXTENT, SHADOW_LAYER } from './keyShadow'
@@ -56,19 +64,34 @@ const vectors = () => Array.from({ length: MAX_SHAFTS }, () => new Vector4())
 
 export default class ShaftLight {
 	constructor() {
-		this.cookie = new DataTexture(
-			new Uint16Array(COOKIE_SIZE * COOKIE_SIZE),
-			COOKIE_SIZE,
-			COOKIE_SIZE,
-			RedFormat,
-			HalfFloatType,
-		)
-		this.cookie.minFilter = LinearFilter
-		this.cookie.magFilter = LinearFilter
-		this.cookie.name = 'ShaftCookie'
-		this.cookie.needsUpdate = true
+		this.cookie = new WebGLRenderTarget(COOKIE_SIZE, COOKIE_SIZE, {
+			type: HalfFloatType,
+			format: RedFormat,
+			minFilter: LinearFilter,
+			magFilter: LinearFilter,
+			depthBuffer: false,
+			generateMipmaps: false,
+		})
+		this.cookie.texture.name = 'ShaftCookie'
+		this.cookieMaterial = new ShaderMaterial({
+			uniforms: {
+				uZero: new Uniform(0),
+				uBlades: new Uniform(Array.from({ length: MAX_SHAFTS * 3 }, () => new Vector4())),
+				uBladeCount: new Uniform(0),
+				uCookie: new Uniform(new Vector2()),
+			},
+			defines: { MAX_SHAFTS },
+			vertexShader,
+			fragmentShader: cookieShader,
+			depthTest: false,
+			depthWrite: false,
+		})
+		this.cookieMaterial.name = 'ShaftCookie'
+		this.cookieScene = new Scene()
+		this.cookieScene.add(new Mesh(new PlaneGeometry(2, 2), this.cookieMaterial))
+		this.cookieCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1)
 		this.uniforms = {
-			uShaftCookie: new Uniform(this.cookie),
+			uShaftCookie: new Uniform(this.cookie.texture),
 			// Columns: the cross-section's axes u and v, the beams' direction (world).
 			uShaftFrame: new Uniform(new Matrix3()),
 			// The source (world) and its distance to the globe's center (mm).
@@ -101,11 +124,8 @@ export default class ShaftLight {
 		// The beams of the layout, and as they move (animateShafts()).
 		this.shafts = new Float32Array(0)
 		this.beams = this.shafts
-		// The cookie's values (float), its half side (mm), the texel boxes the
-		// beams fill and the time it was baked for.
-		this.values = new Float32Array(COOKIE_SIZE * COOKIE_SIZE)
+		// The cookie's half side (mm) and the time it was baked for.
 		this.extent = 1
-		this.boxes = []
 		this.bakedAt = null
 		// The source (world) and toward it (unit), or null without a key.
 		this.source = null
@@ -121,15 +141,15 @@ export default class ShaftLight {
 
 	// `emitter`: emitter 0 when it casts the key's shadow, or null; `active`:
 	// whether the image shows the shafts (the beauty view); `time`: their
-	// clock (s, the dust's).
-	update(params, emitter, active, time) {
+	// clock (s, the dust's). The beams' cookie bakes only while they show.
+	update(renderer, params, emitter, active, time) {
 		const shafts = params.shafts
-		this.bake(shafts, time)
 		this.direction = emitter ? shaftDirection(emitter, shafts) : null
 		this.source = this.direction ? vec3.scale(this.direction, shafts.distance) : null
 		const on = active && emitter !== null && shafts.enabled && shafts.intensity > 0
 		this.shadowed = active && emitter !== null && (on || params.backdrop.shadow > 0)
 		const irradiance = on ? emitterIrradiance(emitter, [0, 0, 0])?.irradiance : null
+		if (irradiance) this.bake(renderer, shafts, time)
 		if (!irradiance) {
 			this.uniforms.uShaftLight.value.set(0, 0, 0)
 			this.uniforms.uShaftIrradiance.value.set(0, 0, 0)
@@ -188,10 +208,9 @@ export default class ShaftLight {
 	}
 
 	// The beams of the layout, again only when it changes, then swaying and
-	// flickering at `time` (animateShafts()); the cookie bakes again when they
-	// move, clearing and converting only the texels the beams cover (a few
-	// tenths of a millisecond).
-	bake(shafts, time) {
+	// flickering at `time` (animateShafts()); the cookie bakes again on the
+	// GPU when they move (a few hundredths of a millisecond).
+	bake(renderer, shafts, time) {
 		const { count, seed, width, widthVariation, spread, offsetX, offsetY, angle, alignment } =
 			shafts
 		// Compared every frame as they are, without building a key.
@@ -206,50 +225,30 @@ export default class ShaftLight {
 			// Room for the sway, so the cookie's texels stay put as the beams move.
 			this.extent = cookieExtent(this.shafts, shafts.elongation) + shafts.sway
 			this.uniforms.uShaftCookieExtent.value = this.extent
-			this.values.fill(0)
-			this.cookie.image.data.fill(0)
-			this.boxes = []
 			this.bakedAt = null
 		}
 		const at = moving ? time : 0
 		if (at === this.bakedAt) return
 		this.bakedAt = at
 		animateShafts(this.shafts, seed, shafts, at, this.beams)
-		const { values, boxes } = this
-		const size = COOKIE_SIZE
-		for (const [i0, i1, j0, j1] of boxes) {
-			for (let j = j0; j <= j1; j++) values.fill(0, j * size + i0, j * size + i1 + 1)
-		}
-		this.boxes = []
-		bakeShaftCookie(this.beams, shafts.elongation, size, this.extent, values, this.boxes)
-		// The texels cleared or baked, each converted once: per row, the union
-		// of the old and the new boxes' spans.
-		const data = this.cookie.image.data
-		const spans = [...boxes, ...this.boxes]
-		let first = size
-		let last = -1
-		for (const [, , j0, j1] of spans) {
-			first = Math.min(first, j0)
-			last = Math.max(last, j1)
-		}
-		for (let j = first; j <= last; j++) {
-			const row = []
-			for (const [i0, i1, j0, j1] of spans) if (j >= j0 && j <= j1) row.push([i0, i1])
-			row.sort((a, b) => a[0] - b[0])
-			let next = 0
-			for (const [i0, i1] of row) {
-				for (let i = Math.max(i0, next); i <= i1; i++) {
-					const index = j * size + i
-					data[index] = DataUtils.toHalfFloat(values[index])
-				}
-				next = Math.max(next, i1 + 1)
-			}
-		}
-		this.cookie.needsUpdate = true
+		const blades = cookieBlades(this.beams, shafts.elongation, COOKIE_SIZE, this.extent)
+		const u = this.cookieMaterial.uniforms
+		blades.forEach((blade, k) => {
+			u.uBlades.value[3 * k].set(blade.u, blade.v, blade.across, blade.along)
+			u.uBlades.value[3 * k + 1].set(blade.intensity, blade.cos, blade.sin, 0)
+			u.uBlades.value[3 * k + 2].set(...blade.box)
+		})
+		u.uBladeCount.value = blades.length
+		u.uCookie.value.set(this.extent, (2 * this.extent) / COOKIE_SIZE)
+		const previous = renderer.getRenderTarget()
+		renderer.setRenderTarget(this.cookie)
+		renderer.render(this.cookieScene, this.cookieCamera)
+		renderer.setRenderTarget(previous)
 	}
 
 	dispose() {
 		this.cookie.dispose()
+		this.cookieMaterial.dispose()
 		this.map.dispose()
 		this.coverage.dispose()
 	}

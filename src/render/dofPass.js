@@ -131,6 +131,7 @@ export default class DofPass extends Pass {
 				uTileMax: new Uniform(this.tileMax.texture),
 				uLens: this.prepare.uniforms.uLens,
 				uWeight: new Uniform(1),
+				uBackdropGathered: new Uniform(false),
 			},
 			defines: { MAX_SHAFTS, DOF_TILE: TILE },
 			vertexShader,
@@ -152,9 +153,11 @@ export default class DofPass extends Pass {
 		)
 		// The radius dofRadius() (dof-radius.glsl) gives a point halfway to the
 		// backdrop's distance: only the backdrop lies farther.
-		const distance = FOCUS_AT_INFINITY / 2
-		this.tileReduce.uniforms.uBackdropRadius.value =
-			(0.5 * lens.x * (distance - lens.y) * lens.w) / (distance * lens.z)
+		const radius = (distance) => (0.5 * lens.x * (distance - lens.y) * lens.w) / (distance * lens.z)
+		this.tileReduce.uniforms.uBackdropRadius.value = radius(FOCUS_AT_INFINITY / 2)
+		// The backdrop's own: the composite shows it as the gather's whole
+		// past NEAR_RADIUS + 0.5 (dof-composite-fragment.glsl).
+		this.composite.uniforms.uBackdropGathered.value = Math.abs(radius(FOCUS_AT_INFINITY)) >= 3
 	}
 
 	// The haze: `density` (1/mm, 0 for none), the distance it stops growing at

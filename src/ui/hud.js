@@ -647,8 +647,10 @@ export function createHud({
 		requestAnimationFrame(stepSway)
 		const dt = swayTime === null ? 0 : Math.min((time - swayTime) / 1000, 0.1)
 		swayTime = time
+		// They land within 1e-4 rad (a twentieth of a pixel out at 500 px),
+		// so the layers stop being redrawn a second or two sooner.
 		const toward = (current, layer) =>
-			follow(current, still.matches ? 0 : swayTurn(layer, mouse), dt, layer.lag, 1e-5)
+			follow(current, still.matches ? 0 : swayTurn(layer, mouse), dt, layer.lag, 1e-4)
 		let rings = false
 		for (const kind of ['inner', 'outer']) {
 			const turn = toward(sway[kind], HUD.sway[kind])

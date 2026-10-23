@@ -86,6 +86,7 @@ pnpm sounds
   | [`src/random.js`](src/random.js) `pcg()` | `pcgHash()` |
   | `hgPhase()` in [`src/atmosphere/dustField.js`](src/atmosphere/dustField.js) | `scattering.glsl` |
   | `beamIntegral()` and `erf()` in [`src/atmosphere/lightShafts.js`](src/atmosphere/lightShafts.js) | `applyShafts()` and `shaftErf()` in `light-shafts.glsl` |
+  | `bakeShaftCookie()` (over `cookieBlades()`) in [`src/atmosphere/lightShafts.js`](src/atmosphere/lightShafts.js) | `shaft-cookie-fragment.glsl` |
 - Keep development-only code (the console API, telemetry, benchmarks, the panel) in the development tools of [`src/debug/devTools.js`](src/debug/devTools.js), which `main.js` imports only on request: a plain page neither downloads nor runs it.
 - Scene materials write the apparent focus distance in alpha. Only the accumulation history keeps it; the effects receive opaque alpha (see [`docs/RENDERING.md`](docs/RENDERING.md)).
 - In shaders:

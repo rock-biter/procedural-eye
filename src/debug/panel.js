@@ -60,8 +60,16 @@ export function createPanel(context, loadPreset) {
 			ui.audio.play(heard.sound)
 		})
 	}
+	// The camera notifies on every pointer move of a drag and every frame of a
+	// glide: one refresh per animation frame.
+	let queued = false
 	app.listeners.add((path) => {
-		if (path === 'camera' || path === '*') gui.refresh()
+		if (queued || (path !== 'camera' && path !== '*')) return
+		queued = true
+		requestAnimationFrame(() => {
+			queued = false
+			gui.refresh()
+		})
 	})
 	hooks.refreshPanel = () => gui.refresh()
 	return gui

@@ -15,6 +15,10 @@ import { hexToLinearRgb, kelvinToLinearRgb, luminance } from './colorTemperature
 
 export const MAX_EMITTERS = 10
 export const EMITTER_VEC4S = 6
+// The lit emitters (panels, window, ring, LEDs) come first in
+// buildEmitters()'s list, at most this many; the skin evaluates their
+// irradiance per vertex (skin-vertex.glsl).
+export const LIT_EMITTERS = 5
 
 export const EMITTER_TYPE = Object.freeze({
 	RECT: 0,

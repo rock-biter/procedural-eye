@@ -44,13 +44,11 @@ Cap shadeCap(vec3 p, vec3 dir, bool terminator) {
 	// The clear cornea is a near-perfect mirror; the conjunctiva over the
 	// limbus already has the irregular surface of the sclera. The sclera's
 	// relief and diffuse light are only computed where the limbus shows them.
-	vec3 mirror = opacity > 0.0 ? normalize(mix(n, scleraNormal(p, n), opacity)) : n;
-	float cosi = -dot(dir, mirror);
-	float fresnel = fresnelDielectric(cosi, uIor.x);
-	vec3 mirrorDir = reflect(dir, mirror);
-	vec3 reflection = lidReflection(p, mirrorDir, envRadiance(p, mirrorDir));
 	vec3 inside = vec3(0.0);
 	float insideDistance = 3.0;
+	// The limbal ring: a dark band where the iris disappears under the
+	// limbus (black, where the lens meets its socket).
+	float ring = smoothstep(uGlobe.y - uLimbus.x - uLimbus.z, uGlobe.y - 0.25 * uLimbus.x, rLimbus);
 	if (opacity < 0.999) {
 		vec3 inner;
 		vec3 innerDir;
@@ -65,14 +63,17 @@ Cap shadeCap(vec3 p, vec3 dir, bool terminator) {
 				gIrisSight = vec2(length(p - uCameraEye), length(inner - p));
 				ChamberResult chamber = traceChamber(inner, innerDir, coneOrigin, uPixelAngle / uIor.z);
 				inside = chamber.radiance;
-				insideDistance = length(inner - p) + chamber.distance;
+				insideDistance = gIrisSight.y + chamber.distance;
 			}
 		}
-		// The limbal ring: a dark band where the iris disappears under the
-		// limbus (black, where the lens meets its socket).
-		float ring = smoothstep(uGlobe.y - uLimbus.x - uLimbus.z, uGlobe.y - 0.25 * uLimbus.x, rLimbus);
-		inside *= (1.0 - fresnel) * (1.0 - (terminator ? 1.0 : uLimbus.w) * ring);
 	}
+	// After the trace, which then holds fewer values across its loops.
+	vec3 mirror = opacity > 0.0 ? normalize(mix(n, scleraNormal(p, n), opacity)) : n;
+	float cosi = -dot(dir, mirror);
+	float fresnel = fresnelDielectric(cosi, uIor.x);
+	vec3 mirrorDir = reflect(dir, mirror);
+	vec3 reflection = lidReflection(p, mirrorDir, envRadiance(p, mirrorDir));
+	inside *= (1.0 - fresnel) * (1.0 - (terminator ? 1.0 : uLimbus.w) * ring);
 	vec3 diffuse = vec3(0.0);
 	if (opacity > 0.0) {
 		float footprint = length(p - uCameraEye) * uPixelAngle;

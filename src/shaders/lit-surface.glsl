@@ -22,14 +22,17 @@ float schlick(float cosTheta, float f0) {
 	return f0 + (1.0 - f0) * pow(1.0 - saturate(cosTheta), 5.0);
 }
 
+#ifdef LIT_EMITTERS
 // Diffuse with wrap per channel (`wrap` = red, green, blue reach past the
 // terminator) and a normal per channel (the columns of `diffuse`: red, green,
 // blue; skin passes its relief softer in the red, which light scattered
 // under it blurs the most), specular GGX lobe of `roughness` on the normal
 // `n`, for every emitter, plus the background. `shadow0` dims emitter 0 (the
 // key light) per channel: skin passes it with a softer red, the scattered
-// light bleeding into the shadow.
+// light bleeding into the shadow. `facings`: the lit emitters' irradiance
+// facing them (the skin's vertices evaluate it, skin-vertex.glsl).
 vec3 litSurface(
+	vec3 facings[LIT_EMITTERS],
 	vec3 p,
 	vec3 n,
 	mat3 diffuse,
@@ -52,7 +55,7 @@ vec3 litSurface(
 		vec3 toLight = A.xyz - p;
 		float distance = length(toLight);
 		vec3 l = toLight / distance;
-		vec3 facing = emitterIrradiance(i, p, l);
+		vec3 facing = i < LIT_EMITTERS ? facings[i] : emitterIrradiance(i, p, l);
 		vec3 shadow = i == 0 ? shadow0 : vec3(1.0);
 		float nl = dot(n, l);
 		vec3 wrapped = saturate((l * diffuse + wrap) / (1.0 + wrap));
@@ -71,5 +74,6 @@ vec3 litSurface(
 	}
 	return color;
 }
+#endif
 
 #endif

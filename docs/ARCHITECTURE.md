@@ -59,7 +59,7 @@
 | [`src/lighting/lightRig.js`](../src/lighting/lightRig.js) | Per-frame env uniforms in eye space and in world space. |
 | [`src/lighting/keyShadow.js`](../src/lighting/keyShadow.js) | The key light's shadow map of the lids and lashes; the caster draw the light shafts reuse. |
 | [`src/lighting/shadowCoverage.js`](../src/lighting/shadowCoverage.js) | A light's soft coverage: its shadow map reduced and blurred, with the globe's disc, for the dust, the shafts and the floor shadow. |
-| [`src/lighting/shaftLight.js`](../src/lighting/shaftLight.js) | The light shafts' source, cookie texture, uniforms (surfaces, dust, air) and perspective shadow. |
+| [`src/lighting/shaftLight.js`](../src/lighting/shaftLight.js) | The light shafts' source, cookie (baked on the GPU), uniforms (surfaces, dust, air) and perspective shadow. |
 | [`src/camera/cameraOptics.js`](../src/camera/cameraOptics.js) * | Thin-lens formulas, blur circle, lens-shift projection shear. |
 | [`src/camera/lensSampling.js`](../src/camera/lensSampling.js) * | Halton and concentric-disk samples (pixel, lens, light). |
 | [`src/camera/physicalCamera.js`](../src/camera/physicalCamera.js) | The macro `PerspectiveCamera`, placed and sheared per sample, turned by the parallax (`orbitOffset`) and the intro (`roll`) outside the params; its `pinhole` matrices before the sample's jitter place the dust. |
@@ -67,10 +67,10 @@
 | [`src/camera/cameraControls.js`](../src/camera/cameraControls.js) | Pointer orbit (with inertia) and distance, and the f-number from the wheel over the HUD's aperture knob, written into `params.camera`; a right-drag's horizontal motion, handed to `sideDrag` (`main.js`); the mouse parallax, a turn of the orbit outside the params. |
 | **Atmosphere** ([`docs/RENDERING.md`](RENDERING.md#dust-and-haze)) | |
 | [`src/atmosphere/dustField.js`](../src/atmosphere/dustField.js) * | Seeded dust motes (fibers, flakes, crossed fibers) in a unit cube, the lights the haze scatters, an emitter's irradiance, the Henyey–Greenstein phase. |
-| [`src/atmosphere/lightShafts.js`](../src/atmosphere/lightShafts.js) * | Seeded light blades in their cross-section, their geometry from the source, the cookie bake, a blade's integral along a ray ([`docs/RENDERING.md`](RENDERING.md#light-shafts)). |
+| [`src/atmosphere/lightShafts.js`](../src/atmosphere/lightShafts.js) * | Seeded light blades in their cross-section, their geometry from the source, the cookie's blades and its bake (the GPU's twin), a blade's integral along a ray ([`docs/RENDERING.md`](RENDERING.md#light-shafts)). |
 | **Render and tools** ([`docs/RENDERING.md`](RENDERING.md)) | |
-| [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, dust, effects, antialiasing of fresh frames (FXAA) and grain. |
-| [`src/render/scenePass.js`](../src/render/scenePass.js) | The scene into the composer's buffer; living frames split into a full-resolution sharp share and a half-resolution blurred one. |
+| [`src/render/postProcessing.js`](../src/render/postProcessing.js) | The composer: scene pass, accumulation, depth of field, dust, effects, antialiasing of fresh frames (FXAA) and grain, or the effects and the grain in one pass where FXAA has no weight; samples only accumulated (`render(false)`). |
+| [`src/render/scenePass.js`](../src/render/scenePass.js) | The scene into the composer's buffer; with `quality.splitShading` (off by default) living frames split into a full-resolution sharp share and a half-resolution blurred one. |
 | [`src/render/accumulationPass.js`](../src/render/accumulationPass.js) | Progressive mean of still frames in a float history; living frames pass through. |
 | [`src/render/dofPass.js`](../src/render/dofPass.js) | Interactive depth of field (half-resolution prepare, tile bounds and gather), composited over the accumulated mean; the haze and the light shafts in the air. |
 | [`src/render/backdrop.js`](../src/render/backdrop.js) | The backdrop triangle, in every view: the clear color, with the patch's soft shadow on a floor in the beauty view ([`docs/RENDERING.md`](RENDERING.md#backdrop-shadow)). |
@@ -107,7 +107,7 @@
 
 `EyeApp.start()` overlaps the compile with the CPU work of the first rebuild, and draws nothing before the first animation frame:
 
-1. It hands every program of the post-processing and the bakes to `compileAsync()` (`precompile()`, [`src/render/precompile.js`](../src/render/precompile.js)): the scene pass, the accumulation, the depth of field's five materials, the dust, the effects and the antialiasing, the iris atlases, the skin's patterns, relief and freckles, and the soft coverages' reduce and blur. Each job draws into the target it will draw into, so the program cache keys match; where `KHR_parallel_shader_compile` exists the driver links them while the main thread goes on.
+1. It hands every program of the post-processing and the bakes to `compileAsync()` (`precompile()`, [`src/render/precompile.js`](../src/render/precompile.js)): the scene pass, the accumulation, the depth of field's five materials, the dust, the effects and the antialiasing, the iris atlases, the skin's patterns, relief and freckles, the light shafts' cookie, and the soft coverages' reduce and blur. Each job draws into the target it will draw into, so the program cache keys match; where `KHR_parallel_shader_compile` exists the driver links them while the main thread goes on.
 2. The initial rebuild; a living eye that blinks posts the blink's frames to the worker at once.
 3. The scene's programs, now that its meshes carry their morph targets, with the lids' and lashes' shadow proxies drawn with the shadow map's material.
 4. The initial bake, the skin's relief (outside `#debug`; `main.js` sets the mode from the hash before it, and again on every hash change through `setSkinBaked()`), and the camera and light rig of the first pose (its pupil weighs their light).
@@ -145,12 +145,13 @@
 7. **Render one sample** (`renderSample()`)
    - The first frame after a change is a fresh (interactive) frame. It is a pinhole frame with the cheaper shading tier and the interactive depth of field. When the next frame restarts the image anyway (a living eye, a running transition), it is shown without being kept in the accumulation ([`docs/RENDERING.md`](RENDERING.md#pipeline)); `capture()` then renders and keeps one first.
    - Later frames take `accumulationSample(n)`: a subpixel jitter, a point on the lens and a point on the key light.
+   - **Accumulating** (`accumulate()`): an image that accumulates renders `batch` samples per animation frame. A fence marks the end of each frame's work; one more sample per frame after two frames whose work two frames back had finished, one fewer as soon as it had not, and the next try waits twice as long (`paceBatch()`: the interval between frames would not tell, the browser lets a busy GPU fall a few frames behind first). Every new image starts at one. The image is shown at its first frame, every `PREVIEW_INTERVAL` (150 ms) and at its last sample; the samples in between only render the scene and the blend (`PostProcessing.render(false)`), and the canvas keeps the last image shown.
    - The steps, in order:
      1. `PhysicalCamera` places the camera.
      2. The eye rig updates its matrices.
      3. `LightRig` rebuilds the emitters and packs them in eye space and in world space.
      4. `KeyShadow` renders the lid and lash shadow map from emitter 0, when it is a panel or a window; on fresh frames it reduces it into the key's soft coverage when the light, `backdrop.softness` or the lids changed (`refreshScene()`, after the mesh tree shows or hides an object, drops both coverages).
-     5. `ShaftLight` sets the light shafts' source, blades (swaying and flickering on the dust's clock), cookie (baked again when their layout changed or they moved) and light; on fresh frames it redraws their shadow and coverage when its inputs changed. Moving shafts restart the image every frame (`shaftsMove`), as a living eye does. `Backdrop` takes the clear color and the shadow plane.
+     5. `ShaftLight` sets the light shafts' source, blades (swaying and flickering on the dust's clock), cookie (baked again on the GPU when their layout changed or they moved, while they show) and light; on fresh frames it redraws their shadow and coverage when its inputs changed. Moving shafts restart the image every frame (`shaftsMove`), as a living eye does. `Backdrop` takes the clear color and the shadow plane.
      6. The eyeball, lid and lash uniforms are refreshed from the params; the lashes' widening from the camera's distance between the screen's zoom distances (`lashWidening()`, [`docs/ADNEXA.md`](ADNEXA.md#lashes)).
      7. The post-processing updates the lens of the depth of field and its fade, then the haze, the shafts' origin and the dust (`updateAtmosphere()`: the pinhole camera, the rig and the dust's clock), then the composer renders.
 

@@ -53,6 +53,7 @@ centroid varying vec4 vRelief;
 centroid varying float vAo;
 varying vec3 vCenterWorldPos;
 varying vec4 vCenterFrame;
+centroid varying vec3 vFacing[LIT_EMITTERS];
 
 // Meibomian orifices per margin, upper and lower (docs/RESEARCH.md).
 const vec2 ORIFICES = vec2(34.0, 24.0);
@@ -269,16 +270,24 @@ void main() {
 	float lit = keyShadow(vWorldPos + geometric * 0.02, geometric);
 	// Light scattered under the skin softens the red edge of the shadows.
 	vec3 shadow = mix(vec3(lit), vec3(sqrt(lit), lit, lit * lit), uSkin2.y);
-	vec3 color = litSurface(vWorldPos, n, diffuse, v, albedo * occlusion, wrap, roughness, 0.028, occlusion, shadow);
+	vec3 facings[LIT_EMITTERS];
+	for (int i = 0; i < LIT_EMITTERS; i++) facings[i] = vFacing[i];
+	vec3 color = litSurface(facings, vWorldPos, n, diffuse, v, albedo * occlusion, wrap, roughness, 0.028, occlusion, shadow);
 	// The light shafts crossing the skin.
 	color += albedo * occlusion * INV_PI * shaftIrradiance(vWorldPos, diffuse[1], 0.15);
 	// The tear film makes the margin a mirror. On the skin the moisture follows
 	// the relief, so it reflects roughly (litSurface() above), and the mirror
 	// image fades out within half a millimeter: further out, where the folds of
 	// the canthi turn the skin grazing, it showed the emitters as pale blots.
+	// It is left out where it fades under 1e-4 (some 4 mm from the margin) and
+	// on the back shell, which lies 60 mm out.
+#ifndef SKIN_SHELL
 	float mirror = mix(wet * exp(-a / 0.5), wet, onMargin);
-	float fresnel = schlick(dot(n, v), 0.02);
-	color += mirror * occlusion * fresnel * envRadiance(vWorldPos, reflect(-v, n)) * 0.6;
+	if (mirror > 1e-4) {
+		float fresnel = schlick(dot(n, v), 0.02);
+		color += mirror * occlusion * fresnel * envRadiance(vWorldPos, reflect(-v, n)) * 0.6;
+	}
+#endif
 
 #if DEBUG_VIEW == DEBUG_NORMALS
 	color = n * 0.5 + 0.5;
