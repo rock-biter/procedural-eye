@@ -19,6 +19,7 @@ import { randomEye, randomIrises } from './src/params/populationPriors'
 import { SECRET_TONE, SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
 import { SHARINGAN_NAMES, pickPattern } from './src/eye/sharinganPatterns'
+import { KONAMI, createSequence, parseUnlocks } from './src/ui/unlocks'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
 import { CHECKLIST, createChecklist } from './src/ui/checklist'
@@ -447,7 +448,7 @@ if (urlParams.get('gui') !== '0') {
 		onSharingan: desktop
 			? () => {
 					const clan = progress.done().some((task) => task.id === 'uchiha')
-					const odds = clan ? app.params.sharingan.rinnegan : 0
+					const odds = clan || unlocks.has('rinnegan') ? app.params.sharingan.rinnegan : 0
 					const next = pickPattern(app.sharingan.name, Math.random, odds)
 					app.sharingan.show(next, app.params, motionless.matches)
 					if (next === 'rinnegan') report('rinnegan')
@@ -537,16 +538,22 @@ if (urlParams.get('gui') !== '0') {
 		saved,
 	})
 	const worn = new Set(Array.isArray(saved.tones) ? saved.tones : [])
+	// What `?unlock=` gives this page without the checklist
+	// (src/ui/unlocks.js), and whether the Konami code has unlocked the
+	// Sharingan (kept with the checklist, until Reset).
+	const unlocks = parseUnlocks(urlParams.get('unlock'))
+	let konami = saved.konami === true
 	const keepChecklist = () =>
-		writeStored(CHECKLIST_KEY, JSON.stringify({ ...progress.state(), tones: [...worn] }))
+		writeStored(CHECKLIST_KEY, JSON.stringify({ ...progress.state(), tones: [...worn], konami }))
 	const secretShown = () => progress.current()?.id === 'secret'
 	const unlockSecret = () => {
 		const found = progress.done().some((task) => task.id === 'secret')
 		const allWorn = SKIN_TONES.every((tone) => worn.has(tone.name))
-		hud.unlockSecret(found || (secretShown() && allWorn))
+		hud.unlockSecret(unlocks.has('tone') || found || (secretShown() && allWorn))
 	}
 	// A desktop's checklist done unlocks the Sharingan (the HUD's tomoe) and
-	// its hidden tasks; Reset locks it again and takes it off the eye. Done
+	// its hidden tasks, and so do the Konami code and `?unlock=` (not the
+	// hidden tasks); Reset locks it again and takes it off the eye. Done
 	// live (`live`), it awakens AWAKEN_DELAY s later, after the photo's
 	// shutter: a singing bowl, a shockwave over the image from the eye (not
 	// with reduced motion), the HUD's tomoe coming in and a first Sharingan
@@ -564,7 +571,9 @@ if (urlParams.get('gui') !== '0') {
 	}
 	const unlockSharingan = (live) => {
 		const ids = new Set(progress.done().map((task) => task.id))
-		const done = desktop && tasks.every((task) => task.hidden || ids.has(task.id))
+		const done =
+			desktop &&
+			(konami || unlocks.has('sharingan') || tasks.every((task) => task.hidden || ids.has(task.id)))
 		const awakens = live && done && !sharinganUnlocked
 		sharinganUnlocked = done
 		if (awakens)
@@ -575,6 +584,26 @@ if (urlParams.get('gui') !== '0') {
 		if (!done) app.sharingan.hide(app.params)
 		return awakens
 	}
+	// The awakening again, counting for nothing: with the Sharingan
+	// unlocked, its button hidden and brought in again; otherwise its sound,
+	// its shockwave and a Sharingan alone.
+	const replayAwakening = () => {
+		if (sharinganUnlocked) hud.unlockSharingan(false)
+		awaken(false)
+	}
+	// The Konami code (↑ ↑ ↓ ↓ ← → ← → B A, a desktop's, not typed into a
+	// field of the panel) unlocks the Sharingan, which awakens; unlocked
+	// already, it plays the awakening again.
+	const konamiCode = createSequence(KONAMI)
+	window.addEventListener('keydown', (event) => {
+		if (!desktop || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return
+		if (event.target.closest?.('input, textarea, select, [contenteditable]')) return
+		if (!konamiCode(event.key)) return
+		if (sharinganUnlocked) return replayAwakening()
+		konami = true
+		keepChecklist()
+		unlockSharingan(true)
+	})
 	// Each task done sounds as something unlocking (by the list, at the
 	// left), the controls' as the achievements'; the one that awakens the
 	// Sharingan sounds its bowl instead.
@@ -595,8 +624,12 @@ if (urlParams.get('gui') !== '0') {
 			countFirstShot()
 			for (const listener of checklistListeners) listener()
 		},
-		// Reset forgets the tones worn too: the hidden tone locks again.
-		onReset: () => worn.clear(),
+		// Reset forgets the tones worn and the Konami code too: the hidden
+		// tone and the Sharingan lock again.
+		onReset: () => {
+			worn.clear()
+			konami = false
+		},
 	})
 	const report = (id, key) => checklist.report(id, key)
 	// The T-800's first report comes once a page, before every other: told
@@ -1386,7 +1419,7 @@ if (urlParams.get('gui') !== '0') {
 	const checklistTools = {
 		complete: () => checklist?.complete(),
 		reset: () => checklist?.reset(),
-		state: () => ({ ...progress.state(), tones: [...worn] }),
+		state: () => ({ ...progress.state(), tones: [...worn], konami }),
 		tasks: tasks.map(({ id, text, achievement = false, hidden = false }) => ({
 			id,
 			text,
@@ -1395,10 +1428,7 @@ if (urlParams.get('gui') !== '0') {
 		})),
 		setDone: (id, done) => checklist?.setDone(id, done),
 		subscribe: (listener) => checklistListeners.add(listener),
-		replayAwakening: () => {
-			if (sharinganUnlocked) hud.unlockSharingan(false)
-			awaken(false)
-		},
+		replayAwakening: () => replayAwakening(),
 		achievementSound: () => cue('achievement', { element: checklist.element }),
 		shockwave: () => app.post.shockwave.trigger(),
 		hint: () => app.sharingan.hint(),
