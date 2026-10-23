@@ -85,7 +85,7 @@ The `sound` group of [`src/params/paramSchema.js`](../src/params/paramSchema.js)
 | --- | --- | --- |
 | `volume` | 0.64 | The master volume, over every sound; the volume slider sets it. |
 | `volumes.press`, `.hover`, `.zoom`, `.aperture`, `.strain`, `.advance`, `.shutter`, `.mirror`, `.beep` | 0.35, 0.3, 0.2, 0.15, 0.35, 0.42, 0.56, 0.35, 0.08 | Each sound's own volume, under the master (`advance` also sets `wind`, `aperture` both kinds of ticks, `beep` both beeps). |
-| `volumes.unlock`, `.gong` | 0.3, 0.5 | The checklist's chime (a task done) and the Sharingan's awakening bowl. |
+| `volumes.unlock`, `.gong` | 0.12, 0.5 | The checklist's chime (a task done) and the Sharingan's awakening bowl. |
 | `volumes.glasses`, `.lead` | 0.22, 0.3 | The glass harp's quiet glasses and its louder ones. |
 | `variation` | 60 cents | How far a sound's pitch varies from one play to the next. |
 | `zoomDetents` | 16 | The zoom ring's detents across the knob's track. |
@@ -135,7 +135,7 @@ The cuts were chosen from measurements (onsets, transients, spectral flatness an
   | The hover's tick | −17 |
   | The zoom's detents | −15 to −21 |
   | The aperture's ticks (either kind) | −16 to −23 |
-  | The checklist's chime | −17.5 |
+  | The checklist's chime | −24 |
   | The awakening's bowl | −11 |
 
   The glass harp alone, measured as RMS over 15 s windows: its quiet glasses rise to −44 dBFS about 12 s after the first press with the 10 s fade (−86, −58, −46 and −44 dBFS at 3, 6, 9 and 12 s), then sing at −41 to −46 dBFS, peaking at −32 to −35; the louder glasses peak at −27 dBFS.

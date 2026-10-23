@@ -398,8 +398,8 @@
       "shutter": 0.56,
       "mirror": 0.35,
       "beep": 0.08,
-      "unlock": 0.25,
-      "gong": 0.45,
+      "unlock": 0.015,
+      "gong": 0.05,
       "glasses": 0.03,
       "lead": 0.07
     },
