@@ -62,6 +62,7 @@
   - The pause follows the window's focus: the sound also stops while the focus is in the browser's own interface (the address bar, the developer tools).
   - The sounds are not placed in space beyond a pan by the control's place on the screen.
   - On iOS the ringer switch silences Web Audio.
+- **Sharingan** ([`docs/IRIS.md`](IRIS.md#sharingan)): the patterns are compass approximations of the reference drawings (curves as arcs of circles; Obito's hooks stand apart from his blades, the spokes of Madara's eternal one are a symmetric guess); while one shows, the pupil holds at `sharingan.pupil`, without the light reflex or hippus; the spin turns the pigment over the still tissue; the Rinnegan's rings on the iris live in rest space and follow the tissue, those on the sclera are millimeters along the globe, so they only meet at the limbus.
 - **Gaze and orbit**: a living eye with `animation.gaze` = `camera` turns toward the camera as it orbits. Use the default `wander`, `fixed`, photo mode, or a still eye to look at grazing angles.
 
 ## Future Work

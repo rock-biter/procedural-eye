@@ -771,3 +771,18 @@ test("the tones' arcs grow as the aperture opens, bounded, inside the inner zoom
 		assert.ok(toneArcs(radius, 0)[0].radius * widest < ticks - 4, `${radius}`)
 	}
 })
+
+test('a desktop HUD keeps room for the Sharingan below Random eye, before and after it shows', () => {
+	for (const [width, height] of [SCREENS.desktop, [1100, 700], [700, 1000]]) {
+		const layout = hudLayout(width, height, TONES, HUD, { sharingan: true })
+		const { radius, angles, split } = layout
+		const without = hudLayout(width, height, TONES)
+		assert.ok(radius <= without.radius)
+		assert.ok(near(angles.sharingan - angles.random, HUD.sharingan.spacing / radius))
+		const [x, y] = point(radius, angles.sharingan)
+		const half = HUD.button / 2 - (split ? HUD.split.overhang : 0)
+		assert.ok(Math.abs(x) <= width / 2 - half && Math.abs(y) <= height / 2 - half)
+		// Lower down the circle than Random eye.
+		assert.ok(y > point(radius, angles.random)[1])
+	}
+})

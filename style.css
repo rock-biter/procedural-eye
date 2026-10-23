@@ -671,8 +671,8 @@ canvas {
 /* The Sharingan's tomoe, as Random eye's icon; the button shows once the
    checklist is done (main.js). */
 .sharingan .icon {
-	width: 24px;
-	height: 24px;
+	width: 26px;
+	height: 26px;
 }
 
 .sharingan .hud-reticle {

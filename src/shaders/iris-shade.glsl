@@ -63,7 +63,7 @@ vec3 irisColorLookup(float melanin, float eumelanin, float stroma) {
 // where the ABL is missing), the radial vessels with `fiberAbl` of it, the
 // deeper collagen arcs with most of it, the ruff the dark pigment epithelium,
 // nodules paler. The Sharingan's pigment covers it all but the ruff, the
-// tissue still showing through (uSharinganLevel.z): darker down the crypts,
+// tissue still showing through (uSharinganLook.x): darker down the crypts,
 // a little lighter on the fibers.
 vec3 irisAlbedo(IrisParts parts, vec4 weights) {
 #if DEBUG_VIEW == DEBUG_IRIS_CLAY
@@ -80,13 +80,13 @@ vec3 irisAlbedo(IrisParts parts, vec4 weights) {
 	vec3 ruffColor = vec3(0.028, 0.016, 0.011);
 	vec3 albedo = weights.x * stromaColor + weights.y * radialColor + weights.z * arcColor + weights.w * ruffColor;
 	albedo = max(mix(vec3(luma(albedo)), albedo, uIrisColorMisc.y), 0.0) * uIrisTint;
-	if (uSharinganLevel.x > 0.0) {
+	if (uSharingan.x > 0.0) {
 		float rhoFootprint = gIrisFootprint / max(uIrisRest.y - uPupil.z, 0.5);
 		vec3 painted = sharinganIris(parts.rho, parts.theta, rhoFootprint);
-		float tissue = uSharinganLevel.z;
+		float tissue = uSharinganLook.x;
 		painted *= (1.0 - 0.55 * tissue * inCrypt) * (1.0 + 0.2 * tissue * (weights.y + weights.z));
 		painted = mix(painted, ruffColor, weights.w);
-		albedo = mix(albedo, painted, uSharinganLevel.x);
+		albedo = mix(albedo, painted, uSharingan.x);
 	}
 	return albedo;
 #endif
@@ -110,7 +110,7 @@ vec3 shadeIris(IrisHit hit) {
 	float lidAmbient = lidOcclusion((uEyeToWorld * vec4(pEye, 1.0)).xyz);
 	vec3 radiance = albedo * INV_PI * backgroundIrradiance(n) * ao * 0.6 * mix(0.4, 1.0, lidAmbient);
 	// Its own light (irisColor.glow, or the Sharingan's), neither shadowed nor occluded.
-	radiance += albedo * mix(uIrisColorMisc.w, uSharinganLevel.w, uSharinganLevel.x);
+	radiance += albedo * mix(uIrisColorMisc.w, uSharinganLook.y, uSharingan.x);
 	for (int i = ZERO; i < uEmitterCount; i++) {
 		int base = i * EMITTER_VEC4S;
 		vec4 A = uEmitters[base];

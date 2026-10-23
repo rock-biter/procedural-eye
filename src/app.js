@@ -241,7 +241,8 @@ export default class EyeApp {
 	}
 
 	// The start-up compile jobs of the bakes: the iris atlases, the skin's
-	// patterns and relief, the light shafts' cookie, the soft coverages.
+	// patterns and relief, the light shafts' cookie, the soft coverages, the
+	// Sharingan's maps.
 	bakePrograms() {
 		const target = this.post.composer.inputBuffer
 		const quad = (mesh, materials) => materials.map((material) => withMaterial(mesh, material))
@@ -269,6 +270,7 @@ export default class EyeApp {
 				target,
 				variants: quad(coverage.mesh, [coverage.reduce, coverage.blur]),
 			})),
+			{ scene: this.sharingan.scene, camera: this.sharingan.camera, target },
 		]
 	}
 
@@ -787,6 +789,7 @@ export default class EyeApp {
 		const pixelAngle = (camera.fov * Math.PI) / 180 / size.height
 		this.pixelAngle = pixelAngle
 		this.terminator.update(this.params, this.lightRig.luminance * 0.05)
+		this.sharingan.prepare(renderer, this.params)
 		this.sharingan.update(this.params, this.lightRig.luminance * 0.05)
 		this.eyeball.update(
 			this.params,

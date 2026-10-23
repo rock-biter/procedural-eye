@@ -9,6 +9,7 @@ import { IRIS_COLOR_LUT } from '../iris/irisColor'
 import { GLOBE_CUT } from '../adnexa/backShell'
 import { EMITTER_VEC4S, MAX_EMITTERS } from '../lighting/envRig'
 import { DRAW_ORDER } from '../render/drawOrder'
+import { SHARINGAN_DEFINES } from './sharinganPatterns'
 import capFragmentShader from '../shaders/eyeball-cap-fragment.glsl'
 import scleraFragmentShader from '../shaders/eyeball-sclera-fragment.glsl'
 import vertexShader from '../shaders/eyeball-vertex.glsl'
@@ -69,6 +70,7 @@ export default class Eyeball {
 			IRIS_LUT_MELANIN: `${IRIS_COLOR_LUT.melanin}.0`,
 			IRIS_LUT_EUMELANIN: `${IRIS_COLOR_LUT.eumelanin}.0`,
 			IRIS_LUT_STROMA: `${IRIS_COLOR_LUT.stroma}.0`,
+			...SHARINGAN_DEFINES,
 			DEBUG_VIEW: debugViewDefine(debugView),
 		}
 		const material = (fragmentShader) =>

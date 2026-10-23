@@ -46,7 +46,7 @@ const ICONS = {
 	minus: '<path d="M6 12h12"/>',
 	eye: '<path d="M3 13.5C6.5 6.5 17.5 6.5 21 13.5"/><circle class="icon-fill" cx="12" cy="14.5" r="2.75"/>',
 	tomoe:
-		'<path class="icon-fill" transform="rotate(-35 12 12)" d="M12 4.8A7.2 7.2 0 0 1 12 19.2A3.6 3.6 0 0 0 12 12A3.6 3.6 0 0 1 12 4.8Z"/>',
+		'<path class="icon-fill" transform="rotate(-35 12 12)" d="M12 3.6A8.4 8.4 0 0 1 12 20.4A4.2 4.2 0 0 0 12 12A4.2 4.2 0 0 1 12 3.6Z"/>',
 }
 const icon = (name) =>
 	`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`

@@ -56,7 +56,7 @@ pnpm sounds
 
 - [`main.js`](main.js) is the bootstrap (URL flags, params, renderer, app, panel actions). [`src/app.js`](src/app.js) owns the systems and the frame loop.
 - [`src/params/`](src/params/): the parameter schema, its default values (`defaults.json`), the params helpers, the presets and the population priors of the random eye.
-- [`src/eye/`](src/eye/): the eye geometry and optics twins, the eyeball mesh and materials, and the eye rig (gaze transform).
+- [`src/eye/`](src/eye/): the eye geometry and optics twins, the eyeball mesh and materials, the eye rig (gaze transform), and the Sharingan easter egg (its patterns and their baked maps).
 - [`src/iris/`](src/iris/): rest space, seeded features and the spectral color model, plus the GPU atlas bake and the color lookup texture.
 - [`src/adnexa/`](src/adnexa/): the fissure, the surfaces around the eye (support, conjunctiva, face), lid geometry, the back shell closing the skin patch, the lash generator and the fissure map, plus the lid, lash and tear-film meshes.
 - [`src/sclera/`](src/sclera/): the vessel generator and the polar vessel map.
@@ -87,6 +87,7 @@ pnpm sounds
   | `hgPhase()` in [`src/atmosphere/dustField.js`](src/atmosphere/dustField.js) | `scattering.glsl` |
   | `beamIntegral()` and `erf()` in [`src/atmosphere/lightShafts.js`](src/atmosphere/lightShafts.js) | `applyShafts()` and `shaftErf()` in `light-shafts.glsl` |
   | `bakeShaftCookie()` (over `cookieBlades()`) in [`src/atmosphere/lightShafts.js`](src/atmosphere/lightShafts.js) | `shaft-cookie-fragment.glsl` |
+  | `paintPattern()` (over `packPatterns()`) and `patternShade()` in [`src/eye/sharinganPatterns.js`](src/eye/sharinganPatterns.js) | `sharinganWeights()` in `sharingan-paint.glsl`, `sharinganShade()` in `sharingan.glsl` |
 - Keep development-only code (the console API, telemetry, benchmarks, the panel) in the development tools of [`src/debug/devTools.js`](src/debug/devTools.js), which `main.js` imports only on request: a plain page neither downloads nor runs it.
 - Scene materials write the apparent focus distance in alpha. Only the accumulation history keeps it; the effects receive opaque alpha (see [`docs/RENDERING.md`](docs/RENDERING.md)).
 - In shaders:

@@ -23,6 +23,17 @@ import { DEG, clamp01, smoothstep } from '../math'
 export const SHARINGAN_PUPIL = 0.17
 // The rest ρ at the disc's edge.
 export const SHARINGAN_EDGE = 0.88
+// The map a pattern is baked into (src/eye/sharingan.js): `size` texels
+// across, from −`extent` to `extent`, a little past the disc.
+export const SHARINGAN_MAP = Object.freeze({ size: 2048, extent: 1.04 })
+// Those constants for the shaders.
+const glslFloat = (value) => (Number.isInteger(value) ? `${value}.0` : `${value}`)
+export const SHARINGAN_DEFINES = Object.freeze({
+	SHARINGAN_PUPIL: glslFloat(SHARINGAN_PUPIL),
+	SHARINGAN_EDGE: glslFloat(SHARINGAN_EDGE),
+	SHARINGAN_EXTENT: glslFloat(SHARINGAN_MAP.extent),
+	SHARINGAN_MAP_SIZE: SHARINGAN_MAP.size,
+})
 // Shapes per pattern, and copies of a shape around the center, at most.
 export const SHARINGAN_SHAPES = 24
 export const SHARINGAN_COPIES = 6
@@ -341,13 +352,39 @@ export const PATTERNS = Object.freeze(
 export const PATTERN_NAMES = Object.freeze(PATTERNS.map((pattern) => pattern.name))
 export const patternIndex = (name) => PATTERN_NAMES.indexOf(name)
 
+// The radii (from the center) between which a shape lies, any copy:
+// within each of its discs (its strokes along their edges), outside the
+// discs it leaves out and beyond the half-planes that leave the center out,
+// widened by its outline. The shader skips a shape away from them.
+export function shapeBounds(item) {
+	let low = 0
+	let high = Infinity
+	for (const term of item.terms) {
+		const center = Math.hypot(term.a, term.b)
+		if (term.kind === DISC) {
+			low = Math.max(
+				low,
+				(term.width > 0 ? Math.abs(center - term.c) : center - term.c) - term.width,
+			)
+			high = Math.min(high, center + term.c + term.width)
+		} else if (term.kind === OUTSIDE && term.width === 0) {
+			low = Math.max(low, term.c - center)
+		} else if (term.kind === PLANE && term.width === 0) {
+			low = Math.max(low, -term.c)
+		}
+	}
+	return [Math.max(low - item.width, 0), high + item.width]
+}
+
 // The texture of the patterns (a row each, RGBA floats): a header (shape
-// count, base color, whether it is the Rinnegan), then five texels a shape:
+// count, base color, whether it is the Rinnegan), then six texels a shape:
 // (color + 8 × its terms' kinds, copies, turn in radians, outline
-// half-width), and a texel a term (a, b, c, half-width). Kinds are packed
-// three bits each, the first lowest.
+// half-width), its bounds (shapeBounds(), the outer one 1e3 for none), and
+// a texel a term (a, b, c, half-width). Kinds are packed three bits each,
+// the first lowest.
 export const SHAPE_TERMS = 4
-export const PATTERN_TEXELS = 1 + (1 + SHAPE_TERMS) * SHARINGAN_SHAPES
+export const SHAPE_TEXELS = 2 + SHAPE_TERMS
+export const PATTERN_TEXELS = 1 + SHAPE_TEXELS * SHARINGAN_SHAPES
 
 export function packPatterns(patterns = PATTERNS) {
 	const data = new Float32Array(patterns.length * PATTERN_TEXELS * 4)
@@ -362,10 +399,12 @@ export function packPatterns(patterns = PATTERNS) {
 			if (item.count > SHARINGAN_COPIES)
 				throw new Error(`${pattern.name}: more than ${SHARINGAN_COPIES} copies`)
 			const kinds = item.terms.reduce((code, term, k) => code + term.kind * 8 ** k, 0)
-			const offset = base + (1 + (1 + SHAPE_TERMS) * i) * 4
+			const offset = base + (1 + SHAPE_TEXELS * i) * 4
+			const [low, high] = shapeBounds(item)
 			data.set([item.color + 8 * kinds, item.count, item.turn * DEG, item.width], offset)
+			data.set([low, Math.min(high, 1e3), 0, 0], offset + 4)
 			item.terms.forEach((term, k) => {
-				data.set([term.a, term.b, term.c, term.width], offset + 4 * (k + 1))
+				data.set([term.a, term.b, term.c, term.width], offset + 4 * (k + 2))
 			})
 		})
 	})
