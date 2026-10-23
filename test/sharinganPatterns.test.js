@@ -16,7 +16,13 @@ import {
 	packPatterns,
 	paintPattern,
 	patternIndex,
+	FIELD,
+	SHARINGAN_NAMES,
 	pickPattern,
+	fieldColor,
+	hintEnvelope,
+	morphField,
+	patternField,
 	shapeBounds,
 	shapeDistance,
 } from '../src/eye/sharinganPatterns'
@@ -134,28 +140,85 @@ test('a shape repeats around the center: every copy as near as the first', () =>
 	}
 })
 
-test('the button never picks the pattern shown, and the Rinnegan with its odds', () => {
+test('the button picks any other Sharingan at random, the Rinnegan with its odds only', () => {
 	const random = createRandom('sharingan')
-	const rinnegan = patternIndex('rinnegan')
-	let current = -1
+	let current = null
 	let rinnegans = 0
+	const seen = new Set()
 	const draws = 20000
 	for (let i = 0; i < draws; i++) {
 		const next = pickPattern(current, random, 0.02)
 		assert.notEqual(next, current)
-		assert.ok(next >= 0 && next < PATTERNS.length)
-		if (next === rinnegan) rinnegans++
+		if (next === 'rinnegan') rinnegans++
+		else seen.add(next)
 		current = next
 	}
+	assert.equal(seen.size, SHARINGAN_NAMES.length)
 	assert.ok(Math.abs(rinnegans / draws - 0.02) < 0.006, `${rinnegans}`)
+	for (let i = 0; i < 1000; i++) assert.notEqual(pickPattern(current, random), 'rinnegan')
 	assert.notEqual(
-		pickPattern(rinnegan, () => 0, 1),
-		rinnegan,
+		pickPattern('rinnegan', () => 0, 1),
+		'rinnegan',
 	)
 	assert.equal(
-		pickPattern(0, () => 0, 1),
-		rinnegan,
+		pickPattern('itachi', () => 0, 1),
+		'rinnegan',
 	)
+})
+
+test('a field holds the distance to the ink, saturating, and the color under it', () => {
+	const tomoe = PATTERNS[patternIndex('tomoe-3')]
+	const izuna = PATTERNS[patternIndex('izuna')]
+	for (const pattern of [tomoe, izuna]) {
+		for (let i = 0; i < 400; i++) {
+			const [x, y] = at(0.2 + 0.75 * ((i * 0.618) % 1), (i * 137.5) % 360)
+			const [d, ...under] = patternField(pattern, x, y)
+			assert.ok(Math.abs(d) < FIELD.reach)
+			assert.ok(Math.abs(under.reduce((sum, w) => sum + w, 0) - 1) < 1e-9)
+			// Under the ink of both, red.
+			assert.ok(under[0] > 0.99)
+		}
+	}
+	// Izuna's ink is its base: red only in its ring, between its spokes.
+	assert.ok(patternField(izuna, ...at(0.4, 90))[0] < 0)
+	assert.ok(patternField(izuna, ...at(0.75, 150))[0] > 0)
+	const rinnegan = PATTERNS[patternIndex('rinnegan')]
+	assert.deepEqual(patternField(rinnegan, ...at(0.25, 235)).slice(1), [0, 0, 1])
+	assert.deepEqual(fieldColor([1, 0, 1, 0]), [0, 0, 1, 0])
+	assert.deepEqual(fieldColor([-1, 1, 0, 0]), [1, 0, 0, 0])
+})
+
+test('a morph runs from the first field to the second, the inks melting between', () => {
+	const from = PATTERNS[patternIndex('tomoe-3')]
+	const to = PATTERNS[patternIndex('itachi')]
+	let shared = 0
+	for (let i = 0; i < 600; i++) {
+		const [x, y] = at(0.2 + 0.75 * ((i * 0.618) % 1), (i * 137.5) % 360)
+		const a = patternField(from, x, y)
+		const b = patternField(to, x, y)
+		const ink = (field) => field[0] < 0
+		assert.equal(ink(morphField(a, b, 0, 0.12)), ink(a))
+		assert.equal(ink(morphField(a, b, 1, 0.12)), ink(b))
+		// Halfway the melt joins inks that neither thinned field holds.
+		const half = morphField(a, b, 0.5, 0.12)
+		const hard = morphField(a, b, 0.5, 0)
+		assert.ok(half[0] <= hard[0] + 1e-12)
+		if (ink(half) && !ink(hard)) shared++
+	}
+	assert.ok(shared > 0)
+})
+
+test("the Rinnegan's hint rises, holds and fades within its time", () => {
+	assert.equal(hintEnvelope(-0.1, 0.6, 0.5), 0)
+	assert.equal(hintEnvelope(0.6, 0.6, 0.5), 0)
+	assert.equal(hintEnvelope(0.15, 0.6, 0.5), 0.5)
+	let last = 0
+	for (let t = 0; t <= 0.09; t += 0.01) {
+		const value = hintEnvelope(t, 0.6, 0.5)
+		assert.ok(value >= last && value <= 0.5)
+		last = value
+	}
+	assert.ok(hintEnvelope(0.5, 0.6, 0.5) < 0.5)
 })
 
 test('a glide runs from its start to its target over its duration, then holds', () => {

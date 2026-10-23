@@ -1,6 +1,7 @@
 // The Sharingan easter egg's patterns (pure; src/eye/sharingan.js,
 // docs/IRIS.md#sharingan): the Uchiha eyes of Naruto drawn as pigment on the
-// iris, as compass constructions the shader evaluates (sharingan.glsl).
+// iris, as compass constructions baked into the fields the shader reads
+// (sharingan-paint.glsl, sharingan.glsl).
 //
 // A pattern lies in a disc of radius 1, its pupil SHARINGAN_PUPIL wide: the
 // iris between the pupil's margin and SHARINGAN_EDGE of the way to the root
@@ -17,15 +18,27 @@
 // along its edge, and a shape with one is its outline. It repeats `count`
 // times around the center (the union of its turned copies) and is turned
 // `turn` degrees. Its color is a palette index.
+//
+// What the iris reads of a pattern is its field (patternField()): the
+// signed distance to its ink, and the color under the ink. Two patterns
+// morph through their fields (morphField()): the new ink grows in while the
+// old one is still there, the two melted together by a smooth minimum, then
+// the old one thins away.
 import { DEG, clamp01, smoothstep } from '../math'
 
 // The pupil's radius in the pattern's disc: the Sharingan's pupil is small.
 export const SHARINGAN_PUPIL = 0.17
 // The rest ρ at the disc's edge.
 export const SHARINGAN_EDGE = 0.88
-// The map a pattern is baked into (src/eye/sharingan.js): `size` texels
-// across, from −`extent` to `extent`, a little past the disc.
-export const SHARINGAN_MAP = Object.freeze({ size: 2048, extent: 1.04 })
+// The map a pattern's field is baked into (src/eye/sharingan.js): `size`
+// texels across, from −`extent` to `extent`, a little past the disc.
+export const SHARINGAN_MAP = Object.freeze({ size: 1024, extent: 1.04 })
+// The ink's distance in the field saturates softly at `reach` (C·tanh(d/C)),
+// so a morph thins even a broad ink away steadily; a morph erodes the old
+// ink and grows the new one by `erode` times it, so both are whole at its
+// ends: the new one grows over the first `grow` of the morph, the old one
+// thins over the part after `thin`.
+export const FIELD = Object.freeze({ reach: 0.2, erode: 1.25, grow: 0.65, thin: 0.35 })
 // Those constants for the shaders.
 const glslFloat = (value) => (Number.isInteger(value) ? `${value}.0` : `${value}`)
 export const SHARINGAN_DEFINES = Object.freeze({
@@ -33,6 +46,10 @@ export const SHARINGAN_DEFINES = Object.freeze({
 	SHARINGAN_EDGE: glslFloat(SHARINGAN_EDGE),
 	SHARINGAN_EXTENT: glslFloat(SHARINGAN_MAP.extent),
 	SHARINGAN_MAP_SIZE: SHARINGAN_MAP.size,
+	SHARINGAN_FIELD: glslFloat(FIELD.reach),
+	SHARINGAN_ERODE: glslFloat(FIELD.erode * FIELD.reach),
+	SHARINGAN_GROW: glslFloat(FIELD.grow),
+	SHARINGAN_THIN: glslFloat(FIELD.thin),
 })
 // Shapes per pattern, and copies of a shape around the center, at most.
 export const SHARINGAN_SHAPES = 24
@@ -346,11 +363,17 @@ const PATTERN_LIST = [
 	},
 ]
 
+// `under`: the color under the ink where nothing else is painted (a
+// pattern on ink shows it as its ink thins in a morph).
 export const PATTERNS = Object.freeze(
-	PATTERN_LIST.map((pattern) => Object.freeze({ rinnegan: false, ...pattern })),
+	PATTERN_LIST.map((pattern) => Object.freeze({ rinnegan: false, under: red, ...pattern })),
 )
 export const PATTERN_NAMES = Object.freeze(PATTERNS.map((pattern) => pattern.name))
 export const patternIndex = (name) => PATTERN_NAMES.indexOf(name)
+// The Sharingan alone, without the Rinnegan.
+export const SHARINGAN_NAMES = Object.freeze(
+	PATTERNS.filter((pattern) => !pattern.rinnegan).map((pattern) => pattern.name),
+)
 
 // The radii (from the center) between which a shape lies, any copy:
 // within each of its discs (its strokes along their edges), outside the
@@ -377,7 +400,8 @@ export function shapeBounds(item) {
 }
 
 // The texture of the patterns (a row each, RGBA floats): a header (shape
-// count, base color, whether it is the Rinnegan), then six texels a shape:
+// count, base color, whether it is the Rinnegan, the color under its ink),
+// then six texels a shape:
 // (color + 8 × its terms' kinds, copies, turn in radians, outline
 // half-width), its bounds (shapeBounds(), the outer one 1e3 for none), and
 // a texel a term (a, b, c, half-width). Kinds are packed three bits each,
@@ -392,7 +416,7 @@ export function packPatterns(patterns = PATTERNS) {
 		if (pattern.shapes.length > SHARINGAN_SHAPES)
 			throw new Error(`${pattern.name}: more than ${SHARINGAN_SHAPES} shapes`)
 		const base = row * PATTERN_TEXELS * 4
-		data.set([pattern.shapes.length, pattern.base, pattern.rinnegan ? 1 : 0, 0], base)
+		data.set([pattern.shapes.length, pattern.base, pattern.rinnegan ? 1 : 0, pattern.under], base)
 		pattern.shapes.forEach((item, i) => {
 			if (item.terms.length > SHAPE_TERMS)
 				throw new Error(`${pattern.name}: more than ${SHAPE_TERMS} terms`)
@@ -448,25 +472,70 @@ export function patternShade(s) {
 	return (0.55 + 0.45 * smoothstep(SHARINGAN_PUPIL, 0.6, s)) * (1 - 0.15 * smoothstep(0.8, 1, s))
 }
 
-// The color of `pattern` at (x, y) of its disc, as weights of the palette
-// (an array per palette entry), edges `aa` wide.
-export function paintPattern(pattern, x, y, aa = 0.004) {
-	const weights = [0, 0, 0, 0]
-	weights[pattern.base] = 1
+// The ink's distance as the field holds it: saturating softly at FIELD.reach.
+const saturated = (d) => FIELD.reach * Math.tanh(d / FIELD.reach)
+
+// The field of `pattern` at (x, y) of its disc (twin of sharinganField() in
+// sharingan-paint.glsl): [the signed distance to its ink, saturated, then
+// the weights of red, lavender and violet under it, edges `aa` wide]. The
+// ink is a union of the ink shapes, each other shape cutting itself out of
+// it; the color under it is the base, or `under` on an ink base, with every
+// other shape painted over it in order.
+export function patternField(pattern, x, y, aa = 0.004) {
+	let d = pattern.base === ink ? -Infinity : Infinity
+	const under = [0, 0, 0]
+	under[(pattern.base === ink ? pattern.under : pattern.base) - 1] = 1
 	for (const item of pattern.shapes) {
-		const cover = clamp01(0.5 - shapeDistance(item, x, y) / aa)
-		for (let i = 0; i < weights.length; i++) weights[i] *= 1 - cover
-		weights[item.color] += cover
+		const distance = shapeDistance(item, x, y)
+		if (item.color === ink) {
+			d = Math.min(d, distance)
+			continue
+		}
+		d = Math.max(d, -distance)
+		const cover = clamp01(0.5 - distance / aa)
+		for (let i = 0; i < 3; i++) under[i] *= 1 - cover
+		under[item.color - 1] += cover
 	}
-	return weights
+	return [saturated(d), ...under]
 }
 
-// The pattern after `current` (its index, or -1 for none): the Rinnegan
-// with odds `rinnegan`, otherwise any other Sharingan; never the same twice.
-export function pickPattern(current, random, rinnegan) {
-	const rinneganIndex = PATTERNS.findIndex((pattern) => pattern.rinnegan)
-	if (current !== rinneganIndex && random() < rinnegan) return rinneganIndex
-	const others = PATTERNS.map((_, i) => i).filter((i) => i !== rinneganIndex && i !== current)
+// The weights of the palette (ink, red, lavender, violet) of a field's
+// value, edges `aa` wide.
+export function fieldColor([d, ...under], aa = 0.004) {
+	const cover = clamp01(0.5 - d / aa)
+	return [cover, ...under.map((weight) => weight * (1 - cover))]
+}
+
+// The color of `pattern` at (x, y) of its disc, as weights of the palette.
+export const paintPattern = (pattern, x, y, aa = 0.004) =>
+	fieldColor(patternField(pattern, x, y, aa), aa)
+
+// GLSL's polynomial smooth minimum of radius `k` (common.glsl).
+function smin(a, b, k) {
+	const h = Math.max(k - Math.abs(a - b), 0) / k
+	return Math.min(a, b) - h * h * k * 0.25
+}
+
+// Two fields `t` of the way from `from` to `to` (twin of the morph in
+// sharinganIris()): the new ink grown in over the first FIELD.grow of the
+// way, the old one thinned away after FIELD.thin, their union melted by a
+// smooth minimum whose radius peaks at `melt` halfway; the colors under
+// them crossfade.
+export function morphField(from, to, t, melt) {
+	const erode = FIELD.erode * FIELD.reach
+	const k = Math.max(melt * Math.sin(Math.PI * t), 1e-4)
+	const grown = 1 - smoothstep(0, FIELD.grow, t)
+	const thinned = smoothstep(FIELD.thin, 1, t)
+	const d = smin(from[0] + thinned * erode, to[0] + grown * erode, k)
+	return [d, ...from.slice(1).map((weight, i) => weight + (to[i + 1] - weight) * t)]
+}
+
+// The pattern the HUD's button shows after `current` (a name, or null for
+// none): with odds `rinnegan` the Rinnegan (never twice in a row), else any
+// other Sharingan, at random.
+export function pickPattern(current, random, rinnegan = 0) {
+	if (current !== 'rinnegan' && random() < rinnegan) return 'rinnegan'
+	const others = SHARINGAN_NAMES.filter((name) => name !== current)
 	return others[Math.min(Math.floor(random() * others.length), others.length - 1)]
 }
 
@@ -480,8 +549,8 @@ const EASES = {
 	smooth: (t) => smoothstep(0, 1, t),
 	// Fast at first, slowing to a stop: the pattern spinning into place.
 	out: (t) => 1 - (1 - t) ** 3,
-	// The crossfade of two patterns, in the middle of the spin.
-	middle: (t) => smoothstep(0.3, 0.7, t),
+	// The morph of two patterns, through most of the spin.
+	morph: (t) => smoothstep(0.05, 0.9, t),
 }
 
 export const glideValue = (g) =>
@@ -493,8 +562,22 @@ export const glideDone = (g) => g.time >= g.duration
 
 // The activation: the pattern fades in over SHOW.fade of `duration` while
 // it spins `turns` turns into place, slowing, its tomoe's heads leading
-// (counterclockwise); a new pattern spins one turn while the two crossfade;
+// (counterclockwise); a new pattern spins one turn while the two morph;
 // hiding it takes SHOW.hide of `duration`, and the Rinnegan's lavender
 // spreads over the sclera in `spread` and draws back in SHOW.hide of it.
 // With reduced motion nothing spins and every change takes SHOW.still s.
 export const SHOW = Object.freeze({ fade: 0.6, hide: 0.6, still: 0.3 })
+
+// The Rinnegan's hint (src/eye/sharingan.js): once the Uchiha clan is
+// complete, it shows through the eye for an instant, `peak` at most, over
+// `duration` s: rising over HINT.rise of it, holding to HINT.hold, fading
+// out by its end.
+export const HINT = Object.freeze({ rise: 0.15, hold: 0.35 })
+
+export function hintEnvelope(t, duration, peak) {
+	if (!(duration > 0) || t <= 0 || t >= duration) return 0
+	const s = t / duration
+	if (s < HINT.rise) return peak * smoothstep(0, HINT.rise, s)
+	if (s <= HINT.hold) return peak
+	return peak * (1 - smoothstep(HINT.hold, 1, s))
+}

@@ -1,6 +1,5 @@
-// The Sharingan's patterns as compass constructions (twin of paintPattern()
-// in src/eye/sharinganPatterns.js), evaluated where the bake draws a
-// pattern's map (sharingan-bake-fragment.glsl).
+// The Sharingan's patterns as compass constructions (src/eye/sharinganPatterns.js),
+// evaluated where the bake draws a pattern's field (sharingan-bake-fragment.glsl).
 #ifndef SHARINGAN_PAINT_GLSL
 #define SHARINGAN_PAINT_GLSL
 
@@ -30,26 +29,33 @@ float sharinganTerm(int kind, vec4 term, vec2 q) {
 	return term.w > 0.0 ? abs(d) - term.w : d;
 }
 
-// The palette's weights (ink, red, lavender, violet) of pattern `row` at `q`
-// of its disc, edges `aa` wide: its base, then each shape over it, the
-// nearest of its turned copies; a shape away from its bounds is skipped,
-// and a copy as soon as a term puts it out of reach (the intersection only
+// The field of pattern `row` at `q` of its disc (twin of patternField() in
+// src/eye/sharinganPatterns.js): the signed distance to its ink, saturating
+// softly at SHARINGAN_FIELD, then the weights of red, lavender and violet
+// under it, edges `aa` wide. The ink is a union of the ink shapes, each
+// other shape cutting itself out of it; the color under it is the base (or
+// the pattern's own on an ink base) with every other shape painted over it.
+// A shape away from its bounds by more than the field reaches is skipped,
+// and a copy as soon as a term puts it that far (the intersection only
 // grows).
-vec4 sharinganWeights(int row, vec2 q, float aa) {
+vec4 sharinganField(int row, vec2 q, float aa) {
 	vec4 header = texelFetch(uSharinganShapes, ivec2(0, row), 0);
 	int count = int(header.x + 0.5);
-	vec4 weights = vec4(equal(ivec4(0, 1, 2, 3), ivec4(int(header.y + 0.5))));
+	int base = int(header.y + 0.5);
+	float d = base == 0 ? -1e3 : 1e3;
+	vec3 under = vec3(equal(ivec3(1, 2, 3), ivec3(base == 0 ? int(header.w + 0.5) : base)));
+	float far = 4.0 * SHARINGAN_FIELD;
 	float r = length(q);
 	for (int i = ZERO; i < SHARINGAN_SHAPES; i++) {
 		if (i >= count) break;
-		int base = 1 + SHARINGAN_TEXELS * i;
-		vec4 bounds = texelFetch(uSharinganShapes, ivec2(base + 1, row), 0);
-		if (r < bounds.x - aa || r > bounds.y + aa) continue;
-		vec4 head = texelFetch(uSharinganShapes, ivec2(base, row), 0);
-		vec4 t0 = texelFetch(uSharinganShapes, ivec2(base + 2, row), 0);
-		vec4 t1 = texelFetch(uSharinganShapes, ivec2(base + 3, row), 0);
-		vec4 t2 = texelFetch(uSharinganShapes, ivec2(base + 4, row), 0);
-		vec4 t3 = texelFetch(uSharinganShapes, ivec2(base + 5, row), 0);
+		int texel = 1 + SHARINGAN_TEXELS * i;
+		vec4 bounds = texelFetch(uSharinganShapes, ivec2(texel + 1, row), 0);
+		if (r < bounds.x - far || r > bounds.y + far) continue;
+		vec4 head = texelFetch(uSharinganShapes, ivec2(texel, row), 0);
+		vec4 t0 = texelFetch(uSharinganShapes, ivec2(texel + 2, row), 0);
+		vec4 t1 = texelFetch(uSharinganShapes, ivec2(texel + 3, row), 0);
+		vec4 t2 = texelFetch(uSharinganShapes, ivec2(texel + 4, row), 0);
+		vec4 t3 = texelFetch(uSharinganShapes, ivec2(texel + 5, row), 0);
 		int code = int(head.x + 0.5);
 		int paint = code - 8 * (code / 8);
 		int k0 = (code / 8) - 8 * (code / 64);
@@ -57,8 +63,8 @@ vec4 sharinganWeights(int row, vec2 q, float aa) {
 		int k2 = (code / 512) - 8 * (code / 4096);
 		int k3 = code / 4096;
 		int copies = int(head.y + 0.5);
-		float reach = aa + head.w;
-		float d = 1e3;
+		float reach = far + head.w;
+		float distance = 1e3;
 		for (int c = ZERO; c < SHARINGAN_COPIES; c++) {
 			if (c >= copies) break;
 			float a = -(head.z + TAU * float(c) / float(copies));
@@ -68,11 +74,16 @@ vec4 sharinganWeights(int row, vec2 q, float aa) {
 			if (k2 > 0 && e < reach) e = max(e, sharinganTerm(k2, t2, p));
 			if (k3 > 0 && e < reach) e = max(e, sharinganTerm(k3, t3, p));
 			if (head.w > 0.0) e = abs(e) - head.w;
-			d = min(d, e);
+			distance = min(distance, e);
 		}
-		weights = mix(weights, vec4(equal(ivec4(0, 1, 2, 3), ivec4(paint))), saturate(0.5 - d / aa));
+		if (paint == 0) {
+			d = min(d, distance);
+		} else {
+			d = max(d, -distance);
+			under = mix(under, vec3(equal(ivec3(1, 2, 3), ivec3(paint))), saturate(0.5 - distance / aa));
+		}
 	}
-	return weights;
+	return vec4(SHARINGAN_FIELD * tanh(d / SHARINGAN_FIELD), under);
 }
 
 #endif

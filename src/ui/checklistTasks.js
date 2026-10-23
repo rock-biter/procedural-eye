@@ -3,9 +3,11 @@
 // at what to do. One task shows at a time and only it can be done: what a
 // later one asks for does not count before it shows. A counted task
 // (`counted`) is done once it has heard as many different keys as main.js
-// gives it (the tab's titles, the T-800's reports of the shots); a desktop's
-// (`desktop`) asks for what only a desktop has (the aperture knob, Space, the
-// tabs' titles, the console).
+// gives it (the tab's titles, the T-800's reports of the shots, the
+// Sharingan); a desktop's (`desktop`) asks for what only a desktop has (the
+// aperture knob, Space, the tabs' titles, the console, the Sharingan). A
+// hidden one (`hidden`) shows, its dot too, only once every task before it
+// is done: the Sharingan's, which that unlocks.
 export const TASKS = Object.freeze(
 	[
 		{ id: 'iris', text: 'Change the iris' },
@@ -31,8 +33,23 @@ export const TASKS = Object.freeze(
 			counted: true,
 			desktop: true,
 		},
-		{ id: 'secret', text: 'Wear every skin.... every!', achievement: true },
+		{ id: 'secret', text: 'Wear every skin... what the hell!', achievement: true },
 		{ id: 'blink', text: "Let's take another one", achievement: true },
+		{
+			id: 'uchiha',
+			text: 'Meet the whole Uchiha clan',
+			achievement: true,
+			counted: true,
+			desktop: true,
+			hidden: true,
+		},
+		{
+			id: 'rinnegan',
+			text: 'See beyond the Sharingan',
+			achievement: true,
+			desktop: true,
+			hidden: true,
+		},
 	].map((task) => Object.freeze(task)),
 )
 

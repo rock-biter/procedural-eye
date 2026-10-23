@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { TASKS, createProgress } from '../src/ui/checklistTasks'
 
-const counts = { titles: 3, shots: 2 }
+const counts = { titles: 3, shots: 2, uchiha: 4 }
 
 test('the tasks are short, named once, the controls first, then the achievements', () => {
 	assert.equal(new Set(TASKS.map((task) => task.id)).size, TASKS.length)
@@ -12,13 +12,19 @@ test('the tasks are short, named once, the controls first, then the achievements
 	assert.ok(TASKS.slice(first).every((task) => task.achievement))
 	assert.deepEqual(
 		TASKS.filter((task) => task.counted).map((task) => task.id),
-		['titles', 'shots'],
+		['titles', 'shots', 'uchiha'],
 	)
 	// Phones and tablets leave out what only a desktop has.
 	assert.deepEqual(
 		TASKS.filter((task) => task.desktop).map((task) => task.id),
-		['focus', 'photo', 'titles', 'shots'],
+		['focus', 'photo', 'titles', 'shots', 'uchiha', 'rinnegan'],
 	)
+	// The Sharingan's tasks come last, hidden until the rest is done.
+	assert.deepEqual(
+		TASKS.filter((task) => task.hidden).map((task) => task.id),
+		['uchiha', 'rinnegan'],
+	)
+	assert.ok(TASKS.slice(-2).every((task) => task.hidden))
 })
 
 test('only the task shown can be done, one after the other', () => {

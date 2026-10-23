@@ -64,7 +64,7 @@ vec3 irisColorLookup(float melanin, float eumelanin, float stroma) {
 // deeper collagen arcs with most of it, the ruff the dark pigment epithelium,
 // nodules paler. The Sharingan's pigment covers it all but the ruff, the
 // tissue still showing through (uSharinganLook.x): darker down the crypts,
-// a little lighter on the fibers.
+// a little lighter on the fibers; the Rinnegan's hint shows through it.
 vec3 irisAlbedo(IrisParts parts, vec4 weights) {
 #if DEBUG_VIEW == DEBUG_IRIS_CLAY
 	return vec3(0.45);
@@ -80,13 +80,19 @@ vec3 irisAlbedo(IrisParts parts, vec4 weights) {
 	vec3 ruffColor = vec3(0.028, 0.016, 0.011);
 	vec3 albedo = weights.x * stromaColor + weights.y * radialColor + weights.z * arcColor + weights.w * ruffColor;
 	albedo = max(mix(vec3(luma(albedo)), albedo, uIrisColorMisc.y), 0.0) * uIrisTint;
-	if (uSharingan.x > 0.0) {
+	float hint = uSharinganLook.z;
+	if (uSharingan.x > 0.0 || hint > 0.0) {
 		float rhoFootprint = gIrisFootprint / max(uIrisRest.y - uPupil.z, 0.5);
-		vec3 painted = sharinganIris(parts.rho, parts.theta, rhoFootprint);
 		float tissue = uSharinganLook.x;
-		painted *= (1.0 - 0.55 * tissue * inCrypt) * (1.0 + 0.2 * tissue * (weights.y + weights.z));
-		painted = mix(painted, ruffColor, weights.w);
-		albedo = mix(albedo, painted, uSharingan.x);
+		float shading = (1.0 - 0.55 * tissue * inCrypt) * (1.0 + 0.2 * tissue * (weights.y + weights.z));
+		if (uSharingan.x > 0.0) {
+			vec3 painted = sharinganIris(parts.rho, parts.theta, rhoFootprint, false) * shading;
+			albedo = mix(albedo, mix(painted, ruffColor, weights.w), uSharingan.x);
+		}
+		if (hint > 0.0) {
+			vec3 haunted = sharinganIris(parts.rho, parts.theta, rhoFootprint, true) * shading;
+			albedo = mix(albedo, mix(haunted, ruffColor, weights.w), hint);
+		}
 	}
 	return albedo;
 #endif

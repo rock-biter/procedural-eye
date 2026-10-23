@@ -596,7 +596,7 @@ export default class EyeApp {
 		// Sharingan's spin too.
 		const glitchDelta = Math.min(delta / 1000, 0.1)
 		if (this.terminator.step(glitchDelta, this.params, this.frozen)) this.invalidate()
-		if (this.sharingan.step(glitchDelta)) this.invalidate()
+		if (this.sharingan.step(glitchDelta, this.params)) this.invalidate()
 		if (this.converged) {
 			this.lastFresh = false
 			this.lastAccumulating = false

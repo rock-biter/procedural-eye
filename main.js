@@ -18,7 +18,7 @@ import { TRANSITION } from './src/params/paramTransition'
 import { randomEye, randomIrises } from './src/params/populationPriors'
 import { SECRET_TONE, SKIN_TONES } from './src/params/skinTones'
 import RenderSetup from './src/renderSetup'
-import { PATTERN_NAMES, patternIndex, pickPattern } from './src/eye/sharinganPatterns'
+import { SHARINGAN_NAMES, pickPattern } from './src/eye/sharinganPatterns'
 import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
 import { CHECKLIST, createChecklist } from './src/ui/checklist'
@@ -439,13 +439,17 @@ if (urlParams.get('gui') !== '0') {
 			report('iris')
 		},
 		// Once the checklist is done (below), a desktop's Sharingan: another
-		// pattern at each press, now and then the Rinnegan
-		// (src/eye/sharingan.js).
+		// pattern at random at each press, counted for the Uchiha clan; with the
+		// clan complete, now and then the Rinnegan (src/eye/sharingan.js).
 		onSharingan: desktop
 			? () => {
-					const current = patternIndex(app.sharingan.name)
-					const next = pickPattern(current, Math.random, app.params.sharingan.rinnegan)
-					app.sharingan.show(PATTERN_NAMES[next], app.params, motionless.matches)
+					const clan = progress.done().some((task) => task.id === 'uchiha')
+					const odds = clan ? app.params.sharingan.rinnegan : 0
+					const next = pickPattern(app.sharingan.name, Math.random, odds)
+					app.sharingan.show(next, app.params, motionless.matches)
+					if (next === 'rinnegan') report('rinnegan')
+					// The clan complete, the Rinnegan shows through for an instant.
+					else if (report('uchiha', next) === 'done') app.sharingan.hint()
 				}
 			: null,
 		onCue: (name, detail) => cue(name, detail),
@@ -522,7 +526,11 @@ if (urlParams.get('gui') !== '0') {
 	const saved = readChecklist()
 	const tasks = desktop ? TASKS : TASKS.filter((task) => !task.desktop)
 	const progress = createProgress(tasks, {
-		counts: { titles: TAB_TITLES.length, shots: SHOTS.length + 1 },
+		counts: {
+			titles: TAB_TITLES.length,
+			shots: SHOTS.length + 1,
+			uchiha: SHARINGAN_NAMES.length,
+		},
 		saved,
 	})
 	const worn = new Set(Array.isArray(saved.tones) ? saved.tones : [])
@@ -534,11 +542,12 @@ if (urlParams.get('gui') !== '0') {
 		const allWorn = SKIN_TONES.every((tone) => worn.has(tone.name))
 		hud.unlockSecret(found || (secretShown() && allWorn))
 	}
-	// A desktop's checklist done unlocks the Sharingan (the HUD's tomoe);
-	// Reset locks it again and takes it off the eye. `reveal`: it has just
-	// been done, the button comes in.
+	// A desktop's checklist done unlocks the Sharingan (the HUD's tomoe) and
+	// its hidden tasks; Reset locks it again and takes it off the eye.
+	// `reveal`: it has just been done, the button comes in.
 	const unlockSharingan = (reveal) => {
-		const done = desktop && progress.current() === null
+		const ids = new Set(progress.done().map((task) => task.id))
+		const done = desktop && tasks.every((task) => task.hidden || ids.has(task.id))
 		hud.unlockSharingan(done, reveal)
 		if (!done) app.sharingan.hide(app.params)
 	}

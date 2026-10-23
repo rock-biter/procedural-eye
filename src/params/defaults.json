@@ -456,10 +456,13 @@
     "pupil": 2.2,
     "duration": 1.2,
     "turns": 1.5,
+    "melt": 0.12,
     "spread": 1.4,
     "rinnegan": 0.02,
     "ringSpacing": 1.05,
-    "ringWidth": 0.045
+    "ringWidth": 0.045,
+    "hint": 0.45,
+    "hintDuration": 0.6
   },
   "post": {
     "toneMapping": "agx",

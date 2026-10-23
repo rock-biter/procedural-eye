@@ -148,7 +148,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 | `uIrisColorMisc`, `uIrisTint` | ABL share over the radial vessels, saturation, LUT stroma range, glow radiance (`irisColor.glow` times a white surface lit by the rig); tint. |
 | `uIrisSteps`, `uIrisShadowSteps`, `uIrisAoSteps`, `uIrisMicroBlur` | The quality tier of the frame. |
 | `uDefocus` | The camera's aperture diameter and focus distance: the blur radius over the iris, which decides where fresh frames leave out the micro striations. |
-| `uSharinganMap`, `uSharinganPrevious`, `uSharingan`, `uSharinganLook`, `uSharinganPalette`, `uRinnegan` | The Sharingan ([`docs/IRIS.md`](IRIS.md#sharingan)): the baked maps of the pattern and of the one it crossfades from; (amount, blend, turn, the Rinnegan's reach); (tissue, glow radiance); ink, red, lavender, violet; the Rinnegan's ring spacing and half-width (mm). |
+| `uSharinganMap`, `uSharinganPrevious`, `uSharinganHint`, `uSharingan`, `uSharinganLook`, `uSharinganPalette`, `uRinnegan` | The Sharingan ([`docs/IRIS.md`](IRIS.md#sharingan)): the baked fields of the pattern, of the one it morphs from and of the Rinnegan for its hint; (amount, morph, turn, the Rinnegan's reach); (tissue, glow radiance, the Rinnegan's hint, the morph's melt radius); ink, red, lavender, violet; the Rinnegan's ring spacing and half-width (mm). |
 | **Skin, lashes, tear film** | |
 | `uSkinColor`, `uSkin`, `uSkin2`, `uSkin3`, `uPixelAngle` | Skin color; (redness, roughness, wetness, pores); (wrinkles, translucency, lid profile ends); (freckles, veins, pigmentation, `lids.seed`). |
 | `uCanthi`, `uMarginLength`, `uDefocus` | The medial and lateral canthi in the front plane at rest; the upper and lower margin lengths; the camera's aperture diameter and focus distance, which widen the footprint of the skin's fine relief by the blur circle ([`docs/ADNEXA.md`](ADNEXA.md#skin-shading)). |
@@ -175,7 +175,7 @@ A frame that passes through the accumulation (a living eye, a transition) shades
 Defines:
 - `MAX_EMITTERS` and `EMITTER_VEC4S` (from `envRig.js`); `MAX_SHAFTS` (from `lightShafts.js`);
 - `IRIS_ATLAS_HEIGHT` and `IRIS_LUT_MELANIN`, `IRIS_LUT_EUMELANIN`, `IRIS_LUT_STROMA`;
-- `SHARINGAN_PUPIL`, `SHARINGAN_EDGE`, `SHARINGAN_EXTENT`, `SHARINGAN_MAP_SIZE` (`SHARINGAN_DEFINES`, from `sharinganPatterns.js`): the Sharingan's disc and maps, in the eyeball's programs and its bake;
+- `SHARINGAN_PUPIL`, `SHARINGAN_EDGE`, `SHARINGAN_FIELD`, `SHARINGAN_ERODE`, `SHARINGAN_GROW`, `SHARINGAN_THIN`, `SHARINGAN_EXTENT`, `SHARINGAN_MAP_SIZE` (`SHARINGAN_DEFINES`, from `sharinganPatterns.js`): the Sharingan's disc, field, morph and maps, in the eyeball's programs and its bake;
 - `PIGMENT_PASS` (atlas bake);
 - `SKIN_SHELL`: the back shell's variant of the skin program (its own pattern coordinates, no margin, freckles or veins);
 - `SKIN_BAKED`: the skin and back shell programs read the baked relief and freckles; set outside `#debug` (`Lids.setBaked()`, [`docs/ADNEXA.md`](ADNEXA.md#skin-shading));
@@ -202,7 +202,7 @@ The lids, the lashes and the tear meniscus blink by three.js morph targets ([`sr
 | `chamber.glsl` | `traceChamber()`: the iris, the angle, the pupil and the lens. |
 | `iris-space.glsl`, `iris-noise.glsl`, `iris-sdf.glsl`, `iris-trace.glsl`, `iris-shade.glsl` | The iris: rest space, periodic noise, distance field, sphere tracing (normal, AO, soft shadow), lighting and color. |
 | `iris-bake-fragment.glsl` | Structure and pigment atlas bake. |
-| `sharingan.glsl`, `sharingan-paint.glsl`, `sharingan-bake-fragment.glsl` | The Sharingan: the iris's pigment read from the baked maps (`sharinganIris()`) and the Rinnegan over the sclera (`rinneganSclera()`); the patterns' compass constructions (`sharinganWeights()`, the twin of `paintPattern()`); their bake into a map. |
+| `sharingan.glsl`, `sharingan-paint.glsl`, `sharingan-bake-fragment.glsl` | The Sharingan: the iris's pigment read from the baked fields and morphing between two (`sharinganIris()`), and the Rinnegan over the sclera (`rinneganSclera()`), its hint through both; the patterns' compass constructions and fields (`sharinganField()`, the twin of `patternField()`); their bake into a map. |
 | `sclera.glsl` | Sclera albedo with vessels, conjunctival micro-relief, fissure distance, lid occlusion and lid reflections. |
 | `lid-follow.glsl` | Lid rotation with the gaze and its inverse for rest-space lookups. |
 | `lid-morph.glsl` | The blink: `lidMorph()` blends a vertex's position, normal or color with its morph targets. |

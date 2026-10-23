@@ -612,10 +612,14 @@ export const BASE_PARAM_SCHEMA = {
 	// pigment is `red` and `ink` (the Rinnegan's `lavender` and `violet`) over
 	// the tissue, which still shades it by `tissue`; it glows `glow` times a
 	// white surface under the rig, and the pupil narrows to `pupil`. It spins
-	// `turns` turns into place over `duration`; the Rinnegan's lavender
-	// spreads over the sclera in `spread`, ringed every `ringSpacing` along
-	// the globe, `ringWidth` either side. `preview` shows a pattern still, for
-	// tuning ('off' in use).
+	// `turns` turns into place over `duration`; a new one spins a turn as the
+	// old one morphs into it, the two inks melted by a smooth minimum of
+	// radius `melt` (in the pattern's disc, of radius 1) at the middle. The
+	// Rinnegan's lavender spreads over the sclera in `spread`, ringed every
+	// `ringSpacing` along the globe, `ringWidth` either side; once the Uchiha
+	// clan is complete (main.js), its hint shows through the eye at `hint`
+	// for `hintDuration`. `preview` shows a pattern still, for tuning ('off'
+	// in use).
 	sharingan: {
 		preview: choice('off', ['off', ...PATTERN_NAMES], 'uniform', 'still preview'),
 		red: color('#9e0b08', 'uniform', 'red'),
@@ -627,10 +631,13 @@ export const BASE_PARAM_SCHEMA = {
 		pupil: num(2.2, 1.5, 8, 0.05, 'mm', 'uniform', 'pupil diameter'),
 		duration: num(1.2, 0.2, 4, 0.05, 's', 'uniform', 'spin duration'),
 		turns: num(1.5, 0, 6, 0.05, '', 'uniform', 'spin turns'),
+		melt: num(0.12, 0, 0.4, 0.005, '', 'uniform', 'morph melt radius'),
 		spread: num(1.4, 0.2, 5, 0.05, 's', 'uniform', 'Rinnegan spread'),
 		rinnegan: num(0.02, 0, 1, 0.005, '', 'uniform', 'Rinnegan odds'),
 		ringSpacing: num(1.05, 0.3, 3, 0.01, 'mm', 'uniform', 'Rinnegan ring spacing'),
 		ringWidth: num(0.045, 0, 0.3, 0.005, 'mm', 'uniform', 'Rinnegan ring half-width'),
+		hint: num(0.45, 0, 1, 0.01, '', 'uniform', 'Rinnegan hint opacity'),
+		hintDuration: num(0.6, 0.1, 3, 0.05, 's', 'uniform', 'Rinnegan hint duration'),
 	},
 	post: {
 		toneMapping: choice('agx', ['agx', 'aces', 'neutral', 'reinhard', 'linear'], 'define'),

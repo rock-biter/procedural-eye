@@ -11,7 +11,7 @@
 import { cloneParams, createParams, setValue } from '../params/params'
 import { PARAM_SCHEMA } from '../params/paramSchema'
 import { PRESETS } from '../params/presets'
-import { PATTERN_NAMES, patternIndex, pickPattern } from '../eye/sharinganPatterns'
+import { PATTERN_NAMES, pickPattern } from '../eye/sharinganPatterns'
 import FrameStats from './frameStats'
 
 // `context` (main.js): { app, urlParams, panelState, fitScreen, actions, ui,
@@ -71,16 +71,17 @@ export function installDevTools(context) {
 		glitch: () => app.terminator.trigger(),
 		isGlitching: () => app.terminator.active,
 		// The Sharingan (src/eye/sharingan.js), locked or not: the pattern
-		// `name`, or the next the HUD's button would pick; off; the one shown
-		// (null for none); the names; whether it moves.
+		// `name`, or one at random as the HUD's button picks it (the Rinnegan
+		// with its odds); off; the Rinnegan's hint; the one shown (null for
+		// none); the names; whether it moves.
 		sharingan: (name) => {
-			const current = patternIndex(app.sharingan.name)
 			const next =
-				name ?? PATTERN_NAMES[pickPattern(current, Math.random, app.params.sharingan.rinnegan)]
+				name ?? pickPattern(app.sharingan.name, Math.random, app.params.sharingan.rinnegan)
 			app.sharingan.show(next, app.params)
 			return next
 		},
 		sharinganOff: () => app.sharingan.hide(app.params),
+		sharinganHint: () => app.sharingan.hint(),
 		getSharingan: () => app.sharingan.name,
 		getSharinganNames: () => [...PATTERN_NAMES],
 		isSharinganMoving: () => app.sharingan.moving(),

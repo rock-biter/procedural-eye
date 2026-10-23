@@ -129,7 +129,11 @@ export function createChecklist({
 				showCount()
 			}
 		}
-		const left = tasks.length - progress.done().length - (task ? 1 : 0)
+		// The tasks after it, a hidden one only once one shows.
+		const done = new Set(progress.done().map(({ id }) => id))
+		const left = tasks.filter(
+			(other) => other !== task && !done.has(other.id) && (!other.hidden || task?.hidden),
+		).length
 		dots.replaceChildren(...Array.from({ length: left }, () => document.createElement('span')))
 		resetButton.hidden = progress.done().length === 0
 	}
@@ -208,8 +212,12 @@ export function createChecklist({
 			clip()
 		},
 		counting,
+		// What the report did: 'done', 'counted' or null (progress.report()).
 		report(id, key) {
-			if (counting()) step(progress.report(id, key))
+			if (!counting()) return null
+			const result = progress.report(id, key)
+			step(result)
+			return result
 		},
 		complete() {
 			const task = progress.current()
