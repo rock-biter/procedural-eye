@@ -22,7 +22,7 @@ import { magnification } from './src/camera/cameraOptics'
 import { createHud } from './src/ui/hud'
 import { CHECKLIST, createChecklist } from './src/ui/checklist'
 import { TASKS, createProgress } from './src/ui/checklistTasks'
-import { SHOTS, createShotLog, terminatorLog } from './src/ui/consoleArt'
+import { FIRST_SHOT, SHOTS, createShotLog, terminatorLog } from './src/ui/consoleArt'
 import { INTRO, createIntro } from './src/ui/intro'
 import {
 	HUD,
@@ -258,15 +258,16 @@ async function savePng(element) {
 	await takePhoto()
 }
 
-// The download of savePng(), without its sound. The PNG is encoded off the
-// main thread, so the page goes on meanwhile.
-async function takePhoto() {
+// The download of savePng(), without its sound, as `name`.png (the time by
+// default). The PNG is encoded off the main thread, so the page goes on
+// meanwhile.
+async function takePhoto(name = `eye-${Date.now()}`) {
 	const { insertPngText } = await import('./src/render/pngMetadata')
 	const state = app.getState()
 	const blob = await app.captureBlob()
 	const bytes = new Uint8Array(await blob.arrayBuffer())
 	const tagged = insertPngText(bytes, 'eye-state', state)
-	download(new Blob([tagged], { type: 'image/png' }), `eye-${Date.now()}.png`)
+	download(new Blob([tagged], { type: 'image/png' }), `${name}.png`)
 }
 
 // The viewer's mute and volume (sound.volume, the master), kept in the
@@ -502,7 +503,7 @@ if (urlParams.get('gui') !== '0') {
 	}
 	const saved = readChecklist()
 	const progress = createProgress(TASKS, {
-		counts: { titles: TAB_TITLES.length, shots: SHOTS.length },
+		counts: { titles: TAB_TITLES.length, shots: SHOTS.length + 1 },
 		saved,
 	})
 	const worn = new Set(Array.isArray(saved.tones) ? saved.tones : [])
@@ -521,10 +522,18 @@ if (urlParams.get('gui') !== '0') {
 				onChange: () => {
 					keepChecklist()
 					unlockSecret()
+					countFirstShot()
 				},
+				// Reset forgets the tones worn too: the hidden tone locks again.
+				onReset: () => worn.clear(),
 			})
 		: null
 	const report = (id, key) => checklist?.report(id, key)
+	// The T-800's first report comes once a page, before every other: told
+	// already, it counts as soon as the task of the reports shows (shoot()).
+	const countFirstShot = () => {
+		if (shotLog.line !== null && progress.current()?.id === 'shots') report('shots', FIRST_SHOT)
+	}
 	const wearTone = (name) => {
 		if (!checklist?.counting() || !secretShown() || worn.has(name)) return
 		if (!SKIN_TONES.some((tone) => tone.name === name)) return
@@ -534,6 +543,7 @@ if (urlParams.get('gui') !== '0') {
 	}
 	if (checklist) {
 		document.body.appendChild(checklist.element)
+		sounding(checklist.resetButton, 'reset')
 		unlockSecret()
 		// Its room, measured once the HUD has laid out (its own observer, made
 		// first, runs first).
@@ -930,7 +940,6 @@ if (urlParams.get('gui') !== '0') {
 	const shoot = () => {
 		const from = volume.querySelector('.volume-handle').getBoundingClientRect()
 		const to = snapshot.getBoundingClientRect()
-		report('cannon')
 		volume.classList.add('fired')
 		userVolume(1)
 		showVolume()
@@ -1004,11 +1013,15 @@ if (urlParams.get('gui') !== '0') {
 			snapshot.classList.add('recoil')
 			cue('press', { control: 'snapshot', element: snapshot })
 			cue('snapshot', { element: snapshot })
-			// The easter egg: the photo catches the T-800. With reduced motion
-			// the glitch holds still. The T-800 reports the hit in the console.
-			app.terminator.trigger(motionless.matches).then(takePhoto)
+			// The hit does the cannon's task; the T-800 reports it in the
+			// console (the next task counts the reports), and the easter egg's
+			// photo, which catches the T-800, takes the report's name. With
+			// reduced motion the glitch holds still.
+			report('cannon')
 			console.log(...shotLog.next())
-			if (SHOTS.includes(shotLog.line)) report('shots', shotLog.line)
+			report('shots', shotLog.line)
+			const name = shotLog.name
+			app.terminator.trigger(motionless.matches).then(() => takePhoto(name))
 			// Bounced off Snapshot (back and up from its side; down from below,
 			// still drifting left), then falling, spinning.
 			let [x, y] = hit
@@ -1267,13 +1280,10 @@ if (urlParams.get('gui') !== '0') {
 	if (introPlays) intro.hold()
 	else checklist?.show()
 	// The checklist for the console: complete() does the task shown, reset()
-	// forgets the progress (and the tones worn) and reloads.
+	// is Reset's.
 	const checklistTools = {
 		complete: () => checklist?.complete(),
-		reset() {
-			writeStored(CHECKLIST_KEY, '{}')
-			window.location.reload()
-		},
+		reset: () => checklist?.reset(),
 		state: () => ({ ...progress.state(), tones: [...worn] }),
 	}
 	ui = { audio, ambience, intro, INTRO, checklist: checklistTools }

@@ -28,8 +28,8 @@ export const TASKS = Object.freeze(
 // were done; current(), the first task not done, or null; count() and
 // total(), the keys the current task has heard and needs (0 for one not
 // counted); report(id, key), which returns 'done' when it completes the
-// current task, 'counted' for a new key of a counted one, else null; and
-// state(), to save.
+// current task, 'counted' for a new key of a counted one, else null;
+// reset(), back to the first task; and state(), to save.
 export function createProgress(tasks, { counts = {}, saved = null } = {}) {
 	const byId = new Map(tasks.map((task) => [task.id, task]))
 	const done = [...new Set(Array.isArray(saved?.done) ? saved.done : [])].filter((id) =>
@@ -61,6 +61,10 @@ export function createProgress(tasks, { counts = {}, saved = null } = {}) {
 			done.push(id)
 			keys = new Set()
 			return 'done'
+		},
+		reset() {
+			done.length = 0
+			keys = new Set()
 		},
 		state: () => ({ done: [...done], seen: { task: current()?.id ?? null, keys: [...keys] } }),
 	}

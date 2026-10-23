@@ -98,7 +98,7 @@ export function installDevTools(context) {
 			getIntro: () => intro.timeline,
 			getIntroConfig: () => INTRO,
 			// The checklist (desktop only): its progress, the task shown done,
-			// or everything forgotten (a reload).
+			// or everything forgotten, as its Reset does.
 			getChecklist: () => checklist.state(),
 			completeTask: () => checklist.complete(),
 			resetChecklist: () => checklist.reset(),

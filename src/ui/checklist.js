@@ -4,8 +4,9 @@
 // comes in under it, its text scrambling into place (GSAP's
 // ScrambleTextPlugin), as the title and the first task do when it shows; a
 // counted task shows its count beside it. Where its height runs out, the
-// tasks done first leave at the top, fading. With reduced motion the texts
-// show at once.
+// tasks done first leave at the top, fading. Reset, beside the title once a
+// task is done, scrambles the tasks out from the last to the first and
+// starts again. With reduced motion the texts show and go at once.
 import { gsap } from 'gsap'
 import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin'
 
@@ -22,6 +23,9 @@ export const CHECKLIST = Object.freeze({
 		speed: 0.5,
 		chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+/<>',
 	}),
+	// A task going on a reset: `duration` s, each `stagger` s after the one
+	// below it.
+	scrambleOut: Object.freeze({ duration: 0.5, stagger: 0.08 }),
 	// The narrowest and the shortest room (px) it shows in, the gap (px) it
 	// keeps from the HUD's skin tones and above the camera's angles, and half
 	// their line's height (main.js).
@@ -32,28 +36,41 @@ export const CHECKLIST = Object.freeze({
 })
 
 // `tasks` (src/ui/checklistTasks.js) and `progress` (createProgress() of
-// them); onChange(state) hears each step, to keep it. Returns the element,
-// show(), which brings it in (once: main.js, as the intro ends),
-// report(id, key) (createProgress()), heard only while it shows (counting()),
-// complete(),
-// which does the task to do (the console's, src/debug/devTools.js), and
-// fit(width, height), the room it has beside the HUD (px; too narrow or too
-// short, it hides).
-export function createChecklist({ tasks, progress, onChange = () => {} }) {
+// them); onChange(state) hears each step, to keep it, and onReset() a reset
+// as it starts again. Returns the element, `resetButton`, show(), which
+// brings it in (once: main.js, as the intro ends), report(id, key)
+// (createProgress()), heard only while it shows and is not resetting
+// (counting()), complete(), which does the task to do, and reset(), Reset's
+// (both the console's too, src/debug/devTools.js), and fit(width, height),
+// the room it has beside the HUD (px; too narrow or too short, it hides).
+export function createChecklist({ tasks, progress, onChange = () => {}, onReset = () => {} }) {
 	const motionless = window.matchMedia('(prefers-reduced-motion: reduce)')
 	const element = document.createElement('section')
 	// Cramped until the first fit().
 	element.className = 'checklist cramped'
 	element.setAttribute('aria-label', CHECKLIST.title)
+	const head = document.createElement('div')
+	head.className = 'checklist-head'
 	const title = document.createElement('h2')
 	title.className = 'checklist-title'
+	// Reset, a link's look; it blurs itself after a click, as the HUD buttons
+	// do.
+	const resetButton = document.createElement('button')
+	resetButton.type = 'button'
+	resetButton.className = 'checklist-reset'
+	resetButton.innerHTML = '<span class="swap-underline">Reset</span>'
+	resetButton.addEventListener('click', () => {
+		resetButton.blur()
+		reset()
+	})
+	head.append(title, resetButton)
 	const list = document.createElement('ol')
 	list.className = 'checklist-tasks'
 	list.setAttribute('aria-live', 'polite')
 	const dots = document.createElement('div')
 	dots.className = 'checklist-dots'
 	dots.setAttribute('aria-hidden', 'true')
-	element.append(title, list, dots)
+	element.append(head, list, dots)
 
 	const scramble = (target, text) => {
 		gsap.killTweensOf(target)
@@ -105,10 +122,40 @@ export function createChecklist({ tasks, progress, onChange = () => {} }) {
 		}
 		const left = tasks.length - progress.done().length - (task ? 1 : 0)
 		dots.replaceChildren(...Array.from({ length: left }, () => document.createElement('span')))
+		resetButton.hidden = progress.done().length === 0
 	}
 
 	let shown = false
 	let cramped = true
+	let resetting = false
+	const counting = () => shown && !cramped && !resetting
+	// The tasks scramble out, the last first, the dots fading with them; then
+	// the first task comes in again.
+	const reset = () => {
+		if (!shown || resetting) return
+		resetting = true
+		const again = () => {
+			progress.reset()
+			onReset()
+			gsap.set(dots, { clearProps: 'opacity' })
+			list.replaceChildren()
+			addCurrent()
+			clip()
+			resetting = false
+			onChange(progress.state())
+		}
+		if (motionless.matches) return again()
+		const { duration, stagger } = CHECKLIST.scrambleOut
+		const { chars, speed } = CHECKLIST.scramble
+		const timeline = gsap.timeline({ onComplete: again })
+		timeline.to(dots, { opacity: 0, duration }, 0)
+		;[...list.children].reverse().forEach((item, i) => {
+			const text = item.querySelector('.checklist-text')
+			gsap.killTweensOf(text)
+			timeline.to(text, { duration, scrambleText: { text: '', chars, speed } }, i * stagger)
+			timeline.to(item, { opacity: 0, duration: duration / 2 }, i * stagger + duration / 2)
+		})
+	}
 	const step = (result) => {
 		if (result === 'counted') showCount()
 		if (result === 'done') {
@@ -122,6 +169,7 @@ export function createChecklist({ tasks, progress, onChange = () => {} }) {
 
 	return {
 		element,
+		resetButton,
 		show() {
 			if (shown) return
 			shown = true
@@ -131,18 +179,18 @@ export function createChecklist({ tasks, progress, onChange = () => {} }) {
 			addCurrent()
 			clip()
 		},
-		counting: () => shown && !cramped,
+		counting,
 		report(id, key) {
-			if (!shown || cramped) return
-			step(progress.report(id, key))
+			if (counting()) step(progress.report(id, key))
 		},
 		complete() {
 			const task = progress.current()
-			if (!shown || !task) return
+			if (!shown || resetting || !task) return
 			let result = null
 			for (let key = 0; result !== 'done'; key++) result = progress.report(task.id, `skip-${key}`)
 			step(result)
 		},
+		reset,
 		fit(width, height) {
 			cramped = width < CHECKLIST.minWidth || height < CHECKLIST.minHeight
 			element.classList.toggle('cramped', cramped)

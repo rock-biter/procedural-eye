@@ -977,11 +977,37 @@ canvas {
 	visibility: hidden;
 }
 
-.checklist-title {
+/* The title, and Reset 3 characters after it, in the accent and underlined
+   as the credit's link (.swap-underline), once a task is done. */
+.checklist-head {
+	display: flex;
 	flex: none;
+	align-items: baseline;
+	gap: 3ch;
 	margin: 0 0 6px;
+}
+
+.checklist-title {
+	margin: 0;
 	font: inherit;
 	color: var(--accent);
+}
+
+.checklist-reset {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--accent);
+	font: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
+	pointer-events: auto;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.checklist-reset[hidden] {
+	display: none;
 }
 
 .checklist-tasks {
@@ -1000,9 +1026,11 @@ canvas {
 	mask-image: linear-gradient(transparent, #000 40px);
 }
 
+/* A line tall at least, so a task scrambled out to nothing keeps its place. */
 .checklist-task {
 	position: relative;
 	flex: none;
+	min-height: 1.4em;
 	padding-left: 16px;
 	transition: opacity 0.4s;
 }

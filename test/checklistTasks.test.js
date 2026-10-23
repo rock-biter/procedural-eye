@@ -79,3 +79,13 @@ test('the progress comes back from its state, whatever the order of the tasks', 
 	for (const saved of [null, {}, { done: 'iris' }, { seen: 3 }, []])
 		assert.equal(createProgress(TASKS, { counts, saved }).current().id, 'iris')
 })
+
+test('a reset starts again from the first task', () => {
+	const progress = createProgress(TASKS, { counts })
+	for (const task of TASKS.slice(0, 8)) progress.report(task.id)
+	progress.report('titles', 0)
+	progress.reset()
+	assert.equal(progress.current().id, 'iris')
+	assert.equal(progress.done().length, 0)
+	assert.deepEqual(progress.state(), { done: [], seen: { task: 'iris', keys: [] } })
+})

@@ -43,13 +43,16 @@ test('the shots are numbered, the first told, then every line once before any ag
 			.match(/SHOT (\d+) · (.*?) {2}$/)
 			.slice(1)
 	assert.equal(log.line, null)
+	assert.equal(log.name, null)
 	assert.deepEqual(shot(), ['1', 'I TOLD YOU NOT TO LET GO.'])
 	assert.equal(log.line, 'I TOLD YOU NOT TO LET GO.')
+	assert.equal(log.name, 'shot-1-i-told-you-not-to-let-go')
 	const lines = []
 	for (let i = 0; i < SHOTS.length * 3; i++) {
 		const [count, line] = shot()
 		assert.equal(Number(count), i + 2)
 		assert.equal(log.line, line)
+		assert.match(log.name, new RegExp(`^shot-${count}(-[a-z0-9]+)+$`))
 		lines.push(line)
 	}
 	for (let turn = 0; turn < 3; turn++) {

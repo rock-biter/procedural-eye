@@ -59,7 +59,7 @@ const READOUT = [
 
 // The T-800's report of a shot at Snapshot: the first always, then the others
 // in a shuffled turn, none twice before they have all come.
-const FIRST_SHOT = 'I TOLD YOU NOT TO LET GO.'
+export const FIRST_SHOT = 'I TOLD YOU NOT TO LET GO.'
 export const SHOTS = Object.freeze([
 	'TARGET ACQUIRED. SNAPSHOT TERMINATED.',
 	'HASTA LA VISTA, BUTTON.',
@@ -161,7 +161,9 @@ export function terminatorLog(eye = EYE) {
 
 // The T-800's reports of the shots at Snapshot: next() gives the
 // console.log() arguments of the next one, numbered, in the readout's red;
-// `line`, the line of the last one (null before the first).
+// `line`, the line of the last one, and `name`, the last one as a file name:
+// its number and its words, lowercase, joined by dashes
+// (shot-2-hasta-la-vista-button; both null before the first).
 export function createShotLog(random = Math.random) {
 	let count = 0
 	let turn = []
@@ -187,6 +189,14 @@ export function createShotLog(random = Math.random) {
 		},
 		get line() {
 			return line
+		},
+		get name() {
+			if (line === null) return null
+			const words = line
+				.toLowerCase()
+				.replaceAll("'", '')
+				.match(/[a-z0-9]+/g)
+			return ['shot', count, ...words].join('-')
 		},
 	}
 }
