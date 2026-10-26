@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Environment files stay on this machine
+.env
+.env.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

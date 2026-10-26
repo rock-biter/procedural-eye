@@ -51,7 +51,7 @@ pnpm sounds         # cuts the recorded sounds from their CC0 sources into src/a
   - The iris: a still eye from the front, without the lids, lashes and tear meniscus, cut to a circle around the limbus as the camera projects it.
   - The scene: the page with its interface at 1200×630, rendered at twice the size and scaled down. A style sheet hides its texts (the title and the line about the project, the credit line, the frame rate, the HUD's readouts) and Snapshot, and the image is a screenshot of the page, not `capture()`.
 - **Sounds** ([`src/audio/sounds/`](../src/audio/sounds/), imported with `?url`; the files under 4 KB are inlined): mono MP3 cuts of CC0 camera recordings from Freesound, about 100 KB, with their sources in `CREDITS.md`. [`scripts/sounds.mjs`](../scripts/sounds.mjs) (`pnpm sounds [--only <name>]`) cuts them from the manifest [`scripts/sounds.json`](../scripts/sounds.json) ([`docs/AUDIO.md`](AUDIO.md#recordings)).
-- **`VITE_SITE_URL`** ([`.env`](../.env), empty by default): the site's origin, such as `https://example.com`. Social cards need absolute image URLs; Vite writes it in front of `/og-image.jpg` at build time. Set it on the host or in `.env.production.local`.
+- **Card image URL** ([`vite.config.js`](../vite.config.js)): social cards need absolute image URLs, so a Vercel build writes the project's production domain in front of `/og-image.jpg` (`og:image`, `twitter:image`) through `%VITE_SITE_URL%`. It comes from `VERCEL_PROJECT_PRODUCTION_URL`: the shortest production domain, set in previews too, so every card points to production; it needs **Enable access to System Environment Variables**, on by default. A local build leaves the URL relative to the page.
 
 ## Code Conventions
 
