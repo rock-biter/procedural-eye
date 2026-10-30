@@ -897,7 +897,9 @@ export function createHud({
 			else sharingan.setAttribute('aria-hidden', 'true')
 			const item = items.find((entry) => entry.button === sharingan)
 			const glyph = sharingan.firstElementChild
+			// An awakening cut short leaves the glyph as it was then.
 			gsap.killTweensOf(glyph)
+			gsap.set(glyph, { clearProps: 'opacity,scale,rotate,transform' })
 			if (!unlocked || !reveal || motionless.matches) {
 				sharingan.classList.remove('engaged', 'awakening')
 				item.cut.classList.add('instant')
@@ -929,18 +931,17 @@ export function createHud({
 					},
 				)
 			}
-			gsap.fromTo(
-				glyph,
-				{ opacity: 0, scale: 0, rotate: -720 },
-				{
-					opacity: 1,
-					scale: 1,
-					rotate: 0,
-					duration: awaken.spin,
-					ease: 'back.out(1.4)',
-					clearProps: 'opacity,scale,rotate,transform',
-				},
-			)
+			// The spin ends at the glyph's turn on the circle (its CSS rotate,
+			// which GSAP takes into the transform it tweens), not upright: from
+			// there it would snap to it at the end.
+			gsap.from(glyph, {
+				opacity: 0,
+				scale: 0,
+				rotate: '-=720',
+				duration: awaken.spin,
+				ease: 'back.out(1.4)',
+				clearProps: 'opacity,scale,rotate,transform',
+			})
 			gsap.delayedCall(awaken.glow, () => sharingan.classList.remove('engaged', 'awakening'))
 		},
 		circle() {
